@@ -725,6 +725,14 @@ describe('Canvas Store', () => {
 - [x] Add confirmation dialog for deletion
 - [x] Update store to remove shape from array
 
+#### 4.8.2 Add Reset Canvas Button
+- [x] Add "Reset Canvas" button to CanvasControls
+- [x] Implement `handleResetCanvas` function
+- [x] Delete all shapes from store
+- [x] Reset view to center and 100% zoom
+- [x] Add confirmation dialog for reset
+- [x] Style with red color to indicate destructive action
+
 **Files Modified:**
 - `src/store/canvasStore.ts`
 - `src/components/canvas/CanvasControls.tsx`
@@ -1212,115 +1220,106 @@ describe('Rectangle Synchronization', () => {
 
 ### Subtasks:
 
-#### 6.1 Update Realtime Database Rules
-- [ ] Open `database.rules.json`
-- [ ] Add rules for `/cursors` path
-- [ ] Allow read if authenticated
-- [ ] Allow write if authenticated
-- [ ] Deploy rules: `firebase deploy --only database`
-
-**Files Modified:**
-- `database.rules.json`
-
-#### 6.2 Update Type Definitions
-- [ ] Open `src/types/index.ts`
-- [ ] Add `Cursor` type (userId, userName, x, y, color, lastUpdated)
-- [ ] Export Cursor type
+#### 6.1 Update Type Definitions
+- [x] Open `src/types/index.ts`
+- [x] Add `Cursor` type (userId, userName, x, y, color, lastUpdated)
+- [x] Export Cursor type
 
 **Files Modified:**
 - `src/types/index.ts`
 
-#### 6.3 Create Cursors Hook
-- [ ] Create `src/hooks/useCursors.ts`
-- [ ] Import realtimeDb from firebase config
-- [ ] Create `useCursors` hook
-- [ ] Accept current user data as param
-- [ ] Implement cursor position tracking with throttle (100ms)
-- [ ] Implement `updateCursor` function (writes to Realtime DB)
-- [ ] Implement real-time listener for all cursors
-- [ ] Filter out own cursor
-- [ ] Clean up on unmount
-- [ ] Remove own cursor on unmount
+#### 6.2 Create Cursors Hook
+- [x] Create `src/hooks/useCursors.ts`
+- [x] Import realtimeDb from firebase config
+- [x] Create `useCursors` hook
+- [x] Accept current user data as param
+- [x] Implement cursor position tracking with throttle (50ms)
+- [x] Implement `updateCursor` function (writes to Realtime DB)
+- [x] Implement real-time listener for all cursors
+- [x] Filter out own cursor
+- [x] Clean up on unmount
+- [x] Remove own cursor on unmount
 
 **Files Created:**
 - `src/hooks/useCursors.ts`
 
-#### 6.4 Create Cursor Component
-- [ ] Create `src/components/multiplayer/Cursor.tsx`
-- [ ] Accept cursor data as props (x, y, userName, color)
-- [ ] Render cursor icon (SVG or emoji)
-- [ ] Render username label below cursor
-- [ ] Position using absolute positioning
-- [ ] Style with user color
-- [ ] Use CSS transform for smooth movement
+#### 6.3 Create Cursor Component
+- [x] Create `src/components/multiplayer/Cursor.tsx`
+- [x] Accept cursor data as props (x, y, userName, color)
+- [x] Render cursor icon (SVG or emoji)
+- [x] Render username label below cursor
+- [x] Position using absolute positioning
+- [x] Style with user color
+- [x] Use CSS transform for smooth movement
 
 **Files Created:**
 - `src/components/multiplayer/Cursor.tsx`
 
-#### 6.5 Create Cursor Layer Component
-- [ ] Create `src/components/multiplayer/CursorLayer.tsx`
-- [ ] Accept array of cursors as props
-- [ ] Map over cursors and render Cursor component for each
-- [ ] Position layer over canvas
-- [ ] Ensure cursors don't block canvas interactions (pointer-events: none on layer, auto on cursors)
+#### 6.4 Create Cursor Layer Component
+- [x] Create `src/components/multiplayer/CursorLayer.tsx`
+- [x] Accept array of cursors as props
+- [x] Map over cursors and render Cursor component for each
+- [x] Position layer over canvas
+- [x] Ensure cursors don't block canvas interactions (pointer-events: none on layer, auto on cursors)
 
 **Files Created:**
 - `src/components/multiplayer/CursorLayer.tsx`
 
-#### 6.6 Integrate Cursors in Canvas Page
-- [ ] Open `src/pages/CanvasPage.tsx`
-- [ ] Import and call `useCursors()` hook
-- [ ] Get current user from auth
-- [ ] Pass user data to useCursors
-- [ ] Get cursors array from hook
-- [ ] Render CursorLayer component
-- [ ] Pass cursors to CursorLayer
+#### 6.5 Integrate Cursors in Canvas Page
+- [x] Open `src/pages/CanvasPage.tsx`
+- [x] Import and call `useCursors()` hook
+- [x] Get current user from auth
+- [x] Pass user data to useCursors
+- [x] Get cursors array from hook
+- [x] Render CursorLayer component
+- [x] Pass cursors to CursorLayer
 
 **Files Modified:**
 - `src/pages/CanvasPage.tsx`
 
-#### 6.7 Track Mouse Position on Canvas
-- [ ] Open `src/components/canvas/Canvas.tsx`
-- [ ] Add mousemove event listener to Stage
-- [ ] Get pointer position in canvas coordinates (use Konva's getPointerPosition)
-- [ ] Pass position to parent component
-- [ ] Parent should call updateCursor from useCursors hook
+#### 6.6 Track Click and Drag Positions on Canvas
+- [x] Open `src/components/canvas/Canvas.tsx`
+- [x] Add click event listener to Stage for cursor position updates
+- [x] Add dragEnd event listener to Stage for cursor position updates
+- [x] Get pointer position in canvas coordinates (use Konva's getPointerPosition)
+- [x] Pass position to parent component
+- [x] Parent should call updateCursor from useCursors hook
 
 **Files Modified:**
 - `src/components/canvas/Canvas.tsx`
 - `src/pages/CanvasPage.tsx`
 
-#### 6.8 Throttle Cursor Updates
-- [ ] In `useCursors.ts`, implement throttle function
-- [ ] Throttle cursor updates to 100ms
-- [ ] Ensure smooth cursor rendering despite throttling
-- [ ] Use requestAnimationFrame or CSS transitions for smoothness
+#### 6.7 Throttle Cursor Updates
+- [x] In `useCursors.ts`, implement throttle function
+- [x] Throttle cursor updates to 50ms
+- [x] Ensure smooth cursor rendering despite throttling
+- [x] Use requestAnimationFrame or CSS transitions for smoothness
 
 **Files Modified:**
 - `src/hooks/useCursors.ts`
 
-#### 6.9 Assign User Colors
-- [ ] In `src/lib/utils.ts`, verify `getUserColor` function exists
-- [ ] Function should return consistent color for each userId
-- [ ] Use simple hash of userId to pick from color palette
-- [ ] Test that same user always gets same color
+#### 6.8 Assign User Colors
+- [x] In `src/lib/utils.ts`, verify `getUserColor` function exists
+- [x] Function should return consistent color for each userId
+- [x] Use simple hash of userId to pick from color palette
+- [x] Test that same user always gets same color
 
 **Files Modified:**
 - `src/lib/utils.ts` (if needed)
 
-#### 6.10 Test Cursor Sync
+#### 6.9 Test Cursor Sync
 - [ ] Open app in two browser windows
 - [ ] Log in as different users
-- [ ] Move mouse in Window 1
-- [ ] Verify cursor appears in Window 2
-- [ ] Verify cursor moves smoothly (<100ms latency)
+- [ ] Click or drag in Window 1
+- [ ] Verify cursor appears at click/drag position in Window 2
+- [ ] Verify cursor updates smoothly (<50ms latency)
 - [ ] Verify username label is visible
 - [ ] Verify colors are different for each user
 - [ ] Test with 3+ users
 
 **External:** Browser testing, Realtime Database Console
 
-#### 6.11 Test Cursor Cleanup
+#### 6.10 Test Cursor Cleanup
 - [ ] Open multiple windows
 - [ ] Close one window
 - [ ] Verify cursor disappears from other windows
@@ -1335,7 +1334,6 @@ describe('Rectangle Synchronization', () => {
 - `src/components/multiplayer/CursorLayer.tsx`
 
 **Modified:**
-- `database.rules.json`
 - `src/types/index.ts`
 - `src/pages/CanvasPage.tsx`
 - `src/components/canvas/Canvas.tsx`

@@ -9,8 +9,8 @@ interface CanvasControlsProps {
   viewportWidth: number
   viewportHeight: number
   createShape: (shape: Omit<Rectangle, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
-  updateShape: (id: string, updates: Partial<Rectangle>) => Promise<void>
   deleteShape: (id: string) => Promise<void>
+  clearAllShapes: () => Promise<void>
   shapesError: string | null
   onRetry: () => void
 }
@@ -20,6 +20,7 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
   viewportHeight,
   createShape,
   deleteShape,
+  clearAllShapes,
   shapesError,
   onRetry
 }) => {
@@ -166,6 +167,20 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
     }
   }
 
+  const handleResetCanvas = async () => {
+    if (window.confirm('Are you sure you want to reset the canvas? This will delete all shapes and reset the view.')) {
+      try {
+        // Clear all shapes from both local state and Firestore
+        await clearAllShapes()
+        
+        // Reset view to center and 100% zoom
+        resetView()
+      } catch (error) {
+        console.error('Error resetting canvas:', error)
+      }
+    }
+  }
+
 
   return (
     <div className="bg-gray-100 border-b border-gray-300">
@@ -287,6 +302,15 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
           title="Reset View (Escape)"
         >
           Reset View
+        </button>
+
+        {/* Reset Canvas Button */}
+        <button
+          onClick={handleResetCanvas}
+          className="px-4 py-1 bg-red-500 text-white rounded hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+          title="Reset Canvas - Delete all shapes and reset view"
+        >
+          Reset Canvas
         </button>
 
 

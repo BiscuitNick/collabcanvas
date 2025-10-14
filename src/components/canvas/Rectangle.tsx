@@ -11,6 +11,7 @@ interface RectangleProps {
   onDragEnd: (x: number, y: number) => void
   onDragStart: () => void
   onDragEndCallback: () => void
+  onMouseMove?: (x: number, y: number) => void
 }
 
 const RectangleComponent: React.FC<RectangleProps> = ({
@@ -20,7 +21,8 @@ const RectangleComponent: React.FC<RectangleProps> = ({
   onUpdate,
   onDragEnd,
   onDragStart,
-  onDragEndCallback
+  onDragEndCallback,
+  onMouseMove
 }) => {
   const rectRef = useRef<any>(null)
   const transformerRef = useRef<any>(null)
@@ -66,6 +68,15 @@ const RectangleComponent: React.FC<RectangleProps> = ({
     // Update position in store (React will handle the re-render)
     onDragEnd(clampedX, clampedY)
     
+    // Update cursor position with mouse position
+    if (onMouseMove) {
+      const stage = e.target.getStage()
+      const pointer = stage.getPointerPosition()
+      if (pointer) {
+        onMouseMove(pointer.x, pointer.y)
+      }
+    }
+    
     // Notify parent that dragging has ended
     onDragEndCallback()
   }
@@ -74,7 +85,7 @@ const RectangleComponent: React.FC<RectangleProps> = ({
     // Transform started - no locking needed
   }
 
-  const handleTransformEnd = () => {
+  const handleTransformEnd = (e: any) => {
     if (!rectRef.current) return
 
     const node = rectRef.current
@@ -100,6 +111,15 @@ const RectangleComponent: React.FC<RectangleProps> = ({
       width: newWidth,
       height: newHeight
     })
+
+    // Update cursor position with mouse position
+    if (onMouseMove) {
+      const stage = e.target.getStage()
+      const pointer = stage.getPointerPosition()
+      if (pointer) {
+        onMouseMove(pointer.x, pointer.y)
+      }
+    }
 
     // Reset scale and position
     node.scaleX(1)

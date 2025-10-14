@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useShapes } from '../hooks/useShapes'
+import { useCursors } from '../hooks/useCursors'
 import Layout from '../components/layout/Layout'
 import Canvas from '../components/canvas/Canvas'
 import CanvasControls from '../components/canvas/CanvasControls'
+import CursorLayer from '../components/multiplayer/CursorLayer'
 import ErrorBoundary from '../components/ErrorBoundary'
 
 export const CanvasPage: React.FC = () => {
@@ -16,10 +18,17 @@ export const CanvasPage: React.FC = () => {
     createShape,
     updateShape,
     deleteShape,
+    clearAllShapes,
     loading: shapesLoading,
     error: shapesError,
     retry: retryShapes
   } = useShapes()
+
+  const {
+    cursors,
+    updateCursor,
+    error: cursorsError
+  } = useCursors(user?.uid || '', user?.displayName || 'Anonymous')
 
 
   // Calculate canvas size based on viewport
@@ -67,18 +76,20 @@ export const CanvasPage: React.FC = () => {
           viewportWidth={canvasSize.width}
           viewportHeight={canvasSize.height}
           createShape={createShape}
-          updateShape={updateShape}
           deleteShape={deleteShape}
-          shapesError={shapesError}
+          clearAllShapes={clearAllShapes}
+          shapesError={shapesError || cursorsError}
           onRetry={retryShapes}
         />
-        <div className="flex-1 p-5">
+        <div className="flex-1 p-5 relative">
           <Canvas
             width={canvasSize.width}
             height={canvasSize.height}
             shapes={shapes}
             updateShape={updateShape}
+            onMouseMove={updateCursor}
           />
+          <CursorLayer cursors={cursors} />
         </div>
       </Layout>
     </ErrorBoundary>

@@ -19,6 +19,7 @@ interface UseShapesReturn {
   createShape: (shape: Omit<Rectangle, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
   updateShape: (id: string, updates: Partial<Rectangle>) => Promise<void>
   deleteShape: (id: string) => Promise<void>
+  clearAllShapes: () => Promise<void>
   loading: boolean
   error: string | null
   retry: () => void
@@ -48,7 +49,7 @@ export const useShapes = (): UseShapesReturn => {
   const [shapes, setShapes] = useState<Rectangle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { addShape, updateShape: updateStoreShape, deleteShape: deleteStoreShape, setSyncStatus } = useCanvasStore()
+  const { addShape, updateShape: updateStoreShape, deleteShape: deleteStoreShape, setSyncStatus, clearAllShapes: clearAllShapesStore } = useCanvasStore()
   const pendingUpdates = useRef<Map<string, Partial<Rectangle>>>(new Map())
   const retryCount = useRef(0)
   const maxRetries = 3
@@ -102,8 +103,6 @@ export const useShapes = (): UseShapesReturn => {
             createdBy: data.createdBy,
             createdAt: data.createdAt,
             updatedAt: data.updatedAt,
-            lockedBy: data.lockedBy,
-            lockedAt: data.lockedAt,
             syncStatus: 'synced'
           })
         })
@@ -197,6 +196,34 @@ export const useShapes = (): UseShapesReturn => {
     }
   }, [deleteStoreShape])
 
+  // Clear all shapes
+  const clearAllShapes = useCallback(async (): Promise<void> => {
+    try {
+      setLoading(true)
+      
+      // Get all current shapes
+      const currentShapes = shapes
+      
+      // Clear local state immediately (optimistic update)
+      setShapes([])
+      clearAllShapesStore()
+      
+      // Delete all shapes from Firestore in parallel
+      const deletePromises = currentShapes.map(shape => {
+        const shapeRef = doc(firestore, 'shapes', shape.id)
+        return deleteDoc(shapeRef)
+      })
+      
+      await Promise.all(deletePromises)
+      
+    } catch (err) {
+      console.error('Error clearing all shapes:', err)
+      setError('Failed to clear all shapes')
+    } finally {
+      setLoading(false)
+    }
+  }, [shapes, clearAllShapesStore])
+
   // Retry failed operations
   const retry = useCallback(async () => {
     try {
@@ -226,6 +253,7 @@ export const useShapes = (): UseShapesReturn => {
     createShape,
     updateShape,
     deleteShape,
+    clearAllShapes,
     loading,
     error,
     retry

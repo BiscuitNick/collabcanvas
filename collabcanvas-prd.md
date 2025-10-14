@@ -84,6 +84,8 @@
 - Click to select rectangle
 - Drag to move selected rectangle
 - Each rectangle has a solid fill color
+- Delete selected rectangle
+- Reset canvas to clear all shapes and reset view
 
 **Acceptance Criteria:**
 - User can create rectangles with single button click
@@ -91,6 +93,8 @@
 - User can select rectangles by clicking them
 - User can move selected rectangles by dragging
 - Each rectangle has a random or predetermined color
+- User can delete selected rectangle with confirmation
+- User can reset entire canvas with confirmation (clears all shapes, resets view)
 
 **Technical Details:**
 - Rectangles spawn at current viewport center
@@ -108,6 +112,7 @@
 - Broadcast rectangle creation to all users
 - Broadcast rectangle movements to all users
 - Sync latency <100ms for all updates
+- Cursor updates throttled to 50ms for smooth movement
 - Handle 2+ concurrent users
 - "Last write wins" conflict resolution
 
@@ -144,15 +149,15 @@ interface Rectangle {
 **Implementation:** Firebase Realtime Database
 
 **Must Have:**
-- Show cursor position for each connected user
+- Show cursor position for each connected user at their last click or drag end position
 - Display username label near cursor
 - Smooth cursor movement (no jittering)
 - Different color per user
 - Hide your own cursor (only show others)
 
 **Acceptance Criteria:**
-- Each user sees all other users' cursors
-- Cursors move smoothly with <100ms latency
+- Each user sees all other users' cursors at their last interaction point
+- Cursors update when users click or finish dragging shapes
 - Names are clearly visible next to cursors
 - Each cursor has a distinct color
 - Cursors update at minimum 10fps (throttled to 100ms)
@@ -160,6 +165,7 @@ interface Rectangle {
 **Technical Details:**
 - Use Firebase Realtime Database (not Firestore) for lower latency
 - Database path: `/cursors/{userId}`
+- Update cursor position on click events and drag end events
 - Throttle cursor position updates to every 100ms
 - Use CSS transform for smooth cursor rendering
 - Assign user colors deterministically (hash userId to color)
@@ -505,11 +511,10 @@ await batch.commit();
 ---
 
 ### Phase 5: Multiplayer Cursors (Hours 15-19)
-**Goal:** See other users' cursors in real-time
+**Goal:** See other users' cursors at their last interaction point
 
 - [ ] Design Realtime Database structure for cursors
-- [ ] Implement Realtime DB security rules
-- [ ] Track mouse movement on canvas
+- [ ] Track click and drag end events on canvas
 - [ ] Throttle cursor updates (100ms)
 - [ ] Write cursor position to Realtime DB
 - [ ] Listen to other users' cursor positions
@@ -586,8 +591,8 @@ Before submission, verify ALL items:
 - [ ] System handles 2+ concurrent users
 
 ### Multiplayer Cursors ✓
-- [ ] Each user sees other users' cursors
-- [ ] Cursors move smoothly (<100ms latency)
+- [ ] Each user sees other users' cursors at their last interaction point
+- [ ] Cursors update when users click or finish dragging shapes
 - [ ] Username labels are visible on cursors
 - [ ] Each user has a different cursor color
 

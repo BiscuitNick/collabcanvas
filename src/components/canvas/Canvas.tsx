@@ -77,6 +77,17 @@ const Canvas: React.FC<CanvasProps> = ({
       setPanning(false)
       const clampedPos = clampPosition(e.target.x(), e.target.y())
       updatePosition(clampedPos.x, clampedPos.y)
+      
+      // Update cursor position on drag end
+      if (onMouseMove) {
+        const stage = e.target.getStage()
+        const pointer = stage.getPointerPosition()
+        if (pointer) {
+          console.log('🖱️ Stage drag end - updating cursor:', { x: pointer.x, y: pointer.y })
+          // Use the pointer position directly - it's already in screen coordinates
+          onMouseMove(pointer.x, pointer.y)
+        }
+      }
     } catch (error) {
       console.error('Error in handleDragEnd:', error)
     }
@@ -125,19 +136,21 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   }
 
-  // Handle mouse move for cursor tracking
-  const handleMouseMove = (e: any) => {
-    if (onMouseMove) {
-      const stage = e.target.getStage()
-      const pointer = stage.getPointerPosition()
-      onMouseMove(pointer.x, pointer.y)
-    }
-  }
 
-  // Handle stage click to deselect
+  // Handle stage click to deselect and update cursor
   const handleStageClick = (e: any) => {
     if (e.target === e.target.getStage()) {
       selectShape(null)
+    }
+    // Also update cursor position on stage click
+    if (onMouseMove) {
+      const stage = e.target.getStage()
+      const pointer = stage.getPointerPosition()
+      if (pointer) {
+        console.log('🖱️ Stage click - updating cursor:', { x: pointer.x, y: pointer.y })
+        // Use the pointer position directly - it's already in screen coordinates
+        onMouseMove(pointer.x, pointer.y)
+      }
     }
   }
 
@@ -295,7 +308,6 @@ const Canvas: React.FC<CanvasProps> = ({
           onDragStart={!isDraggingShape ? handleDragStart : undefined}
           onDragEnd={!isDraggingShape ? handleDragEnd : undefined}
           onWheel={handleWheel}
-          onMouseMove={handleMouseMove}
           onClick={handleStageClick}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -313,6 +325,7 @@ const Canvas: React.FC<CanvasProps> = ({
                 onDragEnd={(x, y) => handleRectangleDragEnd(shape.id, x, y)}
                 onDragStart={() => setDraggingShape(true)}
                 onDragEndCallback={() => setDraggingShape(false)}
+                onMouseMove={onMouseMove}
               />
             ))}
           </Layer>

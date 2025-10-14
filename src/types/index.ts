@@ -40,6 +40,16 @@ export const SyncStatus = {
 
 export type SyncStatus = typeof SyncStatus[keyof typeof SyncStatus]
 
+// Cursor type for multiplayer cursors
+export interface Cursor {
+  userId: string
+  userName: string
+  x: number
+  y: number
+  color: string
+  lastUpdated: number
+}
+
 // Manipulation state enum
 export const ManipulationState = {
   IDLE: 'idle',           // Not being manipulated

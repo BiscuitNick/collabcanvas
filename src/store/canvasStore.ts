@@ -38,6 +38,7 @@ interface CanvasState {
   addPendingUpdate: (id: string, updates: Partial<Rectangle>) => void
   clearPendingUpdates: () => void
   setShapes: (shapes: Rectangle[]) => void
+  clearAllShapes: () => void
 }
 
 export const useCanvasStore = create<CanvasState>((set) => ({
@@ -134,5 +135,14 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   
   setShapes: (shapes: Rectangle[]) => {
     set({ shapes })
+  },
+  
+  clearAllShapes: () => {
+    set({ 
+      shapes: [],
+      selectedShapeId: null,
+      shapeSyncStatus: {},
+      pendingUpdates: new Map()
+    })
   }
 }))

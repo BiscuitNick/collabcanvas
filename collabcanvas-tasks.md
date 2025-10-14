@@ -212,15 +212,16 @@ collabcanvas/
 - `README.md`
 
 #### 1.13 Configure Vitest
-- [ ] Create `vitest.config.ts`
-- [ ] Configure jsdom environment
-- [ ] Set up test globals
-- [ ] Add test scripts to package.json (`test`, `test:ui`)
-- [ ] Create basic test example to verify setup
+- [x] Create `vitest.config.ts`
+- [x] Configure jsdom environment
+- [x] Set up test globals
+- [x] Add test scripts to package.json (`test`, `test:ui`)
+- [x] Create basic test example to verify setup
 
 **Files Created:**
 - `vitest.config.ts`
-- `src/__tests__/setup.test.ts` (simple test to verify Vitest works)
+- `src/__tests__/setup.ts` (test setup with Firebase mocks)
+- `src/__tests__/example.test.ts` (example tests to verify Vitest works)
 
 **Files Modified:**
 - `package.json`

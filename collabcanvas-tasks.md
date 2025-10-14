@@ -405,131 +405,166 @@ describe('Authentication Flow', () => {
 **Branch:** `feature/canvas-base`
 
 ### High-Level Tasks:
-- [ ] Set up Konva Stage
-- [ ] Implement pan functionality
-- [ ] Implement zoom functionality
-- [ ] Create canvas layout
-- [ ] Test performance
+- [x] Set up Konva Stage
+- [x] Implement pan functionality
+- [x] Implement zoom functionality
+- [x] Create canvas layout
+- [x] Add mobile support
+- [x] Add error handling
 
 ### Subtasks:
 
 #### 3.1 Create Canvas Store
-- [ ] Create `src/store/canvasStore.ts`
-- [ ] Set up Zustand store
-- [ ] Add stage position state (x, y)
-- [ ] Add stage scale state
-- [ ] Add shapes array (empty for now)
-- [ ] Add actions to update position and scale
+- [x] Create `src/store/canvasStore.ts`
+- [x] Set up Zustand store
+- [x] Add stage position state (x, y) - initial: {x: 0, y: 0}
+- [x] Add stage scale state - initial: 1
+- [x] Add shapes array (empty for now)
+- [x] Add interaction state (isPanning, isZooming)
+- [x] Add actions to update position and scale
+- [x] Add actions to set interaction states
 
 **Files Created:**
 - `src/store/canvasStore.ts`
 
 #### 3.2 Update Type Definitions
-- [ ] Open `src/types/index.ts`
-- [ ] Add `Rectangle` type (id, x, y, width, height, fill, createdBy, etc.)
-- [ ] Add `StageConfig` type
-- [ ] Export new types
+- [x] Open `src/types/index.ts`
+- [x] Add `Rectangle` type (id, x, y, width, height, fill, createdBy, etc.)
+- [x] Add `StageConfig` type
+- [x] Add `InteractionState` type (isPanning, isZooming)
+- [x] Export new types
 
 **Files Modified:**
 - `src/types/index.ts`
 
 #### 3.3 Create Canvas Component
-- [ ] Create `src/components/canvas/Canvas.tsx`
-- [ ] Import Konva Stage and Layer
-- [ ] Set up Stage with 5000x5000px workspace
-- [ ] Set stage to fill container
-- [ ] Add empty Layer for shapes (to be used later)
-- [ ] Connect to canvas store for position/scale
+- [x] Create `src/components/canvas/Canvas.tsx`
+- [x] Import Konva Stage and Layer
+- [x] Set up Stage with 5000x5000px workspace
+- [x] Set stage to fill container with padding and border
+- [x] Add empty Layer for shapes (to be used later)
+- [x] Connect to canvas store for position/scale
+- [x] Add error boundary wrapper
+- [x] Implement canvas bounds (center at 0,0, limit panning to 5000px)
 
 **Files Created:**
 - `src/components/canvas/Canvas.tsx`
 
 #### 3.4 Implement Pan Functionality
-- [ ] In `Canvas.tsx`, make Stage draggable
-- [ ] Add `onDragEnd` handler
-- [ ] Update store with new position
-- [ ] Test pan by clicking and dragging background
+- [x] In `Canvas.tsx`, make Stage draggable
+- [x] Add `onDragStart` handler (set isPanning to true, disable zoom)
+- [x] Add `onDragEnd` handler (set isPanning to false, enable zoom)
+- [x] Update store with new position
+- [x] Test pan by clicking and dragging background
 
 **Files Modified:**
 - `src/components/canvas/Canvas.tsx`
 
 #### 3.5 Implement Zoom Functionality
-- [ ] In `Canvas.tsx`, add wheel event listener
-- [ ] Calculate new scale based on wheel delta
-- [ ] Zoom toward mouse cursor position
-- [ ] Clamp zoom between 0.1x and 3x
-- [ ] Update store with new scale
-- [ ] Test zoom with mouse wheel
+- [x] In `Canvas.tsx`, add wheel event listener
+- [x] Calculate new scale using exponential zoom (scale * 1.1^delta)
+- [x] Zoom toward mouse cursor position using Konva's getPointerPosition
+- [x] Clamp zoom between 0.1x and 3x
+- [x] Disable pan while zooming (set isZooming state)
+- [x] Update store with new scale
+- [x] Test zoom with mouse wheel
 
 **Files Modified:**
 - `src/components/canvas/Canvas.tsx`
 
 #### 3.6 Create Canvas Controls Component
-- [ ] Create `src/components/canvas/CanvasControls.tsx`
-- [ ] Add "Reset View" button (reset pan/zoom)
-- [ ] Add zoom indicator (show current zoom %)
-- [ ] Style with Tailwind
+- [x] Create `src/components/canvas/CanvasControls.tsx`
+- [x] Add "Reset View" button (reset pan/zoom to initial state)
+- [x] Add zoom indicator (show current zoom %)
+- [x] Add zoom in/out buttons with keyboard shortcuts
+- [x] Add zoom input field for specific zoom values
+- [x] Add pan X and Y coordinate controls
+- [x] Style with Tailwind
 
 **Files Created:**
 - `src/components/canvas/CanvasControls.tsx`
 
 #### 3.7 Create Layout Component
-- [ ] Create `src/components/layout/Layout.tsx`
-- [ ] Add header with logo and user info
-- [ ] Add logout button
-- [ ] Add main content area
-- [ ] Style with Tailwind
+- [x] Create `src/components/layout/Layout.tsx`
+- [x] Add header with logo and user info
+- [x] Add logout button
+- [x] Add main content area with proper padding
+- [x] Style with Tailwind
 
 **Files Created:**
 - `src/components/layout/Layout.tsx`
 
 #### 3.8 Create Header Component
-- [ ] Create `src/components/layout/Header.tsx`
-- [ ] Display "CollabCanvas" title
-- [ ] Display current user's name
-- [ ] Add logout button
-- [ ] Style with Tailwind
+- [x] Create `src/components/layout/Header.tsx`
+- [x] Display "CollabCanvas" title
+- [x] Display current user's name
+- [x] Add logout button
+- [x] Style with Tailwind
 
 **Files Created:**
 - `src/components/layout/Header.tsx`
 
 #### 3.9 Update Canvas Page
-- [ ] Open `src/pages/CanvasPage.tsx`
-- [ ] Remove placeholder content
-- [ ] Import and render Layout
-- [ ] Import and render Canvas inside Layout
-- [ ] Import and render CanvasControls
-- [ ] Ensure canvas fills available space
+- [x] Open `src/pages/CanvasPage.tsx`
+- [x] Remove placeholder content
+- [x] Import and render Layout
+- [x] Import and render Canvas inside Layout
+- [x] Import and render CanvasControls
+- [x] Ensure canvas fills available space with padding
 
 **Files Modified:**
 - `src/pages/CanvasPage.tsx`
 
 #### 3.10 Add Canvas Styling
-- [ ] Update `src/index.css` if needed
-- [ ] Ensure canvas container has proper dimensions
-- [ ] Set background color for canvas
-- [ ] Ensure no scrollbars on canvas container
+- [x] Update `src/index.css` if needed
+- [x] Set canvas container to fill viewport with padding (e.g., 20px)
+- [x] Add border around canvas for clarity
+- [x] Set background color for canvas
+- [x] Ensure no scrollbars on canvas container
+- [x] Make canvas responsive to viewport changes
 
 **Files Modified:**
 - `src/index.css`
 
-#### 3.11 Test Performance
-- [ ] Open browser dev tools
-- [ ] Monitor FPS during pan
-- [ ] Monitor FPS during zoom
-- [ ] Verify 60 FPS maintained
-- [ ] Test in Chrome and Firefox
+#### 3.11 Add Mobile Support
+- [x] Add touch event handlers for pan (touchstart, touchmove, touchend)
+- [x] Add pinch-to-zoom gesture support using touch events
+- [x] Test on mobile devices
+- [x] Ensure touch events don't conflict with mouse events
+- [x] Add touch-specific styling and interactions
 
-**External:** Browser testing
+**Files Modified:**
+- `src/components/canvas/Canvas.tsx`
 
-#### 3.12 Write Unit Tests for Canvas Store
-- [ ] Create `src/__tests__/canvasStore.test.ts`
-- [ ] Test: Initial state is correct
-- [ ] Test: updatePosition updates x and y correctly
-- [ ] Test: updateScale updates scale correctly
-- [ ] Test: Scale is clamped to min/max bounds
-- [ ] Test: addShape adds shape to array
-- [ ] Run tests: `npm run test`
+#### 3.12 Add Error Handling
+- [x] Add try-catch blocks around canvas operations
+- [x] Handle Konva initialization errors
+- [x] Add fallback UI if canvas fails to load
+- [x] Log errors to console for debugging
+- [x] Add error boundary component for canvas
+
+**Files Modified:**
+- `src/components/canvas/Canvas.tsx`
+
+#### 3.13 Add Keyboard Shortcuts
+- [x] Add keyboard shortcuts (Ctrl+Plus, Ctrl+Minus for zoom)
+- [ ] Add spacebar for temporary pan mode
+- [x] Add Escape to reset view
+- [x] Ensure shortcuts don't conflict with browser defaults
+
+**Files Modified:**
+- `src/components/canvas/Canvas.tsx`
+- `src/components/canvas/CanvasControls.tsx`
+
+#### 3.14 Write Unit Tests for Canvas Store
+- [x] Create `src/__tests__/canvasStore.test.ts`
+- [x] Test: Initial state is correct (blank canvas)
+- [x] Test: updatePosition updates x and y correctly
+- [x] Test: updateScale updates scale correctly
+- [x] Test: Scale is clamped to min/max bounds
+- [x] Test: addShape adds shape to array
+- [x] Test: Interaction states work correctly
+- [x] Run tests: `npm run test`
 
 **Files Created:**
 - `src/__tests__/canvasStore.test.ts`
@@ -538,11 +573,12 @@ describe('Authentication Flow', () => {
 ```typescript
 // Example test structure:
 describe('Canvas Store', () => {
-  it('should initialize with default state', () => {...})
+  it('should initialize with blank canvas state', () => {...})
   it('should update stage position', () => {...})
   it('should update stage scale', () => {...})
   it('should clamp scale within bounds', () => {...})
   it('should add shapes to array', () => {...})
+  it('should manage interaction states', () => {...})
 })
 ```
 

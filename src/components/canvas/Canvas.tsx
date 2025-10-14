@@ -1,0 +1,280 @@
+import React, { useRef, useEffect, useState } from 'react'
+import { Stage, Layer } from 'react-konva'
+import { useCanvasStore } from '../../store/canvasStore'
+import CanvasErrorBoundary from './CanvasErrorBoundary'
+
+interface CanvasProps {
+  width: number
+  height: number
+  onMouseMove?: (x: number, y: number) => void
+}
+
+const Canvas: React.FC<CanvasProps> = ({ width, height, onMouseMove }) => {
+  const stageRef = useRef<any>(null)
+  const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null)
+  const [lastTouchCenter, setLastTouchCenter] = useState<{ x: number; y: number } | null>(null)
+  
+  const {
+    stagePosition,
+    stageScale,
+    isPanning,
+    isZooming,
+    updatePosition,
+    updateScale,
+    setPanning,
+    setZooming,
+    selectShape
+  } = useCanvasStore()
+
+  // Canvas bounds - 5000x5000 with center at (0,0)
+  const CANVAS_SIZE = 5000
+  const CANVAS_HALF = CANVAS_SIZE / 2
+
+  // Clamp position within canvas bounds
+  const clampPosition = (x: number, y: number) => {
+    const minX = -CANVAS_HALF
+    const maxX = CANVAS_HALF
+    const minY = -CANVAS_HALF
+    const maxY = CANVAS_HALF
+    
+    return {
+      x: Math.max(minX, Math.min(maxX, x)),
+      y: Math.max(minY, Math.min(maxY, y))
+    }
+  }
+
+  // Handle pan functionality
+  const handleDragStart = () => {
+    try {
+      setPanning(true)
+      setZooming(false)
+    } catch (error) {
+      console.error('Error in handleDragStart:', error)
+    }
+  }
+
+  const handleDragEnd = (e: any) => {
+    try {
+      setPanning(false)
+      const clampedPos = clampPosition(e.target.x(), e.target.y())
+      updatePosition(clampedPos.x, clampedPos.y)
+    } catch (error) {
+      console.error('Error in handleDragEnd:', error)
+    }
+  }
+
+  // Handle zoom functionality
+  const handleWheel = (e: any) => {
+    try {
+      e.evt.preventDefault()
+      
+      if (isPanning) return // Disable zoom while panning
+      
+      setZooming(true)
+      
+      const scaleBy = 1.1
+      const stage = e.target.getStage()
+      const oldScale = stage.scaleX()
+      const pointer = stage.getPointerPosition()
+      
+      if (!pointer) {
+        setZooming(false)
+        return
+      }
+      
+      const mousePointTo = {
+        x: (pointer.x - stage.x()) / oldScale,
+        y: (pointer.y - stage.y()) / oldScale,
+      }
+      
+      const newScale = e.evt.deltaY > 0 ? oldScale * scaleBy : oldScale / scaleBy
+      const clampedScale = Math.max(0.1, Math.min(3, newScale))
+      
+      setZooming(false)
+      updateScale(clampedScale)
+      
+      const newPos = {
+        x: pointer.x - mousePointTo.x * clampedScale,
+        y: pointer.y - mousePointTo.y * clampedScale,
+      }
+      
+      const clampedPos = clampPosition(newPos.x, newPos.y)
+      updatePosition(clampedPos.x, clampedPos.y)
+    } catch (error) {
+      console.error('Error in handleWheel:', error)
+      setZooming(false)
+    }
+  }
+
+  // Handle mouse move for cursor tracking
+  const handleMouseMove = (e: any) => {
+    if (onMouseMove) {
+      const stage = e.target.getStage()
+      const pointer = stage.getPointerPosition()
+      onMouseMove(pointer.x, pointer.y)
+    }
+  }
+
+  // Handle stage click to deselect
+  const handleStageClick = (e: any) => {
+    if (e.target === e.target.getStage()) {
+      selectShape(null)
+    }
+  }
+
+  // Mobile touch handlers
+  const getTouchDistance = (touches: TouchList) => {
+    if (touches.length < 2) return null
+    const touch1 = touches[0]
+    const touch2 = touches[1]
+    return Math.sqrt(
+      Math.pow(touch2.clientX - touch1.clientX, 2) + 
+      Math.pow(touch2.clientY - touch1.clientY, 2)
+    )
+  }
+
+  const getTouchCenter = (touches: TouchList) => {
+    if (touches.length < 2) return null
+    const touch1 = touches[0]
+    const touch2 = touches[1]
+    return {
+      x: (touch1.clientX + touch2.clientX) / 2,
+      y: (touch1.clientY + touch2.clientY) / 2
+    }
+  }
+
+  const handleTouchStart = (e: any) => {
+    e.evt.preventDefault()
+    const touches = e.evt.touches
+    
+    if (touches.length === 1) {
+      // Single touch - start panning
+      setPanning(true)
+      setZooming(false)
+    } else if (touches.length === 2) {
+      // Two touches - start pinch zoom
+      setPanning(false)
+      setZooming(true)
+      const distance = getTouchDistance(touches)
+      const center = getTouchCenter(touches)
+      if (distance) setLastTouchDistance(distance)
+      if (center) setLastTouchCenter(center)
+    }
+  }
+
+  const handleTouchMove = (e: any) => {
+    e.evt.preventDefault()
+    const touches = e.evt.touches
+    
+    if (touches.length === 1 && isPanning) {
+      // Single touch panning
+      const touch = touches[0]
+      const stage = e.target.getStage()
+      const rect = stage.container().getBoundingClientRect()
+      const x = touch.clientX - rect.left
+      const y = touch.clientY - rect.top
+      const clampedPos = clampPosition(x, y)
+      updatePosition(clampedPos.x, clampedPos.y)
+    } else if (touches.length === 2 && isZooming) {
+      // Two touch pinch zoom
+      const distance = getTouchDistance(touches)
+      const center = getTouchCenter(touches)
+      
+      if (distance && lastTouchDistance && center && lastTouchCenter) {
+        const scaleBy = distance / lastTouchDistance
+        const newScale = stageScale * scaleBy
+        const clampedScale = Math.max(0.1, Math.min(3, newScale))
+        
+        updateScale(clampedScale)
+        
+        // Adjust position to zoom towards center
+        const stage = e.target.getStage()
+        const rect = stage.container().getBoundingClientRect()
+        const stageX = center.x - rect.left
+        const stageY = center.y - rect.top
+        
+        const mousePointTo = {
+          x: (stageX - stagePosition.x) / stageScale,
+          y: (stageY - stagePosition.y) / stageScale,
+        }
+        
+        const newPos = {
+          x: stageX - mousePointTo.x * clampedScale,
+          y: stageY - mousePointTo.y * clampedScale,
+        }
+        
+        const clampedPos = clampPosition(newPos.x, newPos.y)
+        updatePosition(clampedPos.x, clampedPos.y)
+      }
+      
+      if (distance) setLastTouchDistance(distance)
+      if (center) setLastTouchCenter(center)
+    }
+  }
+
+  const handleTouchEnd = (e: any) => {
+    e.evt.preventDefault()
+    setPanning(false)
+    setZooming(false)
+    setLastTouchDistance(null)
+    setLastTouchCenter(null)
+  }
+
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+          case '=':
+          case '+':
+            e.preventDefault()
+            updateScale(stageScale * 1.1)
+            break
+          case '-':
+            e.preventDefault()
+            updateScale(stageScale / 1.1)
+            break
+        }
+      } else if (e.key === 'Escape') {
+        selectShape(null)
+        useCanvasStore.getState().resetView()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [stageScale, updateScale, selectShape])
+
+  return (
+    <CanvasErrorBoundary>
+      <div className="canvas-container">
+        <Stage
+          ref={stageRef}
+          width={width}
+          height={height}
+          x={stagePosition.x}
+          y={stagePosition.y}
+          scaleX={stageScale}
+          scaleY={stageScale}
+          draggable={!isZooming}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onWheel={handleWheel}
+          onMouseMove={handleMouseMove}
+          onClick={handleStageClick}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Shapes Layer */}
+          <Layer>
+            {/* Shapes will be rendered here in future PRs */}
+          </Layer>
+        </Stage>
+      </div>
+    </CanvasErrorBoundary>
+  )
+}
+
+export default Canvas

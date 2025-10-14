@@ -35,6 +35,12 @@ export interface StageConfig {
   scale: number
 }
 
+// Interaction state type
+export interface InteractionState {
+  isPanning: boolean
+  isZooming: boolean
+}
+
 // Cursor type for multiplayer (will be used in later PRs)
 export interface Cursor {
   userId: string

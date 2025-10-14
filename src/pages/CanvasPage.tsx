@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useShapes } from '../hooks/useShapes'
-import { useShapeLocks } from '../hooks/useShapeLocks'
 import Layout from '../components/layout/Layout'
 import Canvas from '../components/canvas/Canvas'
 import CanvasControls from '../components/canvas/CanvasControls'
@@ -22,15 +21,6 @@ export const CanvasPage: React.FC = () => {
     retry: retryShapes
   } = useShapes()
 
-  const {
-    startManipulation,
-    endManipulation,
-    isManipulating,
-    isLocked,
-    getLockOwner,
-    releaseAllLocks,
-    error: locksError
-  } = useShapeLocks(user?.uid || '')
 
   // Calculate canvas size based on viewport
   useEffect(() => {
@@ -47,24 +37,6 @@ export const CanvasPage: React.FC = () => {
     return () => window.removeEventListener('resize', updateCanvasSize)
   }, [])
 
-  // Clean up locks on unmount
-  useEffect(() => {
-    return () => {
-      releaseAllLocks()
-    }
-  }, [releaseAllLocks])
-
-  // Handle keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        releaseAllLocks()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [releaseAllLocks])
 
   if (authLoading || shapesLoading) {
     return (
@@ -97,11 +69,7 @@ export const CanvasPage: React.FC = () => {
           createShape={createShape}
           updateShape={updateShape}
           deleteShape={deleteShape}
-          startManipulation={startManipulation}
-          endManipulation={endManipulation}
-          isManipulating={isManipulating}
           shapesError={shapesError}
-          locksError={locksError}
           onRetry={retryShapes}
         />
         <div className="flex-1 p-5">
@@ -110,11 +78,6 @@ export const CanvasPage: React.FC = () => {
             height={canvasSize.height}
             shapes={shapes}
             updateShape={updateShape}
-            startManipulation={startManipulation}
-            endManipulation={endManipulation}
-            isManipulating={isManipulating}
-            isLocked={isLocked}
-            getLockOwner={getLockOwner}
           />
         </div>
       </Layout>

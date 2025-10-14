@@ -11,11 +11,7 @@ interface CanvasControlsProps {
   createShape: (shape: Omit<Rectangle, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
   updateShape: (id: string, updates: Partial<Rectangle>) => Promise<void>
   deleteShape: (id: string) => Promise<void>
-  startManipulation: (shapeId: string, userId: string) => Promise<boolean>
-  endManipulation: (shapeId: string) => Promise<void>
-  isManipulating: (shapeId: string) => boolean
   shapesError: string | null
-  locksError: string | null
   onRetry: () => void
 }
 
@@ -25,7 +21,6 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
   createShape,
   deleteShape,
   shapesError,
-  locksError,
   onRetry
 }) => {
   const { user } = useAuth()
@@ -175,7 +170,7 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
   return (
     <div className="bg-gray-100 border-b border-gray-300">
       {/* Error Display */}
-      {(shapesError || locksError) && (
+      {shapesError && (
         <div className="bg-red-50 border-b border-red-200 px-4 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -183,7 +178,7 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span className="text-sm text-red-700">
-                {shapesError || locksError}
+                {shapesError}
               </span>
             </div>
             <button
@@ -294,17 +289,6 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
           Reset View
         </button>
 
-        {/* End All Manipulations Button */}
-        <button
-          onClick={() => {
-            // This will be handled by the parent component
-            window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-          }}
-          className="px-4 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500"
-          title="End All Manipulations (Escape)"
-        >
-          End All Manipulations
-        </button>
 
         {/* Rectangle Properties - Inline */}
         {selectedShapeId && (

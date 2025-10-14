@@ -996,7 +996,6 @@ enum ManipulationState {
 - [x] Add error handling for failed operations
 - [x] Show sync status indicators for shapes
 - [x] Show manipulation status indicators
-- [x] Add "End All Manipulations" button for emergency unlock
 
 **Files Modified:**
 - `src/components/canvas/CanvasControls.tsx`
@@ -1458,6 +1457,7 @@ describe('Rectangle Synchronization', () => {
 - [ ] Bug fixes
 - [ ] Documentation updates
 - [ ] Final deployment
+- [ ] Implement shape locking system (removed from MVP)
 
 ### Subtasks:
 
@@ -1672,7 +1672,30 @@ describe('Rectangle Synchronization', () => {
 
 **External:** GitHub
 
-#### 8.20 Final Code Review
+#### 8.20 Implement Shape Locking System (Post-MVP)
+- [ ] Recreate `src/hooks/useShapeLocks.ts` with proper locking logic
+- [ ] Add `ShapeLock` type back to `src/types/index.ts`
+- [ ] Update Firestore rules to include locking collection
+- [ ] Implement lock acquisition on shape manipulation start
+- [ ] Implement lock release on shape manipulation end
+- [ ] Add visual indicators for locked shapes
+- [ ] Add lock timeout handling (1s inactivity)
+- [ ] Test locking with multiple users
+- [ ] Handle lock conflicts gracefully
+- [ ] Add lock cleanup on user disconnect
+
+**Files Created:**
+- `src/hooks/useShapeLocks.ts`
+
+**Files Modified:**
+- `src/types/index.ts`
+- `firestore.rules`
+- `src/components/canvas/Rectangle.tsx`
+- `src/components/canvas/Canvas.tsx`
+- `src/pages/CanvasPage.tsx`
+- `src/components/canvas/CanvasControls.tsx`
+
+#### 8.21 Final Code Review
 - [ ] Review all code for quality
 - [ ] Ensure consistent coding style
 - [ ] Verify no sensitive data (API keys) in repo

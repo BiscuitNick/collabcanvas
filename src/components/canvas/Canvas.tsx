@@ -10,7 +10,7 @@ interface CanvasProps {
   height: number
   shapes: Rectangle[]
   updateShape: (id: string, updates: Partial<Rectangle>) => Promise<void>
-  onMouseMove?: (x: number, y: number) => void
+  onMouseMove?: (x: number, y: number, canvasWidth?: number, canvasHeight?: number) => void
 }
 
 const Canvas: React.FC<CanvasProps> = ({ 
@@ -85,7 +85,7 @@ const Canvas: React.FC<CanvasProps> = ({
         if (pointer) {
           console.log('🖱️ Stage drag end - updating cursor:', { x: pointer.x, y: pointer.y })
           // Use the pointer position directly - it's already in screen coordinates
-          onMouseMove(pointer.x, pointer.y)
+          onMouseMove(pointer.x, pointer.y, width, height)
         }
       }
     } catch (error) {
@@ -149,7 +149,7 @@ const Canvas: React.FC<CanvasProps> = ({
       if (pointer) {
         console.log('🖱️ Stage click - updating cursor:', { x: pointer.x, y: pointer.y })
         // Use the pointer position directly - it's already in screen coordinates
-        onMouseMove(pointer.x, pointer.y)
+        onMouseMove(pointer.x, pointer.y, width, height)
       }
     }
   }
@@ -325,7 +325,7 @@ const Canvas: React.FC<CanvasProps> = ({
                 onDragEnd={(x, y) => handleRectangleDragEnd(shape.id, x, y)}
                 onDragStart={() => setDraggingShape(true)}
                 onDragEndCallback={() => setDraggingShape(false)}
-                onMouseMove={onMouseMove}
+                onMouseMove={onMouseMove ? (x, y) => onMouseMove(x, y, width, height) : undefined}
               />
             ))}
           </Layer>

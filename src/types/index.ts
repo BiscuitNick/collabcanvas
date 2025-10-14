@@ -50,6 +50,15 @@ export interface Cursor {
   lastUpdated: number
 }
 
+// Presence user type for online users
+export interface PresenceUser {
+  userId: string
+  userName: string
+  color: string
+  joinedAt: number | any // Firestore Timestamp
+  lastSeen?: number | any // Firestore Timestamp
+}
+
 // Manipulation state enum
 export const ManipulationState = {
   IDLE: 'idle',           // Not being manipulated
@@ -71,22 +80,4 @@ export interface StageConfig {
 export interface InteractionState {
   isPanning: boolean
   isZooming: boolean
-}
-
-// Cursor type for multiplayer (will be used in later PRs)
-export interface Cursor {
-  userId: string
-  userName: string
-  x: number
-  y: number
-  color: string
-  lastUpdated: number
-}
-
-// Presence user type (will be used in later PRs)
-export interface PresenceUser {
-  userId: string
-  userName: string
-  color: string
-  joinedAt: number
 }

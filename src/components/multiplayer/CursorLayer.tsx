@@ -15,6 +15,12 @@ const CursorLayer: React.FC<CursorLayerProps> = ({ cursors }) => {
       style={{
         // Ensure cursors don't block canvas interactions
         pointerEvents: 'none',
+        // Position cursors relative to the canvas container
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%'
       }}
     >
       {cursors.map((cursor) => {

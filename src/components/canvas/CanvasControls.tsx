@@ -13,6 +13,8 @@ interface CanvasControlsProps {
   clearAllShapes: () => Promise<void>
   shapesError: string | null
   onRetry: () => void
+  onSidebarToggle?: () => void
+  sidebarOpen?: boolean
 }
 
 const CanvasControls: React.FC<CanvasControlsProps> = ({ 
@@ -22,7 +24,9 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
   deleteShape,
   clearAllShapes,
   shapesError,
-  onRetry
+  onRetry,
+  onSidebarToggle,
+  sidebarOpen
 }) => {
   const { user } = useAuth()
   const { stageScale, stagePosition, resetView, updateScale, updatePosition, selectedShapeId } = useCanvasStore()
@@ -208,6 +212,32 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
 
       {/* Main Controls */}
       <div className="flex items-center gap-4 p-4 flex-wrap">
+        {/* Sidebar Toggle */}
+        {onSidebarToggle && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onSidebarToggle}
+              className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 flex items-center gap-2"
+              title={sidebarOpen ? 'Hide Users' : 'Show Users'}
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                />
+              </svg>
+              {sidebarOpen ? 'Hide Users' : 'Show Users'}
+            </button>
+          </div>
+        )}
+
         {/* Zoom Controls */}
         <div className="flex items-center gap-2">
           <button

@@ -1211,11 +1211,11 @@ describe('Rectangle Synchronization', () => {
 **Branch:** `feature/multiplayer-cursors`
 
 ### High-Level Tasks:
-- [ ] Create cursors hook for Realtime Database
-- [ ] Track local cursor position
-- [ ] Broadcast cursor to Realtime Database
-- [ ] Listen to other users' cursors
-- [ ] Render cursor components
+- [x] Create cursors hook for Realtime Database
+- [x] Track local cursor position
+- [x] Broadcast cursor to Realtime Database
+- [x] Listen to other users' cursors
+- [x] Render cursor components
 - [ ] Test cursor sync
 
 ### Subtasks:
@@ -1341,78 +1341,117 @@ describe('Rectangle Synchronization', () => {
 
 ---
 
-## PR #7: Presence System
+## PR #7: Presence System & Collapsible Sidebar
 
-**Goal:** Show list of currently online users
+**Goal:** Show list of currently online users in a collapsible sidebar
 
 **Branch:** `feature/presence-system`
 
 ### High-Level Tasks:
-- [ ] Create presence hook for Realtime Database
-- [ ] Write user presence on mount
-- [ ] Auto-remove presence on disconnect
-- [ ] Create presence list UI component
+- [x] Create collapsible sidebar component
+- [x] Implement canvas width adjustment for sidebar
+- [x] Create presence hook for Firestore
+- [x] Write user presence on mount
+- [x] Auto-remove presence on disconnect
+- [x] Create presence list UI component
 - [ ] Test presence tracking
 
 ### Subtasks:
 
-#### 7.1 Update Type Definitions
-- [ ] Open `src/types/index.ts`
-- [ ] Add `PresenceUser` type (userId, userName, color, joinedAt)
-- [ ] Export PresenceUser type
-
-**Files Modified:**
-- `src/types/index.ts`
-
-#### 7.2 Create Presence Hook
-- [ ] Create `src/hooks/usePresence.ts`
-- [ ] Import realtimeDb from firebase config
-- [ ] Create `usePresence` hook
-- [ ] Accept current user data as param
-- [ ] Write user to `/presence/{userId}` on mount
-- [ ] Set up `onDisconnect().remove()` for auto-cleanup
-- [ ] Listen to all users in `/presence`
-- [ ] Return array of online users
-- [ ] Clean up listener on unmount
+#### 7.1 Create Collapsible Sidebar Component
+- [x] Create `src/components/layout/Sidebar.tsx`
+- [x] Add toggle button to show/hide sidebar
+- [x] Implement smooth slide-in/out animation
+- [x] Add backdrop overlay when open (mobile)
+- [x] Style with Tailwind (fixed width: 300px)
+- [x] Add close button (X) in sidebar header
+- [x] Make responsive (full screen on mobile, sidebar on desktop)
 
 **Files Created:**
-- `src/hooks/usePresence.ts`
+- `src/components/layout/Sidebar.tsx`
 
-#### 7.3 Create Presence List Component
-- [ ] Create `src/components/multiplayer/PresenceList.tsx`
-- [ ] Accept array of users as props
-- [ ] Display user count (e.g., "3 users online")
-- [ ] List each user's name
-- [ ] Show color indicator dot next to each name
-- [ ] Style with Tailwind
-- [ ] Make it compact and unobtrusive
-
-**Files Created:**
-- `src/components/multiplayer/PresenceList.tsx`
-
-#### 7.4 Integrate Presence in Canvas Page
-- [ ] Open `src/pages/CanvasPage.tsx`
-- [ ] Import and call `usePresence()` hook
-- [ ] Pass current user data to hook
-- [ ] Get presence array from hook
-- [ ] Render PresenceList component in Layout
-- [ ] Position in header or sidebar
+#### 7.2 Update Canvas Width Calculation
+- [x] Open `src/pages/CanvasPage.tsx`
+- [x] Add sidebar state (open/closed)
+- [x] Calculate canvas width based on sidebar state
+- [x] Canvas width = viewport width - sidebar width (when open)
+- [x] Canvas width = full viewport width (when closed)
+- [x] Ensure canvas resizes smoothly when sidebar toggles
 
 **Files Modified:**
 - `src/pages/CanvasPage.tsx`
 
-#### 7.5 Update Layout for Presence
-- [ ] Open `src/components/layout/Layout.tsx`
-- [ ] Accept presence list as prop (or render it directly in CanvasPage)
-- [ ] Add space in header or sidebar for PresenceList
-- [ ] Ensure it doesn't obstruct canvas
+#### 7.3 Update Type Definitions
+- [x] Open `src/types/index.ts`
+- [x] Add `PresenceUser` type (userId, userName, color, joinedAt)
+- [x] Export PresenceUser type
+
+**Files Modified:**
+- `src/types/index.ts`
+
+#### 7.4 Create Presence Hook
+- [x] Create `src/hooks/usePresence.ts`
+- [x] Import firestore from firebase config (use Firestore, not Realtime DB)
+- [x] Create `usePresence` hook
+- [x] Accept current user data as param
+- [x] Write user to `/presence/{userId}` on mount
+- [x] Set up automatic cleanup on unmount
+- [x] Listen to all users in `/presence` collection
+- [x] Return array of online users
+- [x] Clean up listener on unmount
+
+**Files Created:**
+- `src/hooks/usePresence.ts`
+
+#### 7.5 Create Presence List Component
+- [x] Create `src/components/multiplayer/PresenceList.tsx`
+- [x] Accept array of users as props
+- [x] Display user count (e.g., "3 users online")
+- [x] List each user's name with color indicator
+- [x] Show user avatar or initial
+- [x] Add "Online" status indicator
+- [x] Style with Tailwind
+- [x] Make it clean and organized
+
+**Files Created:**
+- `src/components/multiplayer/PresenceList.tsx`
+
+#### 7.6 Integrate Sidebar and Presence in Canvas Page
+- [x] Open `src/pages/CanvasPage.tsx`
+- [x] Import and call `usePresence()` hook
+- [x] Pass current user data to hook
+- [x] Get presence array from hook
+- [x] Add sidebar state management
+- [x] Render Sidebar component with PresenceList inside
+- [x] Add sidebar toggle button to header
+- [x] Pass sidebar state to Canvas for width calculation
+
+**Files Modified:**
+- `src/pages/CanvasPage.tsx`
+
+#### 7.7 Update Layout for Sidebar
+- [x] Open `src/components/layout/Layout.tsx`
+- [x] Add sidebar toggle button to header
+- [x] Ensure header accommodates sidebar toggle
+- [x] Style header to work with sidebar
 
 **Files Modified:**
 - `src/components/layout/Layout.tsx`
 
-#### 7.6 Test Presence Tracking
+#### 7.8 Test Sidebar Functionality
+- [ ] Test sidebar toggle button works
+- [ ] Test sidebar slides in/out smoothly
+- [ ] Test canvas resizes when sidebar opens/closes
+- [ ] Test sidebar closes when clicking backdrop (mobile)
+- [ ] Test sidebar closes when clicking X button
+- [ ] Test responsive behavior (mobile vs desktop)
+
+**External:** Browser testing
+
+#### 7.9 Test Presence Tracking
 - [ ] Open app in two browser windows
 - [ ] Log in as different users
+- [ ] Open sidebar in both windows
 - [ ] Verify both users appear in presence list
 - [ ] Verify user count is accurate
 - [ ] Close one window
@@ -1420,18 +1459,19 @@ describe('Rectangle Synchronization', () => {
 - [ ] Verify user count decrements
 - [ ] Test with 3+ users
 
-**External:** Browser testing, Realtime Database Console
+**External:** Browser testing, Firestore Console
 
-#### 7.7 Test Presence Persistence
+#### 7.10 Test Presence Persistence
 - [ ] Refresh browser
 - [ ] Verify user reappears in presence list
 - [ ] Verify no duplicate entries
-- [ ] Check Realtime Database console for data integrity
+- [ ] Check Firestore console for data integrity
 
 **External:** Browser testing
 
 ### Files Summary for PR #7:
 **Created:**
+- `src/components/layout/Sidebar.tsx`
 - `src/hooks/usePresence.ts`
 - `src/components/multiplayer/PresenceList.tsx`
 
@@ -1456,6 +1496,7 @@ describe('Rectangle Synchronization', () => {
 - [ ] Documentation updates
 - [ ] Final deployment
 - [ ] Implement shape locking system (removed from MVP)
+- [ ] Fix cursor positioning bug
 
 ### Subtasks:
 
@@ -1703,6 +1744,24 @@ describe('Rectangle Synchronization', () => {
 
 **Files Modified:**
 - Multiple files (final review)
+
+#### 8.22 Fix Cursor Positioning Bug
+- [ ] Investigate cursor positioning issue after canvas resizing
+- [ ] Debug coordinate conversion between relative and screen coordinates
+- [ ] Fix cursor positioning when sidebar is toggled
+- [ ] Fix cursor positioning when canvas is panned
+- [ ] Test cursor positioning with multiple users
+- [ ] Verify cursors appear at correct mouse positions
+- [ ] Add comprehensive debugging logs
+- [ ] Test edge cases (rapid resizing, extreme panning)
+
+**Files Modified:**
+- `src/hooks/useCursors.ts`
+- `src/components/multiplayer/CursorLayer.tsx`
+- `src/pages/CanvasPage.tsx`
+- `src/components/canvas/Canvas.tsx`
+
+**External:** Browser testing with multiple users
 
 ### Files Summary for PR #8:
 **Created:**

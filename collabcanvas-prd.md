@@ -184,25 +184,32 @@ interface Cursor {
 
 ---
 
-### 6. Presence Awareness
-**Implementation:** Firebase Realtime Database with onDisconnect()
+### 6. Presence Awareness & Collapsible Sidebar
+**Implementation:** Firestore with collapsible sidebar UI
 
 **Must Have:**
-- List of currently connected users
+- Collapsible sidebar on the left side of the canvas
+- List of currently connected users in sidebar
 - Real-time updates when users join/leave
-- Visual indicator in UI (e.g., sidebar or header)
-- Show user count
+- Canvas width adjusts automatically when sidebar opens/closes
+- Show user count and user details
+- Smooth animations for sidebar toggle
 
 **Acceptance Criteria:**
-- Users can see who else is currently in the session
+- Users can toggle sidebar open/closed with a button
+- Canvas resizes to fill available width without overflowing
+- Sidebar shows list of online users with names and colors
 - List updates immediately when someone joins or leaves
 - Disconnected users are removed from presence list within 10 seconds
+- Sidebar is responsive (full screen on mobile, sidebar on desktop)
 
 **Technical Details:**
-- Database path: `/presence/{userId}`
-- Use `onDisconnect().remove()` for automatic cleanup
-- Display online users in a fixed UI element
-- Show user name and color indicator
+- Database path: `/presence/{userId}` in Firestore
+- Use Firestore for presence data (consistent with other data)
+- Sidebar width: 300px on desktop
+- Canvas width = viewport width - sidebar width (when open)
+- Canvas width = full viewport width (when closed)
+- Smooth CSS transitions for sidebar and canvas resizing
 
 **Data Structure:**
 ```typescript
@@ -210,17 +217,18 @@ interface PresenceUser {
   userId: string;
   userName: string;
   color: string;
-  joinedAt: number;       // timestamp
+  joinedAt: Timestamp;    // Firestore timestamp
 }
 ```
 
 ---
 
 ### 7. State Persistence
-**Implementation:** Firestore for shapes, Realtime DB for ephemeral data
+**Implementation:** Firestore for all persistent data
 
 **Must Have:**
 - Canvas rectangles save to Firestore
+- User presence data in Firestore
 - State persists when all users disconnect
 - State loads correctly when users reconnect
 - Automatic save (no manual save button needed)
@@ -233,7 +241,8 @@ interface PresenceUser {
 
 **Technical Details:**
 - Shapes persist in Firestore (permanent storage)
-- Cursors/presence in Realtime DB (ephemeral, cleared on disconnect)
+- Presence data in Firestore (cleared on disconnect)
+- Cursors in Firestore (ephemeral, cleared on disconnect)
 - Load all shapes on canvas mount
 - Show loading spinner until initial data loads
 
@@ -353,21 +362,32 @@ interface PresenceUser {
   - updatedAt: Timestamp
 ```
 
-### Realtime Database Structure
+### Firestore Structure (All Data)
 ```
+/shapes/{shapeId}
+  - id: string
+  - x: number
+  - y: number
+  - width: number
+  - height: number
+  - fill: string
+  - createdBy: string
+  - createdAt: Timestamp
+  - updatedAt: Timestamp
+
 /cursors/{userId}
   - userId: string
   - userName: string
   - x: number
   - y: number
   - color: string
-  - lastUpdated: number
+  - lastUpdated: Timestamp
 
 /presence/{userId}
   - userId: string
   - userName: string
   - color: string
-  - joinedAt: number
+  - joinedAt: Timestamp
 ```
 
 ### Firebase Security Rules (Firestore)
@@ -381,21 +401,13 @@ service cloud.firestore {
       allow update: if request.auth != null;
       allow delete: if request.auth != null;
     }
-  }
-}
-```
-
-### Firebase Security Rules (Realtime Database)
-```json
-{
-  "rules": {
-    "cursors": {
-      ".read": "auth != null",
-      ".write": "auth != null"
-    },
-    "presence": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+    match /cursors/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /presence/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

@@ -3,12 +3,14 @@ import { Stage, Layer } from 'react-konva'
 import { useCanvasStore } from '../../store/canvasStore'
 import CanvasErrorBoundary from './CanvasErrorBoundary'
 import RectangleComponent from './Rectangle'
-import type { Rectangle } from '../../types'
+import Cursor from '../multiplayer/Cursor'
+import type { Rectangle, Cursor as CursorType } from '../../types'
 
 interface CanvasProps {
   width: number
   height: number
   shapes: Rectangle[]
+  cursors: CursorType[]
   updateShape: (id: string, updates: Partial<Rectangle>) => Promise<void>
   onMouseMove?: (x: number, y: number, canvasWidth?: number, canvasHeight?: number) => void
 }
@@ -17,6 +19,7 @@ const Canvas: React.FC<CanvasProps> = ({
   width, 
   height, 
   shapes,
+  cursors,
   updateShape,
   onMouseMove 
 }) => {
@@ -39,8 +42,8 @@ const Canvas: React.FC<CanvasProps> = ({
     selectShape
   } = useCanvasStore()
 
-  // Canvas bounds - 5000x5000 with center at (0,0)
-  const CANVAS_SIZE = 5000
+  // Canvas bounds - 64000x64000 with center at (0,0) for infinite feel
+  const CANVAS_SIZE = 64000
   const CANVAS_HALF = CANVAS_SIZE / 2
 
   // Clamp position within canvas bounds
@@ -83,9 +86,12 @@ const Canvas: React.FC<CanvasProps> = ({
         const stage = e.target.getStage()
         const pointer = stage.getPointerPosition()
         if (pointer) {
-          console.log('🖱️ Stage drag end - updating cursor:', { x: pointer.x, y: pointer.y })
-          // Use the pointer position directly - it's already in screen coordinates
-          onMouseMove(pointer.x, pointer.y, width, height)
+          // Use the stage's live transform (avoids any store lag)
+          const transform = stage.getAbsoluteTransform().copy().invert()
+          const canvasPoint = transform.point({ x: pointer.x, y: pointer.y })
+          const canvasX = canvasPoint.x
+          const canvasY = canvasPoint.y
+          onMouseMove(canvasX, canvasY, width, height)
         }
       }
     } catch (error) {
@@ -147,9 +153,11 @@ const Canvas: React.FC<CanvasProps> = ({
       const stage = e.target.getStage()
       const pointer = stage.getPointerPosition()
       if (pointer) {
-        console.log('🖱️ Stage click - updating cursor:', { x: pointer.x, y: pointer.y })
-        // Use the pointer position directly - it's already in screen coordinates
-        onMouseMove(pointer.x, pointer.y, width, height)
+        const transform = stage.getAbsoluteTransform().copy().invert()
+        const canvasPoint = transform.point({ x: pointer.x, y: pointer.y })
+        const canvasX = canvasPoint.x
+        const canvasY = canvasPoint.y
+        onMouseMove(canvasX, canvasY, width, height)
       }
     }
   }
@@ -328,6 +336,15 @@ const Canvas: React.FC<CanvasProps> = ({
                 onMouseMove={onMouseMove ? (x, y) => onMouseMove(x, y, width, height) : undefined}
               />
             ))}
+          </Layer>
+          
+          {/* Cursors Layer - Only render visible cursors for performance */}
+          <Layer>
+            {cursors
+              .filter(cursor => cursor.isVisible !== false) // Include all if isVisible is undefined
+              .map((cursor) => (
+                <Cursor key={cursor.userId} cursor={cursor} />
+              ))}
           </Layer>
         </Stage>
       </div>

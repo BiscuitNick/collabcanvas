@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type { Rectangle, SyncStatus } from '../types'
 
 interface CanvasState {
@@ -41,7 +42,9 @@ interface CanvasState {
   clearAllShapes: () => void
 }
 
-export const useCanvasStore = create<CanvasState>((set) => ({
+export const useCanvasStore = create<CanvasState>()(
+  persist(
+    (set) => ({
   // Initial state - blank canvas
   stagePosition: { x: 0, y: 0 },
   stageScale: 1,
@@ -145,4 +148,14 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       pendingUpdates: new Map()
     })
   }
-}))
+}),
+    {
+      name: 'canvas-store',
+      partialize: (state) => ({
+        stagePosition: state.stagePosition,
+        stageScale: state.stageScale,
+        selectedShapeId: state.selectedShapeId
+      })
+    }
+  )
+)

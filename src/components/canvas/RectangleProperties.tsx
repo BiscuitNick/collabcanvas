@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react'
-import { useCanvasStore } from '../../store/canvasStore'
+import { useShapes } from '../../hooks/useShapes'
 
 interface RectanglePropertiesProps {
   selectedShapeId: string | null
 }
 
 const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShapeId }) => {
-  const { shapes, updateShape } = useCanvasStore()
+  const { shapes, updateShape } = useShapes()
   const [width, setWidth] = useState('')
   const [height, setHeight] = useState('')
   const [x, setX] = useState('')
   const [y, setY] = useState('')
+  const [rotation, setRotation] = useState('')
   const [fill, setFill] = useState('')
 
   // Get the selected shape
@@ -23,12 +24,14 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
       setHeight(Math.round(selectedShape.height).toString())
       setX(Math.round(selectedShape.x).toString())
       setY(Math.round(selectedShape.y).toString())
+      setRotation(Math.round(selectedShape.rotation).toString())
       setFill(selectedShape.fill)
     } else {
       setWidth('')
       setHeight('')
       setX('')
       setY('')
+      setRotation('')
       setFill('')
     }
   }, [selectedShape])
@@ -71,7 +74,7 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
       const numValue = parseFloat(value)
       if (!isNaN(numValue)) {
         // Clamp within canvas bounds and round to nearest integer
-        const clampedX = Math.min(2500, Math.max(-2500, numValue))
+        const clampedX = Math.min(32000, Math.max(-32000, numValue))
         const roundedX = Math.round(clampedX)
         updateShape(selectedShapeId, { x: roundedX })
       }
@@ -86,9 +89,24 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
       const numValue = parseFloat(value)
       if (!isNaN(numValue)) {
         // Clamp within canvas bounds and round to nearest integer
-        const clampedY = Math.min(2500, Math.max(-2500, numValue))
+        const clampedY = Math.min(32000, Math.max(-32000, numValue))
         const roundedY = Math.round(clampedY)
         updateShape(selectedShapeId, { y: roundedY })
+      }
+    }
+  }
+
+  const handleRotationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setRotation(value)
+    
+    if (selectedShapeId && value) {
+      const numValue = parseFloat(value)
+      if (!isNaN(numValue)) {
+        // Clamp rotation between 0 and 360 degrees and round to nearest integer
+        const clampedRotation = ((numValue % 360) + 360) % 360 // Normalize to 0-360
+        const roundedRotation = Math.round(clampedRotation)
+        updateShape(selectedShapeId, { rotation: roundedRotation })
       }
     }
   }
@@ -138,78 +156,118 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
     }
   }
 
+  const handleRotationBlur = () => {
+    if (selectedShape) {
+      const numValue = parseFloat(rotation)
+      if (isNaN(numValue)) {
+        setRotation(Math.round(selectedShape.rotation).toString())
+      }
+    }
+  }
+
   if (!selectedShape) {
     return null
   }
 
   return (
-    <div className="flex items-center gap-2 bg-white border border-gray-300 rounded px-3 py-2 shadow-sm">
-      <span className="text-sm font-medium text-gray-700">Properties:</span>
-      
+    <div className="space-y-3 bg-white border border-gray-300 rounded p-3 shadow-sm">
       {/* Position */}
-      <div className="flex items-center gap-1">
-        <label className="text-xs text-gray-500">X:</label>
-        <input
-          type="number"
-          value={x}
-          onChange={handleXChange}
-          onBlur={handleXBlur}
-          className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-          placeholder="X"
-        />
-      </div>
-      
-      <div className="flex items-center gap-1">
-        <label className="text-xs text-gray-500">Y:</label>
-        <input
-          type="number"
-          value={y}
-          onChange={handleYChange}
-          onBlur={handleYBlur}
-          className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-          placeholder="Y"
-        />
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-gray-700">Position</label>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 w-6">X:</label>
+            <input
+              type="number"
+              value={x}
+              onChange={handleXChange}
+              onBlur={handleXBlur}
+              className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="X"
+            />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 w-6">Y:</label>
+            <input
+              type="number"
+              value={y}
+              onChange={handleYChange}
+              onBlur={handleYBlur}
+              className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="Y"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Size */}
-      <div className="flex items-center gap-1">
-        <label className="text-xs text-gray-500">W:</label>
-        <input
-          type="number"
-          value={width}
-          onChange={handleWidthChange}
-          onBlur={handleWidthBlur}
-          className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-          placeholder="W"
-          min="20"
-          max="1000"
-        />
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-gray-700">Size</label>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 w-6">W:</label>
+            <input
+              type="number"
+              value={width}
+              onChange={handleWidthChange}
+              onBlur={handleWidthBlur}
+              className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="W"
+              min="20"
+              max="1000"
+            />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 w-6">H:</label>
+            <input
+              type="number"
+              value={height}
+              onChange={handleHeightChange}
+              onBlur={handleHeightBlur}
+              className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="H"
+              min="20"
+              max="1000"
+            />
+          </div>
+        </div>
       </div>
-      
-      <div className="flex items-center gap-1">
-        <label className="text-xs text-gray-500">H:</label>
-        <input
-          type="number"
-          value={height}
-          onChange={handleHeightChange}
-          onBlur={handleHeightBlur}
-          className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-          placeholder="H"
-          min="20"
-          max="1000"
-        />
+
+      {/* Rotation */}
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-gray-700">Rotation</label>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-500 w-6">°:</label>
+          <input
+            type="number"
+            value={rotation}
+            onChange={handleRotationChange}
+            onBlur={handleRotationBlur}
+            className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+            placeholder="0"
+            min="0"
+            max="360"
+            step="1"
+          />
+          <span className="text-xs text-gray-500">degrees</span>
+        </div>
       </div>
 
       {/* Color */}
-      <div className="flex items-center gap-1">
-        <label className="text-xs text-gray-500">Color:</label>
-        <input
-          type="color"
-          value={fill}
-          onChange={handleFillChange}
-          className="w-6 h-6 border border-gray-300 rounded cursor-pointer"
-          title="Choose color"
-        />
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-gray-700">Color</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={fill}
+            onChange={handleFillChange}
+            className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
+            title="Choose color"
+          />
+          <span className="text-xs text-gray-500 font-mono">{fill}</span>
+        </div>
       </div>
     </div>
   )

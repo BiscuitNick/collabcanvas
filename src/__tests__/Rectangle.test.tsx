@@ -27,6 +27,7 @@ describe('Rectangle Component', () => {
     y: 100,
     width: 200,
     height: 150,
+    rotation: 0,
     fill: '#FF0000',
     createdBy: 'test-user',
     createdAt: Date.now(),
@@ -120,23 +121,26 @@ describe('Rectangle Component', () => {
     
     const rect = screen.getByTestId('konva-rect')
     
-    // Simulate transform end
+    // Simulate transform end with proper Konva event structure
     const mockEvent = {
       target: {
         x: () => 120,
         y: () => 130,
         scaleX: () => 1.5,
-        scaleY: () => 1.2
+        scaleY: () => 1.2,
+        rotation: () => 0
       }
     }
     
+    // Use mouseMove to trigger transform end (as mapped in the mock)
     fireEvent.mouseMove(rect, mockEvent)
     
     expect(mockProps.onUpdate).toHaveBeenCalledWith({
       x: 120,
       y: 130,
       width: 300, // 200 * 1.5
-      height: 180  // 150 * 1.2
+      height: 180, // 150 * 1.2
+      rotation: 0
     })
   })
 

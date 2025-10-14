@@ -5,17 +5,14 @@ import { useCursors } from '../hooks/useCursors'
 import { usePresence } from '../hooks/usePresence'
 import { useCanvasStore } from '../store/canvasStore'
 import Layout from '../components/layout/Layout'
+import LeftColumn from '../components/layout/LeftColumn'
 import Canvas from '../components/canvas/Canvas'
-import CanvasControls from '../components/canvas/CanvasControls'
-import CursorLayer from '../components/multiplayer/CursorLayer'
-import Sidebar from '../components/layout/Sidebar'
-import PresenceList from '../components/multiplayer/PresenceList'
 import ErrorBoundary from '../components/ErrorBoundary'
 
 export const CanvasPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth()
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [pendingUserClick, setPendingUserClick] = useState<string | null>(null)
 
   // Initialize hooks
   const {
@@ -29,31 +26,28 @@ export const CanvasPage: React.FC = () => {
     retry: retryShapes
   } = useShapes()
 
-  const { stagePosition } = useCanvasStore()
+  const { stagePosition, stageScale, updatePosition, selectShape } = useCanvasStore()
   
   const {
     cursors,
     updateCursor,
     error: cursorsError
-  } = useCursors(user?.uid || '', user?.displayName || 'Anonymous', canvasSize.width, canvasSize.height, stagePosition)
+  } = useCursors(user?.uid || '', user?.displayName || 'Anonymous', canvasSize.width, canvasSize.height, stagePosition, canvasSize.width, canvasSize.height, stageScale)
 
   const {
     presenceUsers,
     error: presenceError
   } = usePresence(user?.uid || '', user?.displayName || 'Anonymous')
 
-
-  // Calculate canvas size based on viewport and sidebar state
+  // Calculate canvas size based on viewport (left column is fixed at 320px)
   useEffect(() => {
     const updateCanvasSize = () => {
-      const headerHeight = 80 // Approximate header height
-      const controlsHeight = 120 // Approximate controls height
+      const leftColumnWidth = 320 // Fixed left column width
       const padding = 40 // 20px padding on each side
-      const sidebarWidth = sidebarOpen ? 320 : 0 // 300px sidebar + 20px margin
       
       // Calculate available space for canvas
-      const availableWidth = window.innerWidth - sidebarWidth - padding
-      const availableHeight = window.innerHeight - headerHeight - controlsHeight - padding
+      const availableWidth = window.innerWidth - leftColumnWidth - padding
+      const availableHeight = window.innerHeight - padding
       
       setCanvasSize({
         width: Math.max(400, availableWidth), // Minimum 400px width
@@ -64,11 +58,39 @@ export const CanvasPage: React.FC = () => {
     updateCanvasSize()
     window.addEventListener('resize', updateCanvasSize)
     return () => window.removeEventListener('resize', updateCanvasSize)
-  }, [sidebarOpen])
+  }, [])
 
-  // Sidebar toggle handler
-  const handleSidebarToggle = () => {
-    setSidebarOpen(!sidebarOpen)
+  // Handle pending user clicks when cursors become available
+  useEffect(() => {
+    if (pendingUserClick && cursors.length > 0) {
+      handleUserClick(pendingUserClick)
+      setPendingUserClick(null)
+    }
+  }, [cursors, pendingUserClick])
+
+  // Handle user click - auto pan to cursor
+  const handleUserClick = (userId: string) => {
+    const userCursor = cursors.find(cursor => cursor.userId === userId)
+    
+    if (userCursor) {
+      // Calculate stage position to center the cursor
+      // Cursor coordinates are in original canvas space, so we can use them directly
+      const centerX = -userCursor.x + canvasSize.width / 2
+      const centerY = -userCursor.y + canvasSize.height / 2
+      
+      // Smooth pan to cursor location
+      updatePosition(centerX, centerY)
+    } else {
+      // If no cursors are loaded yet, set up a retry mechanism
+      if (cursors.length === 0) {
+        setPendingUserClick(userId)
+      }
+    }
+  }
+
+  // Handle shape selection from the list
+  const handleShapeSelect = (shapeId: string) => {
+    selectShape(shapeId)
   }
 
 
@@ -96,10 +118,9 @@ export const CanvasPage: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <Layout>
-        <div className="flex-1 flex flex-col">
-          {/* Canvas Controls - Full Width */}
-          <CanvasControls 
+      <Layout 
+        leftColumn={
+          <LeftColumn
             viewportWidth={canvasSize.width}
             viewportHeight={canvasSize.height}
             createShape={createShape}
@@ -107,36 +128,31 @@ export const CanvasPage: React.FC = () => {
             clearAllShapes={clearAllShapes}
             shapesError={shapesError || cursorsError || presenceError}
             onRetry={retryShapes}
-            onSidebarToggle={handleSidebarToggle}
-            sidebarOpen={sidebarOpen}
+            presenceUsers={presenceUsers}
+            cursors={cursors}
+            shapes={shapes}
+            onUserClick={handleUserClick}
+            onShapeSelect={handleShapeSelect}
           />
-          
-          {/* Main Content Area - Side by Side Layout */}
-          <div className="flex-1 flex">
-            {/* Sidebar - Left Panel */}
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)}>
-              <PresenceList users={presenceUsers} />
-            </Sidebar>
-            
-            {/* Canvas Area - Right Panel */}
-            <div className="flex-1 flex items-center justify-center p-5 bg-gray-100 min-w-0">
-              <div 
-                className="bg-white overflow-hidden"
-                style={{
-                  width: canvasSize.width,
-                  height: canvasSize.height
-                }}
-              >
-                <Canvas
-                  width={canvasSize.width}
-                  height={canvasSize.height}
-                  shapes={shapes}
-                  updateShape={updateShape}
-                  onMouseMove={(x, y, canvasWidth, canvasHeight) => updateCursor(x, y, canvasWidth, canvasHeight)}
-                />
-                <CursorLayer cursors={cursors} />
-              </div>
-            </div>
+        }
+      >
+        {/* Canvas Area - Takes remaining space */}
+        <div className="flex-1 flex items-center justify-center p-5 bg-gray-100 min-w-0">
+          <div 
+            className="bg-white overflow-hidden"
+            style={{
+              width: canvasSize.width,
+              height: canvasSize.height
+            }}
+          >
+            <Canvas
+              width={canvasSize.width}
+              height={canvasSize.height}
+              shapes={shapes}
+              cursors={cursors}
+              updateShape={updateShape}
+              onMouseMove={(x, y, canvasWidth, canvasHeight) => updateCursor(x, y, canvasWidth, canvasHeight)}
+            />
           </div>
         </div>
       </Layout>

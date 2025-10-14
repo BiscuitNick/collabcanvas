@@ -12,6 +12,7 @@ interface CanvasState {
   // Interaction states
   isPanning: boolean
   isZooming: boolean
+  isDraggingShape: boolean
   
   // Selected shape
   selectedShapeId: string | null
@@ -21,8 +22,10 @@ interface CanvasState {
   updateScale: (scale: number) => void
   setPanning: (isPanning: boolean) => void
   setZooming: (isZooming: boolean) => void
+  setDraggingShape: (isDraggingShape: boolean) => void
   addShape: (shape: Rectangle) => void
   updateShape: (id: string, updates: Partial<Rectangle>) => void
+  deleteShape: (id: string) => void
   selectShape: (id: string | null) => void
   resetView: () => void
 }
@@ -34,6 +37,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   shapes: [],
   isPanning: false,
   isZooming: false,
+  isDraggingShape: false,
   selectedShapeId: null,
   
   // Actions
@@ -55,6 +59,10 @@ export const useCanvasStore = create<CanvasState>((set) => ({
     set({ isZooming })
   },
   
+  setDraggingShape: (isDraggingShape: boolean) => {
+    set({ isDraggingShape })
+  },
+  
   addShape: (shape: Rectangle) => {
     set((state) => ({
       shapes: [...state.shapes, shape]
@@ -66,6 +74,13 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       shapes: state.shapes.map(shape =>
         shape.id === id ? { ...shape, ...updates } : shape
       )
+    }))
+  },
+  
+  deleteShape: (id: string) => {
+    set((state) => ({
+      shapes: state.shapes.filter((shape) => shape.id !== id),
+      selectedShapeId: state.selectedShapeId === id ? null : state.selectedShapeId
     }))
   },
   

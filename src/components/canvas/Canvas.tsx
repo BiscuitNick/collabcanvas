@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react'
 import { Stage, Layer } from 'react-konva'
 import { useCanvasStore } from '../../store/canvasStore'
 import CanvasErrorBoundary from './CanvasErrorBoundary'
+import RectangleComponent from './Rectangle'
 
 interface CanvasProps {
   width: number
@@ -19,11 +20,16 @@ const Canvas: React.FC<CanvasProps> = ({ width, height, onMouseMove }) => {
     stageScale,
     isPanning,
     isZooming,
+    isDraggingShape,
+    shapes,
+    selectedShapeId,
     updatePosition,
     updateScale,
     setPanning,
     setZooming,
-    selectShape
+    setDraggingShape,
+    selectShape,
+    updateShape
   } = useCanvasStore()
 
   // Canvas bounds - 5000x5000 with center at (0,0)
@@ -46,6 +52,9 @@ const Canvas: React.FC<CanvasProps> = ({ width, height, onMouseMove }) => {
   // Handle pan functionality
   const handleDragStart = () => {
     try {
+      // Don't start panning if we're dragging a shape
+      if (isDraggingShape) return
+      
       setPanning(true)
       setZooming(false)
     } catch (error) {
@@ -55,6 +64,9 @@ const Canvas: React.FC<CanvasProps> = ({ width, height, onMouseMove }) => {
 
   const handleDragEnd = (e: any) => {
     try {
+      // Don't handle stage drag if we're dragging a shape
+      if (isDraggingShape) return
+      
       setPanning(false)
       const clampedPos = clampPosition(e.target.x(), e.target.y())
       updatePosition(clampedPos.x, clampedPos.y)
@@ -68,7 +80,7 @@ const Canvas: React.FC<CanvasProps> = ({ width, height, onMouseMove }) => {
     try {
       e.evt.preventDefault()
       
-      if (isPanning) return // Disable zoom while panning
+      if (isPanning || isDraggingShape) return // Disable zoom while panning or dragging shapes
       
       setZooming(true)
       
@@ -120,6 +132,21 @@ const Canvas: React.FC<CanvasProps> = ({ width, height, onMouseMove }) => {
     if (e.target === e.target.getStage()) {
       selectShape(null)
     }
+  }
+
+  // Handle rectangle selection
+  const handleRectangleSelect = (shapeId: string) => {
+    selectShape(shapeId)
+  }
+
+  // Handle rectangle updates
+  const handleRectangleUpdate = (shapeId: string, updates: any) => {
+    updateShape(shapeId, updates)
+  }
+
+  // Handle rectangle drag end
+  const handleRectangleDragEnd = (shapeId: string, x: number, y: number) => {
+    updateShape(shapeId, { x, y })
   }
 
   // Mobile touch handlers
@@ -257,9 +284,9 @@ const Canvas: React.FC<CanvasProps> = ({ width, height, onMouseMove }) => {
           y={stagePosition.y}
           scaleX={stageScale}
           scaleY={stageScale}
-          draggable={!isZooming}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
+          draggable={!isZooming && !isDraggingShape}
+          onDragStart={!isDraggingShape ? handleDragStart : undefined}
+          onDragEnd={!isDraggingShape ? handleDragEnd : undefined}
           onWheel={handleWheel}
           onMouseMove={handleMouseMove}
           onClick={handleStageClick}
@@ -269,7 +296,18 @@ const Canvas: React.FC<CanvasProps> = ({ width, height, onMouseMove }) => {
         >
           {/* Shapes Layer */}
           <Layer>
-            {/* Shapes will be rendered here in future PRs */}
+            {shapes.map((shape) => (
+              <RectangleComponent
+                key={shape.id}
+                shape={shape}
+                isSelected={selectedShapeId === shape.id}
+                onSelect={() => handleRectangleSelect(shape.id)}
+                onUpdate={(updates) => handleRectangleUpdate(shape.id, updates)}
+                onDragEnd={(x, y) => handleRectangleDragEnd(shape.id, x, y)}
+                onDragStart={() => setDraggingShape(true)}
+                onDragEndCallback={() => setDraggingShape(false)}
+              />
+            ))}
           </Layer>
         </Stage>
       </div>

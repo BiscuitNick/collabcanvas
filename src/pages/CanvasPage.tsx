@@ -34,15 +34,18 @@ export const CanvasPage: React.FC = () => {
     )
   }
 
-  return (
-    <Layout>
-      <CanvasControls />
-      <div className="flex-1 p-5">
-        <Canvas
-          width={canvasSize.width}
-          height={canvasSize.height}
-        />
-      </div>
-    </Layout>
-  )
+          return (
+            <Layout>
+              <CanvasControls 
+                viewportWidth={canvasSize.width}
+                viewportHeight={canvasSize.height}
+              />
+              <div className="flex-1 p-5">
+                <Canvas
+                  width={canvasSize.width}
+                  height={canvasSize.height}
+                />
+              </div>
+            </Layout>
+          )
 }

@@ -1,12 +1,12 @@
 import { create } from 'zustand'
-import type { Rectangle } from '../types'
+import type { Rectangle, SyncStatus } from '../types'
 
 interface CanvasState {
   // Stage position and scale
   stagePosition: { x: number; y: number }
   stageScale: number
   
-  // Shapes array (empty for now)
+  // Shapes array
   shapes: Rectangle[]
   
   // Interaction states
@@ -16,6 +16,12 @@ interface CanvasState {
   
   // Selected shape
   selectedShapeId: string | null
+  
+  // Sync status for each shape
+  shapeSyncStatus: Record<string, SyncStatus>
+  
+  // Pending updates queue for offline operations
+  pendingUpdates: Map<string, Partial<Rectangle>>
   
   // Actions
   updatePosition: (x: number, y: number) => void
@@ -28,6 +34,10 @@ interface CanvasState {
   deleteShape: (id: string) => void
   selectShape: (id: string | null) => void
   resetView: () => void
+  setSyncStatus: (id: string, status: SyncStatus) => void
+  addPendingUpdate: (id: string, updates: Partial<Rectangle>) => void
+  clearPendingUpdates: () => void
+  setShapes: (shapes: Rectangle[]) => void
 }
 
 export const useCanvasStore = create<CanvasState>((set) => ({
@@ -39,6 +49,8 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   isZooming: false,
   isDraggingShape: false,
   selectedShapeId: null,
+  shapeSyncStatus: {},
+  pendingUpdates: new Map(),
   
   // Actions
   updatePosition: (x: number, y: number) => {
@@ -80,7 +92,10 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   deleteShape: (id: string) => {
     set((state) => ({
       shapes: state.shapes.filter((shape) => shape.id !== id),
-      selectedShapeId: state.selectedShapeId === id ? null : state.selectedShapeId
+      selectedShapeId: state.selectedShapeId === id ? null : state.selectedShapeId,
+      shapeSyncStatus: Object.fromEntries(
+        Object.entries(state.shapeSyncStatus).filter(([key]) => key !== id)
+      )
     }))
   },
   
@@ -94,5 +109,30 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       stageScale: 1,
       selectedShapeId: null
     })
+  },
+  
+  setSyncStatus: (id: string, status: SyncStatus) => {
+    set((state) => ({
+      shapeSyncStatus: {
+        ...state.shapeSyncStatus,
+        [id]: status
+      }
+    }))
+  },
+  
+  addPendingUpdate: (id: string, updates: Partial<Rectangle>) => {
+    set((state) => {
+      const newPendingUpdates = new Map(state.pendingUpdates)
+      newPendingUpdates.set(id, updates)
+      return { pendingUpdates: newPendingUpdates }
+    })
+  },
+  
+  clearPendingUpdates: () => {
+    set({ pendingUpdates: new Map() })
+  },
+  
+  setShapes: (shapes: Rectangle[]) => {
+    set({ shapes })
   }
 }))

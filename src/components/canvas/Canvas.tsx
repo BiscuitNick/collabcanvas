@@ -1,16 +1,37 @@
 import React, { useRef, useEffect, useState } from 'react'
 import { Stage, Layer } from 'react-konva'
 import { useCanvasStore } from '../../store/canvasStore'
+import { useAuth } from '../../hooks/useAuth'
 import CanvasErrorBoundary from './CanvasErrorBoundary'
 import RectangleComponent from './Rectangle'
+import type { Rectangle } from '../../types'
 
 interface CanvasProps {
   width: number
   height: number
+  shapes: Rectangle[]
+  updateShape: (id: string, updates: Partial<Rectangle>) => Promise<void>
+  startManipulation: (shapeId: string, userId: string) => Promise<boolean>
+  endManipulation: (shapeId: string) => Promise<void>
+  isManipulating: (shapeId: string) => boolean
+  isLocked: (shapeId: string) => boolean
+  getLockOwner: (shapeId: string) => string | null
   onMouseMove?: (x: number, y: number) => void
 }
 
-const Canvas: React.FC<CanvasProps> = ({ width, height, onMouseMove }) => {
+const Canvas: React.FC<CanvasProps> = ({ 
+  width, 
+  height, 
+  shapes,
+  updateShape,
+  startManipulation,
+  endManipulation,
+  isManipulating,
+  isLocked,
+  getLockOwner,
+  onMouseMove 
+}) => {
+  const { user } = useAuth()
   const stageRef = useRef<any>(null)
   const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null)
   const [lastTouchCenter, setLastTouchCenter] = useState<{ x: number; y: number } | null>(null)
@@ -21,15 +42,13 @@ const Canvas: React.FC<CanvasProps> = ({ width, height, onMouseMove }) => {
     isPanning,
     isZooming,
     isDraggingShape,
-    shapes,
     selectedShapeId,
     updatePosition,
     updateScale,
     setPanning,
     setZooming,
     setDraggingShape,
-    selectShape,
-    updateShape
+    selectShape
   } = useCanvasStore()
 
   // Canvas bounds - 5000x5000 with center at (0,0)
@@ -131,6 +150,14 @@ const Canvas: React.FC<CanvasProps> = ({ width, height, onMouseMove }) => {
   const handleStageClick = (e: any) => {
     if (e.target === e.target.getStage()) {
       selectShape(null)
+      // End all manipulations when clicking background
+      shapes.forEach(shape => {
+        if (isManipulating(shape.id)) {
+          endManipulation(shape.id).catch(err => {
+            console.error('Error ending manipulation on background click:', err)
+          })
+        }
+      })
     }
   }
 
@@ -306,6 +333,12 @@ const Canvas: React.FC<CanvasProps> = ({ width, height, onMouseMove }) => {
                 onDragEnd={(x, y) => handleRectangleDragEnd(shape.id, x, y)}
                 onDragStart={() => setDraggingShape(true)}
                 onDragEndCallback={() => setDraggingShape(false)}
+                startManipulation={startManipulation}
+                endManipulation={endManipulation}
+                isManipulating={isManipulating}
+                isLocked={isLocked}
+                getLockOwner={getLockOwner}
+                currentUserId={user?.uid || ''}
               />
             ))}
           </Layer>

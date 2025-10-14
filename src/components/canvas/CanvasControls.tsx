@@ -1,16 +1,35 @@
 import React, { useState, useEffect } from 'react'
 import { useCanvasStore } from '../../store/canvasStore'
-import { generateId, getRandomColor, getViewportCenter } from '../../lib/utils'
+import { useAuth } from '../../hooks/useAuth'
+import { getRandomColor, getViewportCenter } from '../../lib/utils'
 import type { Rectangle } from '../../types'
 import RectangleProperties from './RectangleProperties'
 
 interface CanvasControlsProps {
   viewportWidth: number
   viewportHeight: number
+  createShape: (shape: Omit<Rectangle, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
+  updateShape: (id: string, updates: Partial<Rectangle>) => Promise<void>
+  deleteShape: (id: string) => Promise<void>
+  startManipulation: (shapeId: string, userId: string) => Promise<boolean>
+  endManipulation: (shapeId: string) => Promise<void>
+  isManipulating: (shapeId: string) => boolean
+  shapesError: string | null
+  locksError: string | null
+  onRetry: () => void
 }
 
-const CanvasControls: React.FC<CanvasControlsProps> = ({ viewportWidth, viewportHeight }) => {
-  const { stageScale, stagePosition, resetView, updateScale, updatePosition, addShape, selectedShapeId, deleteShape } = useCanvasStore()
+const CanvasControls: React.FC<CanvasControlsProps> = ({ 
+  viewportWidth, 
+  viewportHeight,
+  createShape,
+  deleteShape,
+  shapesError,
+  locksError,
+  onRetry
+}) => {
+  const { user } = useAuth()
+  const { stageScale, stagePosition, resetView, updateScale, updatePosition, selectedShapeId } = useCanvasStore()
   const [zoomInput, setZoomInput] = useState('')
   const [panXInput, setPanXInput] = useState('')
   const [panYInput, setPanYInput] = useState('')
@@ -117,30 +136,37 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({ viewportWidth, viewport
     }
   }
 
-  const handleCreateRectangle = () => {
-    // Calculate viewport center
-    const center = getViewportCenter(stagePosition, stageScale, viewportWidth, viewportHeight)
+  const handleCreateRectangle = async () => {
+    if (!user) return
     
-    // Create new rectangle
-    const newRectangle: Rectangle = {
-      id: generateId(),
-      x: center.x - 50, // Center the rectangle (100px width / 2)
-      y: center.y - 40, // Center the rectangle (80px height / 2)
-      width: 100,
-      height: 80,
-      fill: getRandomColor(),
-      createdBy: 'current-user', // TODO: Get from auth context
-      createdAt: Date.now(),
-      updatedAt: Date.now()
+    try {
+      // Calculate viewport center
+      const center = getViewportCenter(stagePosition, stageScale, viewportWidth, viewportHeight)
+      
+      // Create new rectangle data
+      const newRectangleData = {
+        x: center.x - 50, // Center the rectangle (100px width / 2)
+        y: center.y - 40, // Center the rectangle (80px height / 2)
+        width: 100,
+        height: 80,
+        fill: getRandomColor(),
+        createdBy: user.uid
+      }
+      
+      await createShape(newRectangleData)
+    } catch (error) {
+      console.error('Error creating rectangle:', error)
     }
-    
-    addShape(newRectangle)
   }
 
-  const handleDeleteRectangle = () => {
+  const handleDeleteRectangle = async () => {
     if (selectedShapeId) {
       if (window.confirm('Are you sure you want to delete this rectangle?')) {
-        deleteShape(selectedShapeId)
+        try {
+          await deleteShape(selectedShapeId)
+        } catch (error) {
+          console.error('Error deleting rectangle:', error)
+        }
       }
     }
   }
@@ -148,6 +174,28 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({ viewportWidth, viewport
 
   return (
     <div className="bg-gray-100 border-b border-gray-300">
+      {/* Error Display */}
+      {(shapesError || locksError) && (
+        <div className="bg-red-50 border-b border-red-200 px-4 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="h-4 w-4 text-red-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-sm text-red-700">
+                {shapesError || locksError}
+              </span>
+            </div>
+            <button
+              onClick={onRetry}
+              className="text-sm text-red-600 hover:text-red-800 underline"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Controls */}
       <div className="flex items-center gap-4 p-4 flex-wrap">
         {/* Zoom Controls */}
@@ -244,6 +292,18 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({ viewportWidth, viewport
           title="Reset View (Escape)"
         >
           Reset View
+        </button>
+
+        {/* End All Manipulations Button */}
+        <button
+          onClick={() => {
+            // This will be handled by the parent component
+            window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+          }}
+          className="px-4 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500"
+          title="End All Manipulations (Escape)"
+        >
+          End All Manipulations
         </button>
 
         {/* Rectangle Properties - Inline */}

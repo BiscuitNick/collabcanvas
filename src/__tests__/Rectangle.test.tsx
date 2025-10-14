@@ -40,7 +40,13 @@ describe('Rectangle Component', () => {
     onUpdate: vi.fn(),
     onDragEnd: vi.fn(),
     onDragStart: vi.fn(),
-    onDragEndCallback: vi.fn()
+    onDragEndCallback: vi.fn(),
+    startManipulation: vi.fn().mockResolvedValue(true),
+    endManipulation: vi.fn().mockResolvedValue(undefined),
+    isManipulating: vi.fn().mockReturnValue(false),
+    isLocked: vi.fn().mockReturnValue(false),
+    getLockOwner: vi.fn().mockReturnValue(null),
+    currentUserId: 'test-user'
   }
 
   beforeEach(() => {

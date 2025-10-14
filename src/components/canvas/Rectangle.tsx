@@ -11,6 +11,12 @@ interface RectangleProps {
   onDragEnd: (x: number, y: number) => void
   onDragStart: () => void
   onDragEndCallback: () => void
+  startManipulation: (shapeId: string, userId: string) => Promise<boolean>
+  endManipulation: (shapeId: string) => Promise<void>
+  isManipulating: (shapeId: string) => boolean
+  isLocked: (shapeId: string) => boolean
+  getLockOwner: (shapeId: string) => string | null
+  currentUserId: string
 }
 
 const RectangleComponent: React.FC<RectangleProps> = ({
@@ -20,7 +26,13 @@ const RectangleComponent: React.FC<RectangleProps> = ({
   onUpdate,
   onDragEnd,
   onDragStart,
-  onDragEndCallback
+  onDragEndCallback,
+  startManipulation,
+  endManipulation,
+  isManipulating,
+  isLocked,
+  getLockOwner,
+  currentUserId
 }) => {
   const rectRef = useRef<any>(null)
   const transformerRef = useRef<any>(null)
@@ -49,12 +61,25 @@ const RectangleComponent: React.FC<RectangleProps> = ({
     onSelect()
   }
 
-  const handleDragStart = () => {
+  const handleDragStart = async () => {
+    // Check if shape is locked by another user
+    if (isLocked(shape.id) && getLockOwner(shape.id) !== currentUserId) {
+      console.log('Shape is locked by another user')
+      return
+    }
+
+    // Start manipulation (acquire lock)
+    const success = await startManipulation(shape.id, currentUserId)
+    if (!success) {
+      console.log('Failed to acquire lock')
+      return
+    }
+
     // Notify parent that dragging has started
     onDragStart()
   }
 
-  const handleDragEnd = (e: any) => {
+  const handleDragEnd = async (e: any) => {
     // Get the current position of the rectangle
     const rectX = e.target.x()
     const rectY = e.target.y()
@@ -66,11 +91,31 @@ const RectangleComponent: React.FC<RectangleProps> = ({
     // Update position in store (React will handle the re-render)
     onDragEnd(clampedX, clampedY)
     
+    // Only end manipulation if we were actually manipulating
+    if (isManipulating(shape.id)) {
+      await endManipulation(shape.id)
+    }
+    
     // Notify parent that dragging has ended
     onDragEndCallback()
   }
 
-  const handleTransformEnd = () => {
+  const handleTransformStart = async () => {
+    // Check if shape is locked by another user
+    if (isLocked(shape.id) && getLockOwner(shape.id) !== currentUserId) {
+      console.log('Shape is locked by another user')
+      return
+    }
+
+    // Start manipulation (acquire lock)
+    const success = await startManipulation(shape.id, currentUserId)
+    if (!success) {
+      console.log('Failed to acquire lock')
+      return
+    }
+  }
+
+  const handleTransformEnd = async () => {
     if (!rectRef.current) return
 
     const node = rectRef.current
@@ -102,7 +147,16 @@ const RectangleComponent: React.FC<RectangleProps> = ({
     node.scaleY(1)
     node.x(clampedX)
     node.y(clampedY)
+
+    // Only end manipulation if we were actually manipulating
+    if (isManipulating(shape.id)) {
+      await endManipulation(shape.id)
+    }
   }
+
+  // Determine visual state
+  const isBeingManipulated = isManipulating(shape.id)
+  const isLockedByOther = isLocked(shape.id) && getLockOwner(shape.id) !== currentUserId
 
   return (
     <>
@@ -113,17 +167,27 @@ const RectangleComponent: React.FC<RectangleProps> = ({
         width={shape.width}
         height={shape.height}
         fill={shape.fill}
-        stroke={isSelected ? '#007AFF' : 'transparent'}
-        strokeWidth={isSelected ? 2 : 0}
+        stroke={
+          isLockedByOther ? '#FF6B6B' : // Red for locked by other
+          isBeingManipulated ? '#4ECDC4' : // Teal for being manipulated
+          isSelected ? '#007AFF' : // Blue for selected
+          'transparent'
+        }
+        strokeWidth={
+          isLockedByOther ? 3 :
+          isBeingManipulated ? 3 :
+          isSelected ? 2 : 0
+        }
         shadowColor="rgba(0, 0, 0, 0.1)"
         shadowBlur={4}
         shadowOffset={{ x: 2, y: 2 }}
         shadowOpacity={0.3}
-        draggable
+        draggable={!isLockedByOther}
         onClick={handleClick}
         onTap={handleClick}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onTransformStart={handleTransformStart}
         onTransformEnd={handleTransformEnd}
         // Hover effects
         onMouseEnter={(e) => {
@@ -147,7 +211,7 @@ const RectangleComponent: React.FC<RectangleProps> = ({
           }
         }}
       />
-      {isSelected && (
+      {isSelected && !isLockedByOther && (
         <Transformer
           ref={transformerRef}
           boundBoxFunc={(oldBox, newBox) => {
@@ -163,10 +227,10 @@ const RectangleComponent: React.FC<RectangleProps> = ({
           keepRatio={false}
           enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top-center', 'bottom-center', 'left-center', 'right-center']}
           anchorSize={8}
-          anchorStroke="#007AFF"
+          anchorStroke={isBeingManipulated ? "#4ECDC4" : "#007AFF"}
           anchorFill="#FFFFFF"
           anchorStrokeWidth={2}
-          borderStroke="#007AFF"
+          borderStroke={isBeingManipulated ? "#4ECDC4" : "#007AFF"}
           borderStrokeWidth={2}
           borderDash={[5, 5]}
         />

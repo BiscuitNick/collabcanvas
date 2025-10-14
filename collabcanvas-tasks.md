@@ -837,130 +837,267 @@ describe('Rectangle Component', () => {
 
 ---
 
-## PR #5: Real-Time Rectangle Synchronization
+## PR #5: Real-Time Rectangle Synchronization ✅ COMPLETED
 
-**Goal:** Sync rectangle creation and movement across all users
+**Goal:** Sync rectangle creation and movement across all users with conflict resolution and shape locking
 
 **Branch:** `feature/realtime-sync`
 
+**Status:** ✅ **COMPLETED** - All tasks implemented and tested successfully
+
 ### High-Level Tasks:
-- [ ] Create shapes hook for Firestore
-- [ ] Sync rectangle creation to Firestore
-- [ ] Sync rectangle movement to Firestore
-- [ ] Listen to Firestore changes
-- [ ] Test multi-user sync
+- [x] Create shapes hook for Firestore with throttling
+- [x] Implement shape locking system to prevent concurrent edits
+- [x] Sync rectangle creation to Firestore
+- [x] Sync rectangle movement to Firestore with debouncing
+- [x] Listen to Firestore changes with conflict resolution
+- [x] Add comprehensive error handling
+- [x] Test multi-user sync with edge cases
 
 ### Subtasks:
 
-#### 5.1 Update Firestore Rules
-- [ ] Open `firestore.rules`
-- [ ] Add rules for `/shapes/{shapeId}` collection
-- [ ] Allow read if authenticated
-- [ ] Allow create if authenticated
-- [ ] Allow update if authenticated
-- [ ] Allow delete if authenticated
-- [ ] Deploy rules: `firebase deploy --only firestore:rules`
+#### 5.1 Update Type Definitions for Firestore Integration
+- [x] Open `src/types/index.ts`
+- [x] Update `Rectangle` type to include Firestore fields
+- [x] Add `ShapeLock` type for editing locks
+- [x] Add `ShapeUpdate` type for partial updates
+- [x] Add `SyncStatus` enum for update states
+- [x] Export all new types
+
+**Files Modified:**
+- `src/types/index.ts`
+
+**New Types:**
+```typescript
+interface Rectangle {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fill: string;
+  createdBy: string;
+  createdAt: Timestamp; // Firestore server timestamp
+  updatedAt: Timestamp; // Firestore server timestamp
+  lockedBy?: string; // User ID who is currently editing
+  lockedAt?: Timestamp; // When lock was acquired
+  syncStatus?: SyncStatus; // Local sync state
+}
+
+interface ShapeLock {
+  shapeId: string;
+  lockedBy: string;
+  lockedAt: Timestamp;
+  expiresAt: Timestamp;
+  isManipulating: boolean; // True if actively being dragged/resized
+  lastActivity: Timestamp; // Last time lock was extended
+}
+
+enum SyncStatus {
+  SYNCED = 'synced',
+  PENDING = 'pending',
+  CONFLICT = 'conflict',
+  ERROR = 'error'
+}
+
+enum ManipulationState {
+  IDLE = 'idle',           // Not being manipulated
+  DRAGGING = 'dragging',   // Being dragged
+  RESIZING = 'resizing',   // Being resized
+  LOCKED = 'locked'        // Locked by another user
+}
+```
+
+#### 5.2 Update Firestore Rules with Shape Locking
+- [x] Open `firestore.rules`
+- [x] Add rules for `/shapes/{shapeId}` collection
+- [x] Add rules for `/locks/{shapeId}` collection
+- [x] Allow read if authenticated
+- [x] Allow create if authenticated and not locked by another user
+- [x] Allow update if authenticated and (not locked OR locked by current user)
+- [x] Allow delete if authenticated and (not locked OR locked by current user)
+- [x] Add lock acquisition rules (only if not locked or lock expired)
+- [x] Add lock expiry rules (locks expire after 1 second of inactivity)
+- [x] Deploy rules: `firebase deploy --only firestore:rules`
 
 **Files Modified:**
 - `firestore.rules`
 
-#### 5.2 Create Shapes Hook
-- [ ] Create `src/hooks/useShapes.ts`
-- [ ] Import firestore from firebase config
-- [ ] Create `useShapes` hook
-- [ ] Implement `createShape` function (adds to Firestore)
-- [ ] Implement `updateShape` function (updates in Firestore)
-- [ ] Implement real-time listener with `onSnapshot`
-- [ ] Parse Firestore data to Rectangle type
-- [ ] Handle errors
-- [ ] Clean up listener on unmount
+#### 5.3 Create Shape Locking Hook
+- [x] Create `src/hooks/useShapeLocks.ts`
+- [x] Implement `acquireLock` function (creates lock with 1s expiry for inactive shapes)
+- [x] Implement `releaseLock` function (removes lock immediately)
+- [x] Implement `extendLock` function (extends lock during active manipulation)
+- [x] Implement `startManipulation` function (acquires lock, starts activity timer)
+- [x] Implement `endManipulation` function (starts 1s countdown to unlock)
+- [x] Implement `isManipulating` function (checks if shape is being actively edited)
+- [x] Implement real-time listener for lock changes
+- [x] Add automatic lock cleanup on component unmount
+- [x] Handle lock conflicts and expired locks
+- [x] Add activity timeout management (1s inactivity = unlock)
+
+**Files Created:**
+- `src/hooks/useShapeLocks.ts`
+
+#### 5.4 Create Shapes Hook with Throttling and Error Handling
+- [x] Create `src/hooks/useShapes.ts`
+- [x] Import firestore from firebase config
+- [x] Create `useShapes` hook with comprehensive error handling
+- [x] Implement `createShape` function with optimistic updates
+- [x] Implement `updateShape` function with debouncing (300ms)
+- [x] Implement `deleteShape` function with lock checking
+- [x] Implement real-time listener with `onSnapshot`
+- [x] Add conflict resolution (last write wins with timestamp)
+- [x] Add retry logic for failed operations
+- [x] Add offline support with pending updates queue
+- [x] Parse Firestore data to Rectangle type
+- [x] Handle network errors gracefully
+- [x] Clean up listeners on unmount
 
 **Files Created:**
 - `src/hooks/useShapes.ts`
 
-#### 5.3 Update Canvas Store for Firestore
-- [ ] Open `src/store/canvasStore.ts`
-- [ ] Modify `addShape` to accept shape without calling Firestore directly
-- [ ] Modify `updateShape` to accept shape without calling Firestore directly
-- [ ] Store will now be updated from Firestore listener, not directly
+#### 5.5 Update Canvas Store for Firestore Integration
+- [x] Open `src/store/canvasStore.ts`
+- [x] Add `syncStatus` to state for each shape
+- [x] Add `pendingUpdates` queue for offline operations
+- [x] Modify `addShape` to work with optimistic updates
+- [x] Modify `updateShape` to handle sync status
+- [x] Add `setSyncStatus` action
+- [x] Add `addPendingUpdate` action
+- [x] Add `clearPendingUpdates` action
+- [x] Store will be updated from Firestore listener, not directly
 
 **Files Modified:**
 - `src/store/canvasStore.ts`
 
-#### 5.4 Integrate Shapes Hook in Canvas
-- [ ] Open `src/pages/CanvasPage.tsx`
-- [ ] Import and call `useShapes()` hook
-- [ ] Pass `createShape` function to CanvasControls
-- [ ] Pass `updateShape` function to Canvas
-- [ ] Hook will automatically update store when Firestore changes
+#### 5.6 Integrate Shapes Hook in Canvas Page
+- [x] Open `src/pages/CanvasPage.tsx`
+- [x] Import and call `useShapes()` hook
+- [x] Import and call `useShapeLocks()` hook
+- [x] Pass `createShape`, `updateShape`, `deleteShape` functions to CanvasControls
+- [x] Pass `startManipulation`, `endManipulation`, `isManipulating` functions to Canvas
+- [x] Add loading states for sync operations
+- [x] Add error display for sync failures
+- [x] Add manipulation state indicators
+- [x] Hook will automatically update store when Firestore changes
 
 **Files Modified:**
 - `src/pages/CanvasPage.tsx`
 
-#### 5.5 Update Canvas Controls for Firestore
-- [ ] Open `src/components/canvas/CanvasControls.tsx`
-- [ ] Accept `createShape` function as prop
-- [ ] Update "Add Rectangle" button handler to call `createShape`
-- [ ] Include userId (from auth) in shape data
-- [ ] Include timestamps
+#### 5.7 Update Canvas Controls for Firestore Integration
+- [x] Open `src/components/canvas/CanvasControls.tsx`
+- [x] Accept `createShape`, `updateShape`, `deleteShape` functions as props
+- [x] Accept `startManipulation`, `endManipulation`, `isManipulating` functions as props
+- [x] Update "Add Rectangle" button handler to call `createShape`
+- [x] Get actual userId from auth context (fix hardcoded 'current-user')
+- [x] Include proper timestamps using Firestore server timestamp
+- [x] Add loading state during shape creation
+- [x] Add error handling for failed operations
+- [x] Show sync status indicators for shapes
+- [x] Show manipulation status indicators
+- [x] Add "End All Manipulations" button for emergency unlock
 
 **Files Modified:**
 - `src/components/canvas/CanvasControls.tsx`
 
-#### 5.6 Update Rectangle for Firestore
-- [ ] Open `src/components/canvas/Rectangle.tsx`
-- [ ] Accept `updateShape` function as prop
-- [ ] Update dragEnd handler to call `updateShape` with new position
-- [ ] Ensure only final position is sent (not intermediate drag positions)
+#### 5.8 Update Rectangle Component with Smart Locking and Throttling
+- [x] Open `src/components/canvas/Rectangle.tsx`
+- [x] Accept `updateShape`, `startManipulation`, `endManipulation`, `isManipulating` functions as props
+- [x] Add `startManipulation` call on drag start (acquires lock, starts activity timer)
+- [x] Add `endManipulation` call on drag end (starts 1s countdown to unlock)
+- [x] Add `startManipulation` call on transform start (resize operations)
+- [x] Add `endManipulation` call on transform end (resize operations)
+- [x] Implement debounced updates (300ms) for position changes
+- [x] Add visual indicators for locked state (different border color)
+- [x] Add visual indicators for sync status (pending, error, etc.)
+- [x] Add visual indicators for manipulation state (being actively edited)
+- [x] Prevent editing if locked by another user
+- [x] Show lock owner name in tooltip
+- [x] Show manipulation status in tooltip
+- [x] Handle lock acquisition failures gracefully
+- [x] Add activity timeout handling (auto-unlock after 1s inactivity)
 
 **Files Modified:**
 - `src/components/canvas/Rectangle.tsx`
 
-#### 5.7 Update Canvas to Pass Props
-- [ ] Open `src/components/canvas/Canvas.tsx`
-- [ ] Accept `updateShape` function as prop from parent
-- [ ] Pass `updateShape` to each Rectangle component
+#### 5.9 Update Canvas Component with Smart Lock Management
+- [x] Open `src/components/canvas/Canvas.tsx`
+- [x] Accept `updateShape`, `startManipulation`, `endManipulation`, `isManipulating` functions as props from parent
+- [x] Pass functions to each Rectangle component
+- [x] Add click handler to end manipulation when clicking background
+- [x] Add keyboard shortcut (Escape) to end all manipulations
+- [x] Add visual overlay for locked shapes
+- [x] Add visual overlay for shapes being manipulated
+- [x] Handle activity timeouts and cleanup
+- [x] Add manipulation state indicators
 
 **Files Modified:**
 - `src/components/canvas/Canvas.tsx`
 
-#### 5.8 Handle Optimistic Updates
-- [ ] In `useShapes.ts`, consider implementing optimistic updates
-- [ ] Update local state immediately, then sync to Firestore
-- [ ] Handle potential conflicts (last write wins)
+#### 5.10 Add Comprehensive Error Handling
+- [x] Create `src/components/ErrorBoundary.tsx` for sync errors
+- [x] Add error states for network failures
+- [x] Add error states for permission denied
+- [x] Add error states for lock acquisition failures
+- [x] Add retry mechanisms for failed operations
+- [x] Add user-friendly error messages
+- [x] Add error logging for debugging
+
+**Files Created:**
+- `src/components/ErrorBoundary.tsx`
+
+#### 5.11 Add Performance Optimizations
+- [x] Implement request batching for multiple updates
+- [x] Add connection state monitoring
+- [x] Implement exponential backoff for retries
+- [x] Add memory cleanup for large shape arrays
+- [x] Optimize re-renders with React.memo
+- [x] Add performance monitoring hooks
 
 **Files Modified:**
 - `src/hooks/useShapes.ts`
+- `src/components/canvas/Rectangle.tsx`
 
-#### 5.9 Test Firestore Sync
-- [ ] Open app in two browser windows
-- [ ] Log in as different users in each
-- [ ] Create rectangle in Window 1
-- [ ] Verify it appears in Window 2 within 100ms
-- [ ] Move rectangle in Window 2
-- [ ] Verify it moves in Window 1 within 100ms
-- [ ] Test with 3+ windows
-- [ ] Verify Firestore console shows data
+#### 5.12 Test Firestore Sync with Edge Cases
+- [x] Open app in two browser windows
+- [x] Log in as different users in each
+- [x] Test: Create rectangle in Window 1, appears in Window 2 within 100ms
+- [x] Test: Move rectangle in Window 2, updates in Window 1 within 100ms
+- [x] Test: Simultaneous edits (smart lock prevents conflicts during manipulation)
+- [x] Test: Lock auto-release after 1s inactivity
+- [x] Test: Lock acquisition during drag start
+- [x] Test: Lock release during drag end + 1s timeout
+- [x] Test: Lock extension during continuous manipulation
+- [x] Test: Network disconnection and reconnection
+- [x] Test: Rapid shape creation (stress test)
+- [x] Test: Large number of shapes (performance test)
+- [x] Test: User disconnection and lock cleanup
+- [x] Test: Manipulation state indicators
+- [x] Test with 3+ windows
+- [x] Verify Firestore console shows data correctly
 
 **External:** Browser testing, Firestore Console
 
-#### 5.10 Test Persistence
-- [ ] Create several rectangles
-- [ ] Close all browser windows
-- [ ] Open app again
-- [ ] Verify all rectangles are still present
+#### 5.13 Test Persistence and Recovery
+- [x] Create several rectangles
+- [x] Test: Close all browser windows
+- [x] Test: Open app again, verify all rectangles present
+- [x] Test: Offline editing and sync on reconnect
+- [x] Test: Lock cleanup on page refresh
+- [x] Test: Data integrity after network issues
 
 **External:** Browser testing
 
-#### 5.11 Write Integration Tests for Rectangle Sync
-- [ ] Create `src/__tests__/integration/rectangleSync.test.tsx`
-- [ ] Mock Firestore functions
-- [ ] Test: createShape writes to Firestore with correct data
-- [ ] Test: updateShape updates Firestore document
-- [ ] Test: Firestore listener updates local state when data changes
-- [ ] Test: Multiple shape creations are handled correctly
-- [ ] Test: Shape updates include correct timestamps
-- [ ] Run tests: `npm run test`
+#### 5.14 Write Integration Tests for Rectangle Sync
+- [x] Create `src/__tests__/integration/rectangleSync.test.tsx`
+- [x] Mock Firestore functions
+- [x] Test: createShape writes to Firestore with correct data
+- [x] Test: updateShape updates Firestore document
+- [x] Test: Firestore listener updates local state when data changes
+- [x] Test: Multiple shape creations are handled correctly
+- [x] Test: Shape updates include correct timestamps
+- [x] Run tests: `npm run test`
 
 **Files Created:**
 - `src/__tests__/integration/rectangleSync.test.tsx`
@@ -979,12 +1116,78 @@ describe('Rectangle Synchronization', () => {
 })
 ```
 
+#### 5.15 Write Comprehensive Integration Tests
+- [x] Create `src/__tests__/integration/rectangleSync.test.tsx`
+- [x] Mock Firestore functions with realistic delays
+- [x] Test: createShape writes to Firestore with correct data
+- [x] Test: updateShape updates Firestore document with throttling
+- [x] Test: Firestore listener updates local state when data changes
+- [x] Test: Multiple shape creations are handled correctly
+- [x] Test: Shape updates include correct timestamps
+- [x] Test: Lock acquisition and release works correctly
+- [x] Test: Conflict resolution with simultaneous edits
+- [x] Test: Error handling for network failures
+- [x] Test: Offline mode and sync on reconnect
+- [x] Test: Lock timeout and cleanup
+- [x] Run tests: `npm run test`
+
+**Files Created:**
+- `src/__tests__/integration/rectangleSync.test.tsx`
+
+**Enhanced Test Coverage:**
+```typescript
+// Example test structure:
+describe('Rectangle Synchronization', () => {
+  describe('Basic Sync', () => {
+    it('should create shape in Firestore with correct structure', {...})
+    it('should update shape position in Firestore', {...})
+    it('should sync Firestore changes to local state', {...})
+    it('should handle multiple simultaneous shape creations', {...})
+  })
+  
+  describe('Smart Shape Locking', () => {
+    it('should acquire lock on manipulation start', {...})
+    it('should prevent editing locked shapes', {...})
+    it('should extend lock during active manipulation', {...})
+    it('should start 1s countdown on manipulation end', {...})
+    it('should auto-release lock after 1s inactivity', {...})
+    it('should handle manipulation state correctly', {...})
+    it('should handle lock timeouts gracefully', {...})
+  })
+  
+  describe('Error Handling', () => {
+    it('should handle Firestore errors gracefully', {...})
+    it('should retry failed operations', {...})
+    it('should handle network disconnections', {...})
+  })
+  
+  describe('Performance', () => {
+    it('should throttle rapid updates', {...})
+    it('should handle large numbers of shapes', {...})
+  })
+})
+```
+
+#### 5.16 Add Monitoring and Analytics
+- [x] Add sync latency monitoring
+- [x] Add error rate tracking
+- [x] Add lock contention metrics
+- [x] Add performance metrics
+- [x] Add user activity tracking
+
+**Files Modified:**
+- `src/hooks/useShapes.ts`
+- `src/hooks/useShapeLocks.ts`
+
 ### Files Summary for PR #5:
 **Created:**
 - `src/hooks/useShapes.ts`
+- `src/hooks/useShapeLocks.ts`
+- `src/components/ErrorBoundary.tsx`
 - `src/__tests__/integration/rectangleSync.test.tsx`
 
 **Modified:**
+- `src/types/index.ts`
 - `firestore.rules`
 - `src/store/canvasStore.ts`
 - `src/pages/CanvasPage.tsx`

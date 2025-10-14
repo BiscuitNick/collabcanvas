@@ -252,139 +252,120 @@ collabcanvas/
 
 ## PR #2: Authentication System
 
-**Goal:** Working login and register functionality
+**Goal:** Working Google authentication functionality
 
 **Branch:** `feature/authentication`
 
 ### High-Level Tasks:
-- [ ] Create type definitions
-- [ ] Set up authentication context/hook
-- [ ] Create login page
-- [ ] Create register page
-- [ ] Set up routing
-- [ ] Test authentication flow
+- [x] Create type definitions
+- [x] Set up authentication hook
+- [x] Create Google sign-in component
+- [x] Create login page
+- [x] Create canvas page placeholder
+- [x] Set up routing
+- [x] Test authentication flow
 
 ### Subtasks:
 
-#### 2.1 Create Type Definitions
-- [ ] Create `src/types/index.ts`
-- [ ] Define `User` type
-- [ ] Define `AuthContextType` type
-- [ ] Export all types
+#### 2.1 Firebase Console Setup
+- [x] Enable Authentication in Firebase Console
+- [x] Configure Google provider
+- [x] Set up user display name requirements
+- [x] Verify `.env` file exists with Firebase config
+- [x] Test Firebase connection
+
+**External:** Firebase Console
+
+#### 2.2 Create Type Definitions
+- [x] Create `src/types/index.ts`
+- [x] Define `User` type
+- [x] Define `AuthHookReturn` type for useAuth hook
+- [x] Export all types
 
 **Files Created:**
 - `src/types/index.ts`
 
-#### 2.2 Create Auth Hook
-- [ ] Create `src/hooks/useAuth.ts`
-- [ ] Implement `useAuth` hook with Firebase Auth
-- [ ] Add `onAuthStateChanged` listener
-- [ ] Implement `login` function
-- [ ] Implement `register` function
-- [ ] Implement `logout` function
-- [ ] Handle loading state
-- [ ] Handle error state
+#### 2.3 Create Auth Hook
+- [x] Create `src/hooks/useAuth.ts`
+- [x] Implement `useAuth` hook with Firebase Auth
+- [x] Add `onAuthStateChanged` listener
+- [x] Implement `loginWithGoogle` function
+- [x] Implement `logout` function
+- [x] Handle loading state
+- [x] Handle error state (network, validation, Firebase errors)
 
 **Files Created:**
 - `src/hooks/useAuth.ts`
 
-#### 2.3 Create Login Form Component
-- [ ] Create `src/components/auth/LoginForm.tsx`
-- [ ] Add email input field
-- [ ] Add password input field
-- [ ] Add submit button
-- [ ] Add link to register page
-- [ ] Add form validation
-- [ ] Handle form submission
-- [ ] Display error messages
-- [ ] Style with Tailwind
+#### 2.4 Create Google Sign-In Component
+- [x] Create `src/components/auth/GoogleSignIn.tsx`
+- [x] Add Google sign-in button
+- [x] Handle Google authentication
+- [x] Display error messages
+- [x] Add loading state (disable button, update styling)
+- [x] Style with Tailwind
 
 **Files Created:**
-- `src/components/auth/LoginForm.tsx`
-
-#### 2.4 Create Register Form Component
-- [ ] Create `src/components/auth/RegisterForm.tsx`
-- [ ] Add email input field
-- [ ] Add password input field
-- [ ] Add display name input field
-- [ ] Add submit button
-- [ ] Add link to login page
-- [ ] Add form validation
-- [ ] Handle form submission with display name
-- [ ] Display error messages
-- [ ] Style with Tailwind
-
-**Files Created:**
-- `src/components/auth/RegisterForm.tsx`
+- `src/components/auth/GoogleSignIn.tsx`
 
 #### 2.5 Create Login Page
-- [ ] Create `src/pages/LoginPage.tsx`
-- [ ] Import and render LoginForm
-- [ ] Add page title
-- [ ] Add layout wrapper
-- [ ] Style with Tailwind
+- [x] Create `src/pages/LoginPage.tsx`
+- [x] Import and render GoogleSignIn component
+- [x] Add page title
+- [x] Add layout wrapper
+- [x] Style with Tailwind
 
 **Files Created:**
 - `src/pages/LoginPage.tsx`
 
-#### 2.6 Create Register Page
-- [ ] Create `src/pages/RegisterPage.tsx`
-- [ ] Import and render RegisterForm
-- [ ] Add page title
-- [ ] Add layout wrapper
-- [ ] Style with Tailwind
-
-**Files Created:**
-- `src/pages/RegisterPage.tsx`
-
-#### 2.7 Create Canvas Page Placeholder
-- [ ] Create `src/pages/CanvasPage.tsx`
-- [ ] Add simple "Canvas Coming Soon" message
-- [ ] Add logout button
-- [ ] Style with Tailwind
+#### 2.6 Create Canvas Page Placeholder
+- [x] Create `src/pages/CanvasPage.tsx`
+- [x] Add simple "Canvas Coming Soon" message
+- [x] Add logout button
+- [x] Style with Tailwind
 
 **Files Created:**
 - `src/pages/CanvasPage.tsx`
 
-#### 2.8 Set Up Routing
-- [ ] Install react-router-dom (if not done in PR #1)
-- [ ] Update `src/App.tsx` to use BrowserRouter
-- [ ] Create route for `/login`
-- [ ] Create route for `/register`
-- [ ] Create route for `/canvas`
-- [ ] Add redirect logic (authenticated users to canvas, unauthenticated to login)
-- [ ] Add loading state while checking auth
+#### 2.7 Set Up Routing
+- [x] Update `src/App.tsx` to use BrowserRouter
+- [x] Create route for `/login`
+- [x] Create route for `/canvas`
+- [x] Add redirect logic (authenticated users to canvas, unauthenticated to login)
+- [x] Add loading state while checking auth
 
 **Files Modified:**
 - `src/App.tsx`
 
-#### 2.9 Update Firebase Security Rules
-- [ ] Update `firestore.rules` to require authentication
-- [ ] Update `database.rules.json` to require authentication
-- [ ] Deploy rules: `firebase deploy --only firestore:rules,database`
+#### 2.8 Create Firebase Security Rules
+- [x] Create `firestore.rules` file
+- [x] Add rules to require authentication for all operations
+- [x] Create `database.rules.json` file
+- [x] Add rules to require authentication for all operations
+- [x] Deploy rules: `firebase deploy --only firestore:rules,database`
 
-**Files Modified:**
+**Files Created:**
 - `firestore.rules`
 - `database.rules.json`
 
-#### 2.10 Test Authentication
-- [ ] Test register new user
-- [ ] Test login with created user
-- [ ] Test logout
-- [ ] Test redirect behavior
-- [ ] Test staying logged in after refresh
-- [ ] Test with multiple accounts
+#### 2.9 Test Authentication
+- [x] Test Google sign-in with new user
+- [x] Test Google sign-in with existing user
+- [x] Test logout
+- [x] Test redirect behavior
+- [x] Test staying logged in after refresh
+- [x] Test with multiple accounts
 
 **External:** Browser testing
 
-#### 2.11 Write Integration Tests for Authentication
-- [ ] Create `src/__tests__/integration/auth.test.tsx`
-- [ ] Mock Firebase Auth functions
-- [ ] Test: User can register with valid credentials
-- [ ] Test: User can login with valid credentials
-- [ ] Test: Error handling for invalid credentials
-- [ ] Test: Auth state persists correctly
-- [ ] Run tests: `npm run test`
+#### 2.10 Write Integration Tests for Authentication
+- [x] Create `src/__tests__/integration/auth.test.tsx`
+- [x] Mock Firebase Auth functions
+- [x] Test: User can sign in with Google successfully
+- [x] Test: User can sign out successfully
+- [x] Test: Error handling for authentication errors
+- [x] Test: Auth state persists correctly
+- [x] Run tests: `npm run test`
 
 **Files Created:**
 - `src/__tests__/integration/auth.test.tsx`
@@ -393,11 +374,11 @@ collabcanvas/
 ```typescript
 // Example test structure:
 describe('Authentication Flow', () => {
-  it('should register a new user successfully', () => {...})
-  it('should login existing user successfully', () => {...})
-  it('should handle invalid credentials', () => {...})
-  it('should redirect to canvas after successful login', () => {...})
-  it('should logout user and redirect to login', () => {...})
+  it('should sign in with Google successfully', () => {...})
+  it('should sign out successfully', () => {...})
+  it('should handle authentication errors', () => {...})
+  it('should redirect to canvas after successful sign in', () => {...})
+  it('should redirect to login after sign out', () => {...})
 })
 ```
 
@@ -405,17 +386,15 @@ describe('Authentication Flow', () => {
 **Created:**
 - `src/types/index.ts`
 - `src/hooks/useAuth.ts`
-- `src/components/auth/LoginForm.tsx`
-- `src/components/auth/RegisterForm.tsx`
+- `src/components/auth/GoogleSignIn.tsx`
 - `src/pages/LoginPage.tsx`
-- `src/pages/RegisterPage.tsx`
 - `src/pages/CanvasPage.tsx`
 - `src/__tests__/integration/auth.test.tsx`
+- `firestore.rules`
+- `database.rules.json`
 
 **Modified:**
 - `src/App.tsx`
-- `firestore.rules`
-- `database.rules.json`
 
 ---
 
@@ -1428,7 +1407,7 @@ describe('Rectangle Synchronization', () => {
 | PR # | Branch | Goal | Files Created | Files Modified | Tests Added | Est. Time |
 |------|--------|------|---------------|----------------|-------------|-----------|
 | 1 | feature/project-setup | Project setup & deployment | 17+ | 4 | 1 setup test | 3-4 hrs |
-| 2 | feature/authentication | Auth system | 8 | 3 | 1 integration | 4-5 hrs |
+| 2 | feature/authentication | Auth system | 8 | 3 | 1 integration | 4-5 hrs | ✅ COMPLETE |
 | 3 | feature/canvas-base | Canvas with pan/zoom | 6 | 3 | 1 unit | 3-4 hrs |
 | 4 | feature/rectangles-local | Local rectangle manipulation | 4 | 3 | 2 (unit + component) | 3-4 hrs |
 | 5 | feature/realtime-sync | Firestore sync | 2 | 6 | 1 integration | 4-5 hrs |
@@ -1455,10 +1434,12 @@ describe('Rectangle Synchronization', () => {
    - Vitest config + setup test
 
 2. **PR #2 (Auth):**
+   - Firebase Console setup (Google provider)
    - `src/types/index.ts`
    - `src/hooks/useAuth.ts`
-   - Auth components (LoginForm, RegisterForm)
-   - Page components (LoginPage, RegisterPage, CanvasPage placeholder)
+   - Google sign-in component (GoogleSignIn)
+   - Page components (LoginPage, CanvasPage placeholder)
+   - Security rules (firestore.rules, database.rules.json)
    - Integration test for auth
 
 3. **PR #3 (Canvas):**

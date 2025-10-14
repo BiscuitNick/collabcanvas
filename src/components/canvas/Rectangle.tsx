@@ -27,8 +27,8 @@ const RectangleComponent: React.FC<RectangleProps> = ({
   const rectRef = useRef<any>(null)
   const transformerRef = useRef<any>(null)
 
-  // Canvas bounds - 5000x5000 with center at (0,0)
-  const CANVAS_SIZE = 5000
+  // Canvas bounds - 64000x64000 with center at (0,0)
+  const CANVAS_SIZE = 64000
   const CANVAS_HALF = CANVAS_SIZE / 2
   const MIN_SIZE = 20
   const MAX_SIZE = 1000
@@ -91,6 +91,7 @@ const RectangleComponent: React.FC<RectangleProps> = ({
     const node = rectRef.current
     const scaleX = node.scaleX()
     const scaleY = node.scaleY()
+    const rotation = node.rotation ? node.rotation() : 0
 
     // Calculate new dimensions
     const newWidth = Math.max(MIN_SIZE, Math.min(MAX_SIZE, shape.width * scaleX))
@@ -104,12 +105,16 @@ const RectangleComponent: React.FC<RectangleProps> = ({
     const clampedX = clamp(newX, -CANVAS_HALF, CANVAS_HALF - newWidth)
     const clampedY = clamp(newY, -CANVAS_HALF, CANVAS_HALF - newHeight)
 
+    // Normalize rotation to 0-360 degrees
+    const normalizedRotation = ((rotation % 360) + 360) % 360
+
     // Update shape in store
     onUpdate({
       x: clampedX,
       y: clampedY,
       width: newWidth,
-      height: newHeight
+      height: newHeight,
+      rotation: normalizedRotation
     })
 
     // Update cursor position with mouse position
@@ -138,6 +143,7 @@ const RectangleComponent: React.FC<RectangleProps> = ({
         y={shape.y}
         width={shape.width}
         height={shape.height}
+        rotation={shape.rotation}
         fill={shape.fill}
         stroke={isSelected ? '#007AFF' : 'transparent'}
         strokeWidth={isSelected ? 2 : 0}
@@ -196,6 +202,7 @@ const RectangleComponent: React.FC<RectangleProps> = ({
           borderStroke="#007AFF"
           borderStrokeWidth={2}
           borderDash={[5, 5]}
+          rotateEnabled={true}
         />
       )}
     </>

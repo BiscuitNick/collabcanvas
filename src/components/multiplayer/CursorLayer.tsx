@@ -7,8 +7,6 @@ interface CursorLayerProps {
 }
 
 const CursorLayer: React.FC<CursorLayerProps> = ({ cursors }) => {
-  console.log('🎯 CursorLayer rendering with cursors:', cursors)
-  
   return (
     <div
       className="absolute inset-0 pointer-events-none z-40"
@@ -23,10 +21,9 @@ const CursorLayer: React.FC<CursorLayerProps> = ({ cursors }) => {
         height: '100%'
       }}
     >
-      {cursors.map((cursor) => {
-        console.log('🎨 Rendering cursor:', cursor)
-        return <Cursor key={cursor.userId} cursor={cursor} />
-      })}
+      {cursors.map((cursor) => (
+        <Cursor key={cursor.userId} cursor={cursor} />
+      ))}
     </div>
   )
 }

@@ -99,6 +99,7 @@ export const useShapes = (): UseShapesReturn => {
             y: data.y,
             width: data.width,
             height: data.height,
+            rotation: data.rotation || 0, // Default to 0 if rotation doesn't exist
             fill: data.fill,
             createdBy: data.createdBy,
             createdAt: data.createdAt,

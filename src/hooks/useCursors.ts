@@ -19,13 +19,14 @@ interface UseCursorsReturn {
   error: string | null
 }
 
-export const useCursors = (userId: string, userName: string, canvasWidth?: number, canvasHeight?: number, stagePosition?: { x: number; y: number }): UseCursorsReturn => {
+export const useCursors = (userId: string, userName: string, canvasWidth?: number, canvasHeight?: number, stagePosition?: { x: number; y: number }, viewportWidth?: number, viewportHeight?: number, stageScale?: number): UseCursorsReturn => {
   const [cursors, setCursors] = useState<Cursor[]>([])
   const [error, setError] = useState<string | null>(null)
   const lastUpdateRef = useRef<number>(0)
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Throttle cursor updates to 50ms
+  // x,y MUST be canvas coordinates (pre-transform)
   const updateCursor = useCallback((x: number, y: number, canvasWidth?: number, canvasHeight?: number) => {
     const now = Date.now()
     
@@ -42,29 +43,21 @@ export const useCursors = (userId: string, userName: string, canvasWidth?: numbe
         try {
           const cursorRef = doc(firestore, 'cursors', userId)
           
-          // Store relative coordinates (0-1 range) for better responsiveness
-          const relativeX = canvasWidth ? x / canvasWidth : x
-          const relativeY = canvasHeight ? y / canvasHeight : y
-          
+          // Store absolute coordinates in canvas space
           const cursorData = {
             userId,
             userName,
-            x: relativeX, // Store as relative coordinate
-            y: relativeY, // Store as relative coordinate
+            x: x, // Store as absolute coordinate
+            y: y, // Store as absolute coordinate
             color: getUserColor(userId),
             lastUpdated: serverTimestamp()
           }
           
-          console.log('📝 Writing cursor to Firestore:', {
-            ...cursorData,
-            originalCoords: { x, y },
-            canvasSize: { width: canvasWidth, height: canvasHeight },
-            relativeCoords: { x: relativeX, y: relativeY }
-          })
+          // optional debug left in place
+          
           await setDoc(cursorRef, cursorData, { merge: true })
           lastUpdateRef.current = now
           setError(null)
-          console.log('✅ Cursor updated successfully')
         } catch (err) {
           console.error('❌ Error updating cursor:', err)
           setError('Failed to update cursor position')
@@ -83,53 +76,18 @@ export const useCursors = (userId: string, userName: string, canvasWidth?: numbe
     const cursorsRef = collection(firestore, 'cursors')
     const q = query(cursorsRef, orderBy('lastUpdated', 'desc'))
     
-    console.log('🔍 Setting up cursor listener for userId:', userId)
-    console.log('🔗 Using Firestore collection: cursors')
-    
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
         try {
           const cursorsData: Cursor[] = []
           
-          console.log('📡 Received cursor data from Firestore:', snapshot.docs.length, 'documents')
-          
           snapshot.forEach((doc) => {
             const data = doc.data()
             
-            // Convert coordinates to screen coordinates
-            // Handle both relative (0-1) and absolute coordinates for backward compatibility
-            let screenX = data.x
-            let screenY = data.y
-            
-            if (canvasWidth && canvasHeight) {
-              // If coordinates are relative (0-1 range), convert to screen coordinates
-              if (data.x <= 1 && data.y <= 1) {
-                screenX = data.x * canvasWidth
-                screenY = data.y * canvasHeight
-                console.log('🔄 Converting relative coordinates:', { 
-                  relative: { x: data.x, y: data.y }, 
-                  screen: { x: screenX, y: screenY },
-                  canvas: { width: canvasWidth, height: canvasHeight }
-                })
-              } else {
-                // Absolute coordinates - use as is
-                screenX = data.x
-                screenY = data.y
-                console.log('📍 Using absolute coordinates:', { x: data.x, y: data.y })
-              }
-              
-              // Adjust for Stage position (pan offset)
-              if (stagePosition) {
-                screenX += stagePosition.x
-                screenY += stagePosition.y
-                console.log('🎯 Adjusted for stage position:', { 
-                  original: { x: data.x, y: data.y },
-                  adjusted: { x: screenX, y: screenY },
-                  stagePos: stagePosition
-                })
-              }
-            }
+            // Use coordinates as-is since they're now stored as absolute coordinates
+            const screenX = data.x
+            const screenY = data.y
             
             const cursor: Cursor = {
               userId: data.userId,
@@ -140,13 +98,37 @@ export const useCursors = (userId: string, userName: string, canvasWidth?: numbe
               lastUpdated: data.lastUpdated?.toMillis() || Date.now()
             }
             
-            // Only include cursors from other users, not the current user
-            if (cursor.userId !== userId) {
-              cursorsData.push(cursor)
+            // Debug logging for cursor positioning
+            if (cursor.userId === userId) {
+              console.log('🎯 Current user cursor retrieved:', {
+                userId: cursor.userId,
+                userName: cursor.userName,
+                x: cursor.x,
+                y: cursor.y,
+                stagePosition,
+                viewportWidth,
+                viewportHeight
+              })
             }
+            
+            // Include all cursors (including current user for debugging)
+            // Check if cursor is within viewport for performance
+            // Cursors are stored in canvas coordinates, so check against canvas viewport bounds
+            const isInViewport = stagePosition && viewportWidth && viewportHeight && stageScale
+              ? cursor.x >= -stagePosition.x / stageScale &&
+                cursor.x <= (-stagePosition.x + viewportWidth) / stageScale &&
+                cursor.y >= -stagePosition.y / stageScale &&
+                cursor.y <= (-stagePosition.y + viewportHeight) / stageScale
+              : true // Include all if viewport info not available
+            
+            // Always include cursor for debug info, but mark if it's visible
+            cursorsData.push({
+              ...cursor,
+              isVisible: isInViewport,
+              isCurrentUser: cursor.userId === userId
+            })
           })
           
-          console.log('👥 Processed cursors (excluding own):', cursorsData)
           setCursors(cursorsData)
           setError(null)
         } catch (err) {

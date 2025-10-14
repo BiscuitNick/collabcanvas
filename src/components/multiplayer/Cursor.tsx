@@ -1,4 +1,5 @@
 import React from 'react'
+import { Group, Line, Text, Rect } from 'react-konva'
 import type { Cursor as CursorType } from '../../types'
 
 interface CursorProps {
@@ -6,34 +7,76 @@ interface CursorProps {
 }
 
 const Cursor: React.FC<CursorProps> = ({ cursor }) => {
+  // Cursor is positioned in canvas coordinates within a Layer that is already transformed
+  const x = cursor.x
+  const y = cursor.y
+  
+  // Cursor line points (vertical line)
+  const linePoints = [
+    x, y,      // Start point
+    x, y + 24  // End point (24px height)
+  ]
+
+  // Username label dimensions - add indicator for current user
+  const labelText = cursor.isCurrentUser ? `${cursor.userName} (You)` : cursor.userName
+  const labelPadding = 8
+  const labelHeight = 20
+  
+  // Calculate label width (approximate)
+  const labelWidth = labelText.length * 7 + labelPadding * 2
+
   return (
-    <div
-      className="absolute pointer-events-none z-50 transition-all duration-75 ease-out"
-      style={{
-        left: cursor.x,
-        top: cursor.y,
-      }}
-    >
-      {/* Vertical Line Cursor */}
-      <div
-        className="w-0.5 h-6 relative"
-        style={{ 
-          backgroundColor: cursor.color,
-          boxShadow: `0 0 4px ${cursor.color}`
-        }}
+    <Group listening={false}>
+      {/* Debug: Small dot at exact click point */}
+      {cursor.isCurrentUser && (
+        <Rect
+          x={x - 2}
+          y={y - 2}
+          width={4}
+          height={4}
+          fill="red"
+          listening={false}
+        />
+      )}
+      
+      {/* Cursor Line */}
+      <Line
+        points={linePoints}
+        stroke={cursor.color}
+        strokeWidth={cursor.isCurrentUser ? 3 : 2}
+        lineCap="round"
+        shadowColor={cursor.color}
+        shadowBlur={cursor.isCurrentUser ? 6 : 4}
+        shadowOpacity={0.8}
+        listening={false}
       />
       
-      {/* Username Label - positioned to the right */}
-      <div
-        className="absolute top-0 left-2 px-2 py-1 text-xs font-medium text-white rounded shadow-sm whitespace-nowrap"
-        style={{ 
-          backgroundColor: cursor.color,
-          lineHeight: '24px' // Match the height of the vertical line
-        }}
-      >
-        {cursor.userName}
-      </div>
-    </div>
+      {/* Username Label Background */}
+      <Rect
+        x={x}
+        y={y}
+        width={labelWidth}
+        height={labelHeight}
+        fill={cursor.color}
+        cornerRadius={4}
+        shadowColor="rgba(0,0,0,0.3)"
+        shadowBlur={2}
+        shadowOffset={{ x: 0, y: 1 }}
+        listening={false}
+      />
+      
+      {/* Username Label Text */}
+      <Text
+        x={x + labelPadding / 2}
+        y={y + 2}
+        text={labelText}
+        fontSize={12}
+        fontFamily="Arial, sans-serif"
+        fill="white"
+        fontStyle="bold"
+        listening={false}
+      />
+    </Group>
   )
 }
 

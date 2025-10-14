@@ -22,6 +22,7 @@ export interface Rectangle {
   y: number
   width: number
   height: number
+  rotation: number
   fill: string
   createdBy: string
   createdAt: number | any // Firestore Timestamp
@@ -48,6 +49,8 @@ export interface Cursor {
   y: number
   color: string
   lastUpdated: number
+  isVisible?: boolean // Whether cursor is within current viewport
+  isCurrentUser?: boolean // Whether this is the current user's cursor
 }
 
 // Presence user type for online users

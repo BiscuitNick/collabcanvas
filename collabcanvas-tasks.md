@@ -1,7 +1,7 @@
 # CollabCanvas MVP - Task List by Pull Request
 
 **Project Timeline:** 24 hours  
-**Total PRs:** 8 pull requests
+**Total PRs:** 9 pull requests
 
 ---
 
@@ -1216,7 +1216,7 @@ describe('Rectangle Synchronization', () => {
 - [x] Broadcast cursor to Realtime Database
 - [x] Listen to other users' cursors
 - [x] Render cursor components
-- [ ] Test cursor sync
+- [x] Test cursor sync
 
 ### Subtasks:
 
@@ -1308,22 +1308,22 @@ describe('Rectangle Synchronization', () => {
 - `src/lib/utils.ts` (if needed)
 
 #### 6.9 Test Cursor Sync
-- [ ] Open app in two browser windows
-- [ ] Log in as different users
-- [ ] Click or drag in Window 1
-- [ ] Verify cursor appears at click/drag position in Window 2
-- [ ] Verify cursor updates smoothly (<50ms latency)
-- [ ] Verify username label is visible
-- [ ] Verify colors are different for each user
-- [ ] Test with 3+ users
+- [x] Open app in two browser windows
+- [x] Log in as different users
+- [x] Click or drag in Window 1
+- [x] Verify cursor appears at click/drag position in Window 2
+- [x] Verify cursor updates smoothly (<50ms latency)
+- [x] Verify username label is visible
+- [x] Verify colors are different for each user
+- [x] Test with 3+ users
 
 **External:** Browser testing, Realtime Database Console
 
 #### 6.10 Test Cursor Cleanup
-- [ ] Open multiple windows
-- [ ] Close one window
-- [ ] Verify cursor disappears from other windows
-- [ ] Check Realtime Database console to verify data removed
+- [x] Open multiple windows
+- [x] Close one window
+- [x] Verify cursor disappears from other windows
+- [x] Check Realtime Database console to verify data removed
 
 **External:** Browser testing
 
@@ -1482,7 +1482,198 @@ describe('Rectangle Synchronization', () => {
 
 ---
 
-## PR #8: Final Testing, Polish & Documentation
+## PR #8: New Layout & Shape Properties
+
+**Goal:** Implement new layout with fixed left column and shape property editing
+
+**Branch:** `feature/new-layout-properties`
+
+### High-Level Tasks:
+- [x] Update layout to have fixed left column with controls and auth
+- [x] Move all controls to left column including auth (login/logout)
+- [x] Add collapsible box in left column to display users and shapes
+- [x] Show shape attributes when clicked with editable inputs
+- [x] Remove 5000px bounds and use 64000px for infinite canvas feel
+
+### Subtasks:
+
+#### 8.1 Update Layout Structure
+- [x] Create new layout component with fixed left column
+- [x] Left column should be fixed width (e.g., 300px) and not resizable
+- [x] Canvas should take remaining space to the right
+- [x] Remove current header layout
+- [x] Ensure responsive design works on different screen sizes
+
+**Files Modified:**
+- `src/components/layout/Layout.tsx`
+- `src/pages/CanvasPage.tsx`
+
+#### 8.2 Move Auth to Left Column
+- [x] Move login/logout functionality from header to left column
+- [x] Add user info display in left column
+- [x] Style auth section appropriately in left column
+- [x] Ensure auth state updates are reflected in left column
+
+**Files Modified:**
+- `src/components/layout/Layout.tsx`
+- `src/components/layout/Header.tsx` (may be removed or simplified)
+
+#### 8.3 Move All Controls to Left Column
+- [x] Move canvas controls from current location to left column
+- [x] Organize controls in logical groups within left column
+- [x] Ensure controls are easily accessible and well-organized
+- [x] Style controls appropriately for vertical layout
+
+**Files Modified:**
+- `src/components/canvas/CanvasControls.tsx`
+- `src/components/layout/Layout.tsx`
+
+#### 8.4 Create Collapsible Users and Shapes Box
+- [x] Create collapsible section in left column for users
+- [x] Create collapsible section in left column for shapes
+- [x] Add toggle functionality for each section
+- [x] Display user list with colors and names
+- [x] Display shape list with basic info (type, color, position)
+
+**Files Created:**
+- `src/components/layout/UsersShapesPanel.tsx`
+
+**Files Modified:**
+- `src/components/layout/Layout.tsx`
+
+#### 8.5 Implement Shape Properties Editing
+- [x] Create shape properties panel in left column
+- [x] Show X, Y, Width, Height, Rotation, and Color when shape is selected
+- [x] Make all properties directly editable with input fields
+- [x] Round pixel values to nearest integer
+- [x] Update canvas in real-time as properties are edited
+- [x] Handle validation for property inputs
+
+**Files Created:**
+- `src/components/canvas/ShapePropertiesPanel.tsx`
+
+**Files Modified:**
+- `src/components/canvas/Rectangle.tsx`
+- `src/components/layout/Layout.tsx`
+
+#### 8.6 Remove Canvas Bounds Restriction
+- [x] Update canvas bounds from 5000px to 64000px
+- [x] Update pan limits to work with new bounds
+- [x] Ensure canvas feels "infinite" for practical use
+- [x] Test panning to extreme positions
+- [x] Update any hardcoded bounds references
+
+**Files Modified:**
+- `src/components/canvas/Canvas.tsx`
+- `src/store/canvasStore.ts`
+
+#### 8.7 Update Canvas Width Calculation
+- [x] Ensure canvas takes remaining space after left column
+- [x] Handle window resize events properly
+- [x] Maintain aspect ratio and functionality
+- [x] Test with different screen sizes
+
+**Files Modified:**
+- `src/pages/CanvasPage.tsx`
+- `src/components/canvas/Canvas.tsx`
+
+#### 8.8 Convert Cursor to Canvas Element
+- [x] Move cursor rendering from DOM overlay to Konva canvas
+- [x] Create cursor as Konva Circle or custom shape
+- [x] Ensure cursors only appear within canvas boundaries
+- [x] Update cursor positioning to use canvas coordinates
+- [x] Remove DOM-based cursor layer
+- [x] Test cursor rendering performance on canvas
+
+**Files Modified:**
+- `src/components/multiplayer/Cursor.tsx`
+- `src/components/multiplayer/CursorLayer.tsx`
+- `src/components/canvas/Canvas.tsx`
+- `src/hooks/useCursors.ts`
+
+#### 8.9 Implement Viewport-Based Cursor Filtering
+- [x] Add viewport bounds calculation to cursor hook
+- [x] Filter cursors based on current canvas view (x, y, width, height)
+- [x] Only show cursors whose coordinates fall within visible area
+- [x] Update cursor visibility when canvas is panned or zoomed
+- [x] Handle edge cases (cursors at viewport edges)
+- [x] Optimize filtering performance for multiple cursors
+
+**Files Modified:**
+- `src/hooks/useCursors.ts`
+- `src/components/canvas/Canvas.tsx`
+
+#### 8.10 Add Cursor Debug Information
+- [x] Add expandable debug info to user list items
+- [x] Show current cursor coordinates (x, y) for each user
+- [x] Display cursor position in real-time as user moves mouse
+- [x] Add visual indicator when cursor is outside viewport
+- [x] Style debug info appropriately in left column
+- [x] Add toggle to show/hide debug information
+
+**Files Modified:**
+- `src/components/multiplayer/PresenceList.tsx`
+- `src/components/layout/UsersShapesPanel.tsx`
+
+#### 8.11 Implement Auto-Pan to Cursor
+- [x] Add click handler to user list items
+- [x] Calculate canvas center position for selected user's cursor
+- [x] Implement smooth pan animation to cursor location
+- [x] Handle cases where cursor is outside current viewport
+- [x] Add visual feedback during pan animation
+- [x] Ensure pan doesn't exceed canvas bounds
+
+**Files Modified:**
+- `src/components/multiplayer/PresenceList.tsx`
+- `src/components/canvas/Canvas.tsx`
+- `src/store/canvasStore.ts`
+
+#### 8.12 Test New Cursor System
+- [x] Test cursor rendering on canvas
+- [x] Test viewport filtering with multiple users
+- [x] Test debug information display
+- [x] Test auto-pan to cursor functionality
+- [x] Test performance with many cursors
+- [x] Test cursor behavior during canvas pan/zoom
+- [x] Verify cursors don't interfere with shape interactions
+
+**External:** Browser testing with multiple users
+
+#### 8.13 Fix Cursor Positioning with Pan and Zoom
+- [x] Debug cursor positioning when canvas is panned (not at x:0, y:0)
+- [x] Debug cursor positioning at different zoom levels
+- [x] Fix coordinate conversion to account for stage position and scale
+- [x] Test cursor positioning with various pan and zoom combinations
+- [x] Verify cursors appear at correct mouse positions in all scenarios
+- [x] Add comprehensive debugging for pan/zoom scenarios
+
+**Files Modified:**
+- `src/hooks/useCursors.ts`
+- `src/components/multiplayer/Cursor.tsx`
+- `src/pages/CanvasPage.tsx`
+- `src/components/canvas/Canvas.tsx`
+
+### Files Summary for PR #8:
+**Created:**
+- `src/components/layout/UsersShapesPanel.tsx`
+- `src/components/canvas/ShapePropertiesPanel.tsx`
+
+**Modified:**
+- `src/components/layout/Layout.tsx`
+- `src/pages/CanvasPage.tsx`
+- `src/components/canvas/CanvasControls.tsx`
+- `src/components/canvas/Canvas.tsx`
+- `src/components/canvas/Rectangle.tsx`
+- `src/store/canvasStore.ts`
+- `src/components/layout/Header.tsx` (may be removed or simplified)
+- `src/components/multiplayer/Cursor.tsx`
+- `src/components/multiplayer/CursorLayer.tsx`
+- `src/hooks/useCursors.ts`
+- `src/components/multiplayer/PresenceList.tsx`
+
+---
+
+## PR #9: Final Testing, Polish & Documentation
 
 **Goal:** Verify all MVP requirements, fix bugs, prepare for submission
 
@@ -1496,11 +1687,10 @@ describe('Rectangle Synchronization', () => {
 - [ ] Documentation updates
 - [ ] Final deployment
 - [ ] Implement shape locking system (removed from MVP)
-- [ ] Fix cursor positioning bug
 
 ### Subtasks:
 
-#### 8.1 Run MVP Checklist - Authentication
+#### 9.1 Run MVP Checklist - Authentication
 - [ ] Test: Create new account with email/password
 - [ ] Test: Login with created account
 - [ ] Test: Stay logged in after browser refresh
@@ -1509,17 +1699,17 @@ describe('Rectangle Synchronization', () => {
 
 **External:** Browser testing
 
-#### 8.2 Run MVP Checklist - Canvas Workspace
+#### 9.2 Run MVP Checklist - Canvas Workspace
 - [ ] Test: Pan by clicking and dragging background
 - [ ] Test: Zoom with mouse wheel
 - [ ] Test: Smooth pan at 60 FPS (use dev tools)
 - [ ] Test: Smooth zoom at 60 FPS
-- [ ] Test: Canvas feels spacious (5000x5000px)
+- [ ] Test: Canvas feels spacious (64000x64000px)
 - [ ] Fix any canvas issues
 
 **External:** Browser testing
 
-#### 8.3 Run MVP Checklist - Rectangles
+#### 9.3 Run MVP Checklist - Rectangles
 - [ ] Test: Create rectangle with button
 - [ ] Test: Click to select rectangle
 - [ ] Test: Drag to move rectangle
@@ -1529,7 +1719,7 @@ describe('Rectangle Synchronization', () => {
 
 **External:** Browser testing
 
-#### 8.4 Run MVP Checklist - Real-Time Sync
+#### 9.4 Run MVP Checklist - Real-Time Sync
 - [ ] Open 2 browser windows with different users
 - [ ] Test: Create rectangle in Window 1, appears in Window 2 (<100ms)
 - [ ] Test: Move rectangle in Window 2, updates in Window 1 (<100ms)
@@ -1539,7 +1729,7 @@ describe('Rectangle Synchronization', () => {
 
 **External:** Browser testing
 
-#### 8.5 Run MVP Checklist - Multiplayer Cursors
+#### 9.5 Run MVP Checklist - Multiplayer Cursors
 - [ ] Open 2 browser windows with different users
 - [ ] Test: Move mouse in Window 1, cursor appears in Window 2
 - [ ] Test: Cursor moves smoothly (<100ms latency)
@@ -1550,7 +1740,7 @@ describe('Rectangle Synchronization', () => {
 
 **External:** Browser testing
 
-#### 8.6 Run MVP Checklist - Presence
+#### 9.6 Run MVP Checklist - Presence
 - [ ] Open 2 browser windows with different users
 - [ ] Test: Both users appear in presence list
 - [ ] Test: User count is accurate
@@ -1561,7 +1751,7 @@ describe('Rectangle Synchronization', () => {
 
 **External:** Browser testing
 
-#### 8.7 Run MVP Checklist - Persistence
+#### 9.7 Run MVP Checklist - Persistence
 - [ ] Create several rectangles
 - [ ] Refresh browser
 - [ ] Test: All rectangles still present
@@ -1572,7 +1762,7 @@ describe('Rectangle Synchronization', () => {
 
 **External:** Browser testing
 
-#### 8.8 Run MVP Checklist - Deployment
+#### 9.8 Run MVP Checklist - Deployment
 - [ ] Verify app is deployed to public URL
 - [ ] Test in Chrome
 - [ ] Test in Firefox
@@ -1583,7 +1773,7 @@ describe('Rectangle Synchronization', () => {
 
 **External:** Browser testing, multiple browsers
 
-#### 8.9 Performance Testing
+#### 9.9 Performance Testing
 - [ ] Open browser dev tools Performance tab
 - [ ] Record while panning canvas
 - [ ] Verify 60 FPS maintained
@@ -1597,7 +1787,7 @@ describe('Rectangle Synchronization', () => {
 
 **External:** Browser dev tools
 
-#### 8.10 Cross-Browser Testing
+#### 9.10 Cross-Browser Testing
 - [ ] Test full workflow in Chrome
 - [ ] Test full workflow in Firefox
 - [ ] Test full workflow in Safari (if available)
@@ -1606,7 +1796,7 @@ describe('Rectangle Synchronization', () => {
 
 **External:** Multiple browsers
 
-#### 8.11 Add Loading States
+#### 9.11 Add Loading States
 - [ ] Add loading spinner while checking auth state
 - [ ] Add loading state while fetching initial shapes
 - [ ] Add loading state during login/register
@@ -1618,7 +1808,7 @@ describe('Rectangle Synchronization', () => {
 - `src/components/auth/LoginForm.tsx`
 - `src/components/auth/RegisterForm.tsx`
 
-#### 8.12 Error Handling Improvements
+#### 9.12 Error Handling Improvements
 - [ ] Add error boundaries (optional for MVP)
 - [ ] Improve error messages in auth forms
 - [ ] Add console.error for debugging
@@ -1631,7 +1821,7 @@ describe('Rectangle Synchronization', () => {
 - `src/components/auth/LoginForm.tsx`
 - `src/components/auth/RegisterForm.tsx`
 
-#### 8.13 Update README
+#### 9.13 Update README
 - [ ] Open `README.md`
 - [ ] Add detailed setup instructions
 - [ ] Add Firebase configuration steps
@@ -1645,7 +1835,7 @@ describe('Rectangle Synchronization', () => {
 **Files Modified:**
 - `README.md`
 
-#### 8.14 Add Code Comments
+#### 9.14 Add Code Comments
 - [ ] Add JSDoc comments to complex functions
 - [ ] Add inline comments for tricky logic
 - [ ] Document Firebase structure in comments
@@ -1654,7 +1844,7 @@ describe('Rectangle Synchronization', () => {
 **Files Modified:**
 - Multiple files (add comments where needed)
 
-#### 8.15 Clean Up Code
+#### 9.15 Clean Up Code
 - [ ] Remove console.logs (or keep for debugging)
 - [ ] Remove unused imports
 - [ ] Remove unused components/files
@@ -1664,7 +1854,7 @@ describe('Rectangle Synchronization', () => {
 **Files Modified:**
 - Multiple files
 
-#### 8.16 Test Edge Cases
+#### 9.16 Test Edge Cases
 - [ ] Test: Very fast rectangle creation (10+ clicks)
 - [ ] Test: Very fast rectangle movements
 - [ ] Test: Creating 50+ rectangles
@@ -1675,7 +1865,7 @@ describe('Rectangle Synchronization', () => {
 
 **External:** Browser testing
 
-#### 8.17 Record Demo Video
+#### 9.17 Record Demo Video
 - [ ] Open deployed app
 - [ ] Record 2-3 minute demo video
 - [ ] Show login/register
@@ -1691,7 +1881,7 @@ describe('Rectangle Synchronization', () => {
 
 **External:** Screen recording software
 
-#### 8.18 Final Deployment
+#### 9.18 Final Deployment
 - [ ] Run `npm run build`
 - [ ] Fix any build errors
 - [ ] Run `firebase deploy`
@@ -1701,7 +1891,7 @@ describe('Rectangle Synchronization', () => {
 
 **External:** Firebase Hosting
 
-#### 8.19 Create Submission Checklist
+#### 9.19 Create Submission Checklist
 - [ ] Verify GitHub repository is public
 - [ ] Verify README has setup instructions
 - [ ] Verify README has deployed link
@@ -1711,7 +1901,7 @@ describe('Rectangle Synchronization', () => {
 
 **External:** GitHub
 
-#### 8.20 Implement Shape Locking System (Post-MVP)
+#### 9.20 Implement Shape Locking System (Post-MVP)
 - [ ] Recreate `src/hooks/useShapeLocks.ts` with proper locking logic
 - [ ] Add `ShapeLock` type back to `src/types/index.ts`
 - [ ] Update Firestore rules to include locking collection
@@ -1734,7 +1924,7 @@ describe('Rectangle Synchronization', () => {
 - `src/pages/CanvasPage.tsx`
 - `src/components/canvas/CanvasControls.tsx`
 
-#### 8.21 Final Code Review
+#### 9.21 Final Code Review
 - [ ] Review all code for quality
 - [ ] Ensure consistent coding style
 - [ ] Verify no sensitive data (API keys) in repo
@@ -1745,27 +1935,10 @@ describe('Rectangle Synchronization', () => {
 **Files Modified:**
 - Multiple files (final review)
 
-#### 8.22 Fix Cursor Positioning Bug
-- [ ] Investigate cursor positioning issue after canvas resizing
-- [ ] Debug coordinate conversion between relative and screen coordinates
-- [ ] Fix cursor positioning when sidebar is toggled
-- [ ] Fix cursor positioning when canvas is panned
-- [ ] Test cursor positioning with multiple users
-- [ ] Verify cursors appear at correct mouse positions
-- [ ] Add comprehensive debugging logs
-- [ ] Test edge cases (rapid resizing, extreme panning)
 
-**Files Modified:**
-- `src/hooks/useCursors.ts`
-- `src/components/multiplayer/CursorLayer.tsx`
-- `src/pages/CanvasPage.tsx`
-- `src/components/canvas/Canvas.tsx`
-
-**External:** Browser testing with multiple users
-
-### Files Summary for PR #8:
+### Files Summary for PR #9:
 **Created:**
-- None (polish only)
+- `src/hooks/useShapeLocks.ts`
 
 **Modified:**
 - `README.md`
@@ -1776,6 +1949,11 @@ describe('Rectangle Synchronization', () => {
 - `src/hooks/useShapes.ts`
 - `src/hooks/useCursors.ts`
 - `src/hooks/usePresence.ts`
+- `src/types/index.ts`
+- `firestore.rules`
+- `src/components/canvas/Rectangle.tsx`
+- `src/components/canvas/Canvas.tsx`
+- `src/components/canvas/CanvasControls.tsx`
 - Multiple files (cleanup, comments, bug fixes)
 
 ---
@@ -1791,7 +1969,8 @@ describe('Rectangle Synchronization', () => {
 | 5 | feature/realtime-sync | Firestore sync | 2 | 6 | 1 integration | 4-5 hrs |
 | 6 | feature/multiplayer-cursors | Cursor sync | 3 | 5 | None | 3-4 hrs |
 | 7 | feature/presence-system | Presence tracking | 2 | 3 | None | 2-3 hrs |
-| 8 | feature/final-polish | Testing & polish | 0 | 10+ | Manual testing | 3-4 hrs |
+| 8 | feature/new-layout-properties | New layout & shape properties | 2 | 7 | None | 3-4 hrs |
+| 9 | feature/final-polish | Testing & polish | 1 | 10+ | Manual testing | 3-4 hrs |
 
 **Total Estimated Time:** 25-33 hours (includes test writing time)
 

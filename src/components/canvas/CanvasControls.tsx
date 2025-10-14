@@ -149,6 +149,7 @@ const CanvasControls: React.FC<CanvasControlsProps> = ({
         y: center.y - 40, // Center the rectangle (80px height / 2)
         width: 100,
         height: 80,
+        rotation: 0, // Default rotation
         fill: getRandomColor(),
         createdBy: user.uid
       }

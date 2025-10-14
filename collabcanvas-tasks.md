@@ -77,21 +77,20 @@ collabcanvas/
 **Branch:** `feature/project-setup`
 
 ### High-Level Tasks:
-- [ ] Initialize Vite + React + TypeScript project
-- [ ] Install and configure all dependencies
-- [ ] Set up Tailwind CSS
-- [ ] Create Firebase project
-- [ ] Configure Firebase services
-- [ ] Deploy "Hello World" to Firebase Hosting
-- [ ] Verify public URL works
+- [x] Initialize Vite + React + TypeScript project
+- [x] Install and configure all dependencies
+- [x] Set up Tailwind CSS
+- [x] Deploy to Vercel (already working)
+- [x] Create Firebase project
+- [x] Configure Firebase services (Auth + Firestore + Realtime DB)
 
 ### Subtasks:
 
 #### 1.1 Initialize Vite Project
-- [ ] Run `npm create vite@latest collabcanvas -- --template react-ts`
-- [ ] Navigate to project directory
-- [ ] Run `npm install`
-- [ ] Test dev server with `npm run dev`
+- [x] Run `npm create vite@latest collabcanvas -- --template react-ts`
+- [x] Navigate to project directory
+- [x] Run `npm install`
+- [x] Test dev server with `npm run dev`
 
 **Files Created:**
 - `package.json`
@@ -104,29 +103,29 @@ collabcanvas/
 - `src/index.css`
 
 #### 1.2 Install Core Dependencies
-- [ ] Run `npm install firebase`
-- [ ] Run `npm install konva react-konva`
-- [ ] Run `npm install react-router-dom`
-- [ ] Run `npm install zustand`
+- [x] Run `npm install firebase`
+- [x] Run `npm install konva react-konva`
+- [x] Run `npm install react-router-dom`
+- [x] Run `npm install zustand`
 
 **Files Modified:**
 - `package.json`
 
 #### 1.3 Install Dev Dependencies & Testing Tools
-- [ ] Run `npm install -D tailwindcss postcss autoprefixer`
-- [ ] Run `npm install -D @types/node`
-- [ ] Run `npm install -D vitest @vitest/ui`
-- [ ] Run `npm install -D @testing-library/react @testing-library/jest-dom @testing-library/user-event`
-- [ ] Run `npm install -D jsdom`
+- [x] Run `npm install -D tailwindcss postcss autoprefixer`
+- [x] Run `npm install -D @types/node`
+- [x] Run `npm install -D vitest @vitest/ui`
+- [x] Run `npm install -D @testing-library/react @testing-library/jest-dom @testing-library/user-event`
+- [x] Run `npm install -D jsdom`
 
 **Files Modified:**
 - `package.json`
 
 #### 1.4 Configure Tailwind CSS
-- [ ] Run `npx tailwindcss init -p`
-- [ ] Configure `tailwind.config.js` content paths
-- [ ] Add Tailwind directives to `src/index.css`
-- [ ] Test Tailwind by adding utility classes to App.tsx
+- [x] Run `npx tailwindcss init -p`
+- [x] Configure `tailwind.config.js` content paths
+- [x] Add Tailwind directives to `src/index.css`
+- [x] Test Tailwind by adding utility classes to App.tsx
 
 **Files Created:**
 - `tailwind.config.js`
@@ -137,34 +136,30 @@ collabcanvas/
 - `src/App.tsx`
 
 #### 1.5 Create Firebase Project
-- [ ] Go to Firebase Console (https://console.firebase.google.com)
-- [ ] Click "Add project"
-- [ ] Name project "collabcanvas" (or similar)
-- [ ] Disable Google Analytics (optional for MVP)
-- [ ] Create project
+- [x] Go to Firebase Console (https://console.firebase.google.com)
+- [x] Click "Add project"
+- [x] Name project "collabcanvas" (or similar)
+- [x] Disable Google Analytics (optional for MVP)
+- [x] Create project
 
 **External:** Firebase Console
 
 #### 1.6 Set Up Firebase Services
-- [ ] In Firebase Console, add web app
-- [ ] Copy Firebase config object
-- [ ] Enable Authentication (Email/Password)
-- [ ] Enable Firestore Database (Start in test mode)
-- [ ] Enable Realtime Database (Start in test mode)
-- [ ] Enable Firebase Hosting
+- [x] In Firebase Console, add web app
+- [x] Copy Firebase config object
+- [x] Enable Authentication (Email/Password)
+- [x] Enable Firestore Database (Start in test mode)
+- [x] Enable Realtime Database (Start in test mode)
 
 **External:** Firebase Console
 
-#### 1.7 Configure Firebase in Project
-- [ ] Install Firebase CLI: `npm install -g firebase-tools`
-- [ ] Run `firebase login`
-- [ ] Run `firebase init` (select Hosting, Firestore, Realtime Database)
-- [ ] Select existing project
-- [ ] Set public directory to `dist`
-- [ ] Configure as single-page app (Yes)
-- [ ] Don't overwrite index.html
+#### 1.7 Configure Firebase in Project (Optional - for rules management)
+- [x] Install Firebase CLI: `npm install -g firebase-tools` (optional)
+- [x] Run `firebase login` (optional)
+- [x] Run `firebase init` (select Firestore, Realtime Database only) (optional)
+- [x] Select existing project (optional)
 
-**Files Created:**
+**Files Created (Optional):**
 - `.firebaserc`
 - `firebase.json`
 - `firestore.rules`
@@ -172,18 +167,18 @@ collabcanvas/
 - `database.rules.json`
 
 #### 1.8 Create Firebase Config File
-- [ ] Create `src/lib/firebase.ts`
-- [ ] Add Firebase config from console
-- [ ] Initialize Firebase app
-- [ ] Export auth, firestore, and realtimeDb instances
+- [x] Create `src/lib/firebase.ts`
+- [x] Add Firebase config from console
+- [x] Initialize Firebase app
+- [x] Export auth, firestore, and realtimeDb instances
 
 **Files Created:**
 - `src/lib/firebase.ts`
 
 #### 1.9 Create Environment Variables
-- [ ] Create `.env.local` file
-- [ ] Add Firebase config as environment variables
-- [ ] Update `.gitignore` to exclude `.env.local`
+- [x] Create `.env.local` file
+- [x] Add Firebase config as environment variables
+- [x] Update `.gitignore` to exclude `.env.local`
 
 **Files Created:**
 - `.env.local`
@@ -192,27 +187,26 @@ collabcanvas/
 - `.gitignore`
 
 #### 1.10 Create Simple "Hello World" App
-- [ ] Clean up default Vite content in `App.tsx`
-- [ ] Create simple "CollabCanvas - Coming Soon" message
-- [ ] Add basic Tailwind styling
+- [x] Clean up default Vite content in `App.tsx`
+- [x] Create simple "CollabCanvas - Coming Soon" message
+- [x] Add basic Tailwind styling
 
 **Files Modified:**
 - `src/App.tsx`
 - `src/App.css` (can delete most/all)
 
-#### 1.11 Build and Deploy
-- [ ] Run `npm run build`
-- [ ] Run `firebase deploy --only hosting`
-- [ ] Visit deployed URL
-- [ ] Verify "Hello World" loads
+#### 1.11 Vercel Deployment (Already Complete)
+- [x] Deploy to Vercel
+- [x] Verify deployed URL works
+- [x] "Hello World" app is live
 
-**External:** Firebase Hosting
+**External:** Vercel (Complete)
 
-#### 1.12 Create README
-- [ ] Create `README.md`
-- [ ] Add project title and description
-- [ ] Add setup instructions
-- [ ] Add deployed URL
+#### 1.12 Update README
+- [x] Update `README.md` with CollabCanvas project info
+- [x] Add project title and description
+- [x] Add setup instructions
+- [x] Add Vercel deployed URL
 
 **Files Created:**
 - `README.md`
@@ -236,21 +230,22 @@ collabcanvas/
 - All initial Vite files
 - `src/lib/firebase.ts`
 - `.env.local`
-- `.firebaserc`
-- `firebase.json`
-- `firestore.rules`
-- `database.rules.json`
-- `tailwind.config.js`
-- `postcss.config.js`
+- `tailwind.config.ts`
 - `vitest.config.ts`
 - `src/__tests__/setup.test.ts`
-- `README.md`
 
 **Modified:**
 - `package.json`
 - `.gitignore`
 - `src/index.css`
 - `src/App.tsx`
+- `README.md`
+
+**Optional (if using Firebase CLI):**
+- `.firebaserc`
+- `firebase.json`
+- `firestore.rules`
+- `database.rules.json`
 
 ---
 

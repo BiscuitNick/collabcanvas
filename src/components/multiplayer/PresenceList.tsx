@@ -6,7 +6,6 @@ interface PresenceListProps {
 }
 
 const PresenceList: React.FC<PresenceListProps> = ({ users }) => {
-  console.log('👥 PresenceList rendering with users:', users)
   
   return (
     <div className="p-4">

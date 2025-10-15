@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useCanvasStore } from '../../store/canvasStore'
 import { useAuth } from '../../hooks/useAuth'
 import { getRandomColor, getViewportCenter } from '../../lib/utils'
+import { CANVAS_HALF } from '../../lib/constants'
 import type { Rectangle } from '../../types'
 import RectangleProperties from '../canvas/RectangleProperties'
+import type { PresenceUser, Cursor as CursorType } from '../../types'
 
 interface CollapsibleSectionProps {
   title: string
@@ -47,15 +49,16 @@ interface LeftColumnProps {
   clearAllShapes: () => Promise<void>
   shapesError: string | null
   onRetry: () => void
-  presenceUsers: any[]
-  cursors: any[]
+  presenceUsers: PresenceUser[]
+  cursors: CursorType[]
   shapes: Rectangle[]
   onUserClick?: (userId: string) => void
   onShapeSelect?: (shapeId: string) => void
+  onDebugStateChange?: (showSelfCursor: boolean) => void
 }
 
-const LeftColumn: React.FC<LeftColumnProps> = ({ 
-  viewportWidth, 
+const LeftColumn: React.FC<LeftColumnProps> = ({
+  viewportWidth,
   viewportHeight,
   createShape,
   deleteShape,
@@ -66,14 +69,28 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
   cursors,
   shapes,
   onUserClick,
-  onShapeSelect
+  onShapeSelect,
+  onDebugStateChange
 }) => {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const { stageScale, stagePosition, resetView, updateScale, updatePosition, selectedShapeId } = useCanvasStore()
   const [zoomInput, setZoomInput] = useState('')
   const [panXInput, setPanXInput] = useState('')
   const [panYInput, setPanYInput] = useState('')
   const [expandedUser, setExpandedUser] = useState<string | null>(null)
+  const [showSelfCursor, setShowSelfCursor] = useState(false)
+
+  const handleDeleteRectangle = useCallback(async () => {
+    if (selectedShapeId) {
+      if (window.confirm('Are you sure you want to delete this rectangle?')) {
+        try {
+          await deleteShape(selectedShapeId)
+        } catch (error) {
+          console.error('Error deleting rectangle:', error)
+        }
+      }
+    }
+  }, [selectedShapeId, deleteShape])
 
   // Update inputs when values change externally
   useEffect(() => {
@@ -81,6 +98,13 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
     setPanXInput(Math.round(stagePosition.x).toString())
     setPanYInput(Math.round(stagePosition.y).toString())
   }, [stageScale, stagePosition])
+
+  // Notify parent when debug state changes
+  useEffect(() => {
+    if (onDebugStateChange) {
+      onDebugStateChange(showSelfCursor)
+    }
+  }, [showSelfCursor, onDebugStateChange])
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -93,14 +117,44 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedShapeId])
+  }, [selectedShapeId, handleDeleteRectangle])
 
   const handleZoomIn = () => {
-    updateScale(stageScale * 1.1)
+    const newScale = Math.min(3, stageScale + 0.1) // Increment by 10%
+    
+    // Calculate new position to keep canvas center fixed
+    const centerX = viewportWidth / 2
+    const centerY = viewportHeight / 2
+    
+    // Current center in canvas space
+    const currentCenterX = (centerX - stagePosition.x) / stageScale
+    const currentCenterY = (centerY - stagePosition.y) / stageScale
+    
+    // New stage position to keep the same center point
+    const newX = centerX - currentCenterX * newScale
+    const newY = centerY - currentCenterY * newScale
+    
+    updateScale(newScale)
+    updatePosition(newX, newY)
   }
 
   const handleZoomOut = () => {
-    updateScale(stageScale / 1.1)
+    const newScale = Math.max(0.1, stageScale - 0.1) // Decrement by 10%
+    
+    // Calculate new position to keep canvas center fixed
+    const centerX = viewportWidth / 2
+    const centerY = viewportHeight / 2
+    
+    // Current center in canvas space
+    const currentCenterX = (centerX - stagePosition.x) / stageScale
+    const currentCenterY = (centerY - stagePosition.y) / stageScale
+    
+    // New stage position to keep the same center point
+    const newX = centerX - currentCenterX * newScale
+    const newY = centerY - currentCenterY * newScale
+    
+    updateScale(newScale)
+    updatePosition(newX, newY)
   }
 
   const handleResetView = () => {
@@ -111,24 +165,40 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
     setZoomInput(e.target.value)
   }
 
-  const handleZoomInputSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const applyZoomFromInput = () => {
     const value = parseFloat(zoomInput)
     if (!isNaN(value) && value > 0) {
       const clampedValue = Math.max(10, Math.min(300, value)) // 10% to 300%
-      updateScale(clampedValue / 100)
+      const newScale = clampedValue / 100
+      
+      // Calculate new position to keep canvas center fixed
+      const centerX = viewportWidth / 2
+      const centerY = viewportHeight / 2
+      
+      // Current center in canvas space
+      const currentCenterX = (centerX - stagePosition.x) / stageScale
+      const currentCenterY = (centerY - stagePosition.y) / stageScale
+      
+      // New stage position to keep the same center point
+      const newX = centerX - currentCenterX * newScale
+      const newY = centerY - currentCenterY * newScale
+      
+      updateScale(newScale)
+      updatePosition(newX, newY)
+      setZoomInput(clampedValue.toString()) // Update input to show clamped value
     } else {
       // Reset to current value if invalid
       setZoomInput(Math.round(stageScale * 100).toString())
     }
   }
 
+  const handleZoomInputSubmit = (e: React.KeyboardEvent | React.FormEvent) => {
+    e.preventDefault()
+    applyZoomFromInput()
+  }
+
   const handleZoomInputBlur = () => {
-    // Reset to current value if input is invalid on blur
-    const value = parseFloat(zoomInput)
-    if (isNaN(value) || value <= 0) {
-      setZoomInput(Math.round(stageScale * 100).toString())
-    }
+    applyZoomFromInput()
   }
 
   const handlePanXInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,8 +213,8 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
     e.preventDefault()
     const value = parseFloat(panXInput)
     if (!isNaN(value)) {
-      // Clamp X value within canvas bounds (-32000 to 32000)
-      const clampedX = Math.max(-32000, Math.min(32000, value))
+      // Clamp X value within canvas bounds
+      const clampedX = Math.max(-CANVAS_HALF, Math.min(CANVAS_HALF, value))
       updatePosition(clampedX, stagePosition.y)
     } else {
       setPanXInput(Math.round(stagePosition.x).toString())
@@ -155,8 +225,8 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
     e.preventDefault()
     const value = parseFloat(panYInput)
     if (!isNaN(value)) {
-      // Clamp Y value within canvas bounds (-32000 to 32000)
-      const clampedY = Math.max(-32000, Math.min(32000, value))
+      // Clamp Y value within canvas bounds
+      const clampedY = Math.max(-CANVAS_HALF, Math.min(CANVAS_HALF, value))
       updatePosition(stagePosition.x, clampedY)
     } else {
       setPanYInput(Math.round(stagePosition.y).toString())
@@ -201,18 +271,6 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
     }
   }
 
-  const handleDeleteRectangle = async () => {
-    if (selectedShapeId) {
-      if (window.confirm('Are you sure you want to delete this rectangle?')) {
-        try {
-          await deleteShape(selectedShapeId)
-        } catch (error) {
-          console.error('Error deleting rectangle:', error)
-        }
-      }
-    }
-  }
-
   const handleResetCanvas = async () => {
     if (window.confirm('Are you sure you want to reset the canvas? This will delete all shapes and reset the view.')) {
       try {
@@ -245,7 +303,7 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-4 flex flex-col h-full">
       {/* Error Display */}
       {shapesError && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3">
@@ -283,21 +341,6 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
                 −
               </button>
               
-              <form onSubmit={handleZoomInputSubmit} className="flex items-center">
-                <input
-                  type="number"
-                  value={zoomInput}
-                  onChange={handleZoomInputChange}
-                  onBlur={handleZoomInputBlur}
-                  className="w-16 px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  min="10"
-                  max="300"
-                  step="1"
-                  title="Enter zoom percentage (10-300%)"
-                />
-                <span className="ml-1 text-sm text-gray-600">%</span>
-              </form>
-              
               <button
                 onClick={handleZoomIn}
                 className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -305,6 +348,26 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
               >
                 +
               </button>
+              
+              <div className="flex items-center">
+                <input
+                  type="number"
+                  value={zoomInput}
+                  onChange={handleZoomInputChange}
+                  onBlur={handleZoomInputBlur}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleZoomInputSubmit(e)
+                    }
+                  }}
+                  className="w-16 px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="10"
+                  max="300"
+                  step="1"
+                  title="Enter zoom percentage (10-300%)"
+                />
+                <span className="ml-1 text-sm text-gray-600">%</span>
+              </div>
             </div>
           </div>
 
@@ -411,7 +474,7 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
                         <div className="font-medium truncate">
                           Rectangle {shapes.indexOf(shape) + 1}
                         </div>
-                        <div className="text-gray-500">
+                        <div className="text-gray-500 text-xs">
                           {Math.round(shape.x)}, {Math.round(shape.y)} • {Math.round(shape.width)}×{Math.round(shape.height)}
                         </div>
                       </div>
@@ -428,7 +491,6 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
           {/* Rectangle Properties - Vertical Layout */}
           {selectedShapeId && (
             <div className="space-y-3">
-              <h4 className="text-xs font-medium text-gray-700">Shape Properties</h4>
               <RectangleProperties selectedShapeId={selectedShapeId} />
             </div>
           )}
@@ -457,7 +519,6 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
                   <span className="text-sm text-gray-700 flex-1 text-left">{user.userName}</span>
                   {userCursor ? (
                     <div className="flex items-center gap-1">
-                      <span className="text-xs text-blue-600">📍</span>
                       <span className="text-xs text-gray-500">
                         {isExpanded ? '▼' : '▶'}
                       </span>
@@ -470,7 +531,6 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
                 {/* Cursor Information */}
                 {isExpanded && userCursor && (
                   <div className="ml-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs space-y-2">
-                    <div className="font-medium text-blue-800">📍 Cursor Details</div>
                     <div className="text-blue-700 space-y-1">
                       <div className="flex justify-between">
                         <span>Position:</span>
@@ -497,25 +557,6 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
                         </span>
                       </div>
                     </div>
-                    <div className="pt-1 border-t border-blue-200">
-                      <button
-                        onClick={() => {
-                          // Trigger auto-pan to this user's cursor
-                          if (onUserClick) {
-                            onUserClick(user.userId)
-                          }
-                        }}
-                        disabled={!userCursor}
-                        className={`w-full px-2 py-1 text-xs rounded focus:outline-none focus:ring-1 ${
-                          userCursor 
-                            ? 'bg-blue-500 text-white hover:bg-blue-600 focus:ring-blue-500' 
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        }`}
-                        title={userCursor ? 'Pan to user cursor' : 'Waiting for cursor data...'}
-                      >
-                        {userCursor ? '🎯 Pan to Cursor' : '⏳ Loading...'}
-                      </button>
-                    </div>
                   </div>
                 )}
               </div>
@@ -523,6 +564,89 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
           })}
         </div>
       </CollapsibleSection>
+
+      {/* Debug Section */}
+      <CollapsibleSection title="Debug" defaultOpen={true}>
+        <div className="space-y-3">
+          {/* Self Cursor Toggle */}
+          <div className="flex items-center justify-between">
+            <label className="text-sm text-gray-700">Show Self Cursor</label>
+            <button
+              onClick={() => setShowSelfCursor(!showSelfCursor)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                showSelfCursor ? 'bg-blue-600' : 'bg-gray-200'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  showSelfCursor ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Debug Info Display - always shown */}
+          <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded text-xs space-y-2">
+            <div className="font-medium text-gray-800">Debug Information</div>
+            <div className="text-gray-600 space-y-1">
+              <div className="flex justify-between">
+                <span>Total Users:</span>
+                <span>{presenceUsers.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Active Cursors:</span>
+                <span>{cursors.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Canvas Scale:</span>
+                <span>{(stageScale * 100).toFixed(1)}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Canvas Position:</span>
+                <span className="font-mono">({Math.round(stagePosition.x)}, {Math.round(stagePosition.y)})</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Viewport Size:</span>
+                <span className="font-mono">{viewportWidth}×{viewportHeight}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Effective Canvas Size:</span>
+                <span className="font-mono">{Math.round(viewportWidth / stageScale)}×{Math.round(viewportHeight / stageScale)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CollapsibleSection>
+
+      {/* User Account Section */}
+      <div className="mt-auto pt-4 border-t border-gray-200">
+        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+          <div className="flex items-center gap-2 flex-1">
+            {user?.photoURL && (
+              <img
+                src={user.photoURL}
+                alt={user.displayName || 'User'}
+                className="w-8 h-8 rounded-full"
+              />
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-sm text-gray-900 truncate">
+                {user?.displayName || user?.email || 'User'}
+              </div>
+              <div className="text-xs text-gray-500">
+                {user?.email && user?.displayName ? user.email : 'Logged in'}
+              </div>
+            </div>
+          </div>
+          
+          <button
+            onClick={logout}
+            className="px-3 py-1.5 bg-red-500 text-white text-sm rounded hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

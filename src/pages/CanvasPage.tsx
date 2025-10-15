@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useShapes } from '../hooks/useShapes'
 import { useCursors } from '../hooks/useCursors'
@@ -8,11 +8,13 @@ import Layout from '../components/layout/Layout'
 import LeftColumn from '../components/layout/LeftColumn'
 import Canvas from '../components/canvas/Canvas'
 import ErrorBoundary from '../components/ErrorBoundary'
+import { CANVAS_HALF } from '../lib/constants'
 
 export const CanvasPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth()
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const [pendingUserClick, setPendingUserClick] = useState<string | null>(null)
+  const [showSelfCursor, setShowSelfCursor] = useState(true)
 
   // Initialize hooks
   const {
@@ -32,22 +34,73 @@ export const CanvasPage: React.FC = () => {
     cursors,
     updateCursor,
     error: cursorsError
-  } = useCursors(user?.uid || '', user?.displayName || 'Anonymous', canvasSize.width, canvasSize.height, stagePosition, canvasSize.width, canvasSize.height, stageScale)
+  } = useCursors(user?.uid || '', user?.displayName || 'Anonymous', stagePosition, canvasSize.width, canvasSize.height, stageScale)
 
   const {
     presenceUsers,
     error: presenceError
   } = usePresence(user?.uid || '', user?.displayName || 'Anonymous')
 
+  // Handle user click - auto pan to cursor (zoom-aware)
+  const handleUserClick = useCallback((userId: string) => {
+    const userCursor = cursors.find(cursor => cursor.userId === userId)
+    
+    if (userCursor) {
+      // Desired stage position to center the cursor at current scale
+      const desiredX = (canvasSize.width / 2) - (userCursor.x * stageScale)
+      const desiredY = (canvasSize.height / 2) - (userCursor.y * stageScale)
+
+      // Clamp stage position to world bounds with scale
+      const minStageX = canvasSize.width - (CANVAS_HALF * stageScale)
+      const maxStageX = (CANVAS_HALF * stageScale)
+      const minStageY = canvasSize.height - (CANVAS_HALF * stageScale)
+      const maxStageY = (CANVAS_HALF * stageScale)
+
+      const clampedX = Math.max(minStageX, Math.min(maxStageX, desiredX))
+      const clampedY = Math.max(minStageY, Math.min(maxStageY, desiredY))
+      
+      updatePosition(clampedX, clampedY)
+    } else {
+      if (cursors.length === 0) {
+        setPendingUserClick(userId)
+      }
+    }
+  }, [cursors, canvasSize.width, canvasSize.height, stageScale, updatePosition])
+
+  // Handle shape click - auto pan to rectangle center (zoom-aware)
+  const handleShapeClick = useCallback((shapeId: string) => {
+    const shape = shapes.find(s => s.id === shapeId)
+    
+    if (shape) {
+      const centerX = shape.x + (shape.width / 2)
+      const centerY = shape.y + (shape.height / 2)
+
+      // Desired stage position to center the rectangle at current scale
+      const desiredX = (canvasSize.width / 2) - (centerX * stageScale)
+      const desiredY = (canvasSize.height / 2) - (centerY * stageScale)
+
+      // Clamp stage position to world bounds with scale
+      const minStageX = canvasSize.width - (CANVAS_HALF * stageScale)
+      const maxStageX = (CANVAS_HALF * stageScale)
+      const minStageY = canvasSize.height - (CANVAS_HALF * stageScale)
+      const maxStageY = (CANVAS_HALF * stageScale)
+
+      const clampedX = Math.max(minStageX, Math.min(maxStageX, desiredX))
+      const clampedY = Math.max(minStageY, Math.min(maxStageY, desiredY))
+      
+      updatePosition(clampedX, clampedY)
+    }
+  }, [shapes, canvasSize.width, canvasSize.height, stageScale, updatePosition])
+
   // Calculate canvas size based on viewport (left column is fixed at 320px)
   useEffect(() => {
     const updateCanvasSize = () => {
       const leftColumnWidth = 320 // Fixed left column width
-      const padding = 40 // 20px padding on each side
+      const pagePadding = 40 // 20px padding on each side (total 40px)
       
       // Calculate available space for canvas
-      const availableWidth = window.innerWidth - leftColumnWidth - padding
-      const availableHeight = window.innerHeight - padding
+      const availableWidth = window.innerWidth - leftColumnWidth - pagePadding
+      const availableHeight = window.innerHeight - pagePadding
       
       setCanvasSize({
         width: Math.max(400, availableWidth), // Minimum 400px width
@@ -66,31 +119,18 @@ export const CanvasPage: React.FC = () => {
       handleUserClick(pendingUserClick)
       setPendingUserClick(null)
     }
-  }, [cursors, pendingUserClick])
-
-  // Handle user click - auto pan to cursor
-  const handleUserClick = (userId: string) => {
-    const userCursor = cursors.find(cursor => cursor.userId === userId)
-    
-    if (userCursor) {
-      // Calculate stage position to center the cursor
-      // Cursor coordinates are in original canvas space, so we can use them directly
-      const centerX = -userCursor.x + canvasSize.width / 2
-      const centerY = -userCursor.y + canvasSize.height / 2
-      
-      // Smooth pan to cursor location
-      updatePosition(centerX, centerY)
-    } else {
-      // If no cursors are loaded yet, set up a retry mechanism
-      if (cursors.length === 0) {
-        setPendingUserClick(userId)
-      }
-    }
-  }
+  }, [cursors, pendingUserClick, handleUserClick])
 
   // Handle shape selection from the list
   const handleShapeSelect = (shapeId: string) => {
     selectShape(shapeId)
+    // Also pan to the selected shape
+    handleShapeClick(shapeId)
+  }
+
+  // Handle debug state changes from LeftColumn
+  const handleDebugStateChange = (selfCursor: boolean) => {
+    setShowSelfCursor(selfCursor)
   }
 
 
@@ -133,6 +173,7 @@ export const CanvasPage: React.FC = () => {
             shapes={shapes}
             onUserClick={handleUserClick}
             onShapeSelect={handleShapeSelect}
+            onDebugStateChange={handleDebugStateChange}
           />
         }
       >
@@ -151,7 +192,9 @@ export const CanvasPage: React.FC = () => {
               shapes={shapes}
               cursors={cursors}
               updateShape={updateShape}
-              onMouseMove={(x, y, canvasWidth, canvasHeight) => updateCursor(x, y, canvasWidth, canvasHeight)}
+              onMouseMove={(x, y) => updateCursor(x, y)}
+              showSelfCursor={showSelfCursor}
+              currentUserId={user?.uid}
             />
           </div>
         </div>

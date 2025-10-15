@@ -5,7 +5,15 @@ import type { Rectangle } from '../types'
 
 // Mock Konva components
 vi.mock('react-konva', () => ({
-  Rect: ({ onClick, onTap, onDragEnd, onTransformEnd, onMouseEnter, onMouseLeave, ...props }: any) => (
+  Rect: ({ onClick, onTap, onDragEnd, onTransformEnd, onMouseEnter, onMouseLeave, ...props }: {
+    onClick: (e: React.MouseEvent) => void,
+    onTap: (e: React.MouseEvent) => void,
+    onDragEnd: (e: React.MouseEvent) => void,
+    onTransformEnd: (e: React.MouseEvent) => void,
+    onMouseEnter: (e: React.MouseEvent) => void,
+    onMouseLeave: (e: React.MouseEvent) => void,
+    [key: string]: unknown
+  }) => (
     <div
       data-testid="konva-rect"
       onClick={onClick}
@@ -17,7 +25,7 @@ vi.mock('react-konva', () => ({
       {...props}
     />
   ),
-  Transformer: (props: any) => <div data-testid="konva-transformer" {...props} />
+  Transformer: (props: { [key: string]: unknown }) => <div data-testid="konva-transformer" {...props} />
 }))
 
 describe('Rectangle Component', () => {
@@ -42,12 +50,6 @@ describe('Rectangle Component', () => {
     onDragEnd: vi.fn(),
     onDragStart: vi.fn(),
     onDragEndCallback: vi.fn(),
-    startManipulation: vi.fn().mockResolvedValue(true),
-    endManipulation: vi.fn().mockResolvedValue(undefined),
-    isManipulating: vi.fn().mockReturnValue(false),
-    isLocked: vi.fn().mockReturnValue(false),
-    getLockOwner: vi.fn().mockReturnValue(null),
-    currentUserId: 'test-user'
   }
 
   beforeEach(() => {

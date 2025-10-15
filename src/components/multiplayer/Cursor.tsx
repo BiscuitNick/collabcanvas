@@ -27,17 +27,7 @@ const Cursor: React.FC<CursorProps> = ({ cursor }) => {
 
   return (
     <Group listening={false}>
-      {/* Debug: Small dot at exact click point */}
-      {cursor.isCurrentUser && (
-        <Rect
-          x={x - 2}
-          y={y - 2}
-          width={4}
-          height={4}
-          fill="red"
-          listening={false}
-        />
-      )}
+      {/* Debug: Small dot at exact click point - Removed */}
       
       {/* Cursor Line */}
       <Line

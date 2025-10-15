@@ -1,4 +1,25 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "shapes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "createdAt",
+          "order": "asc"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cursors",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "lastUpdated",
+          "order": "desc"
+        }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

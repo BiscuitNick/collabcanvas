@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { GoogleSignIn } from '../components/auth/GoogleSignIn'
+import { EmailSignIn } from '../components/auth/EmailSignIn'
 
 export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
+  const [authMethod, setAuthMethod] = useState<'google' | 'email'>('google')
 
   const handleError = (errorMessage: string) => {
     setError(errorMessage)
@@ -32,7 +34,38 @@ export const LoginPage: React.FC = () => {
                 Sign in to your account
               </h3>
               
-              <GoogleSignIn onError={handleError} />
+              {/* Auth Method Toggle */}
+              <div className="flex rounded-lg bg-gray-100 p-1 mb-6">
+                <button
+                  type="button"
+                  onClick={() => setAuthMethod('google')}
+                  className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-all duration-200 ${
+                    authMethod === 'google'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Google
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthMethod('email')}
+                  className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-all duration-200 ${
+                    authMethod === 'email'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Email
+                </button>
+              </div>
+              
+              {/* Auth Components */}
+              {authMethod === 'google' ? (
+                <GoogleSignIn onError={handleError} />
+              ) : (
+                <EmailSignIn onError={handleError} />
+              )}
             </div>
 
             {/* Error Display */}
@@ -70,7 +103,10 @@ export const LoginPage: React.FC = () => {
                   </h3>
                   <div className="mt-2 text-sm text-blue-700">
                     <p>
-                      No need to create an account! Just sign in with Google to get started.
+                      {authMethod === 'google' 
+                        ? 'No need to create an account! Just sign in with Google to get started.'
+                        : 'Create an account with your email address to start collaborating on your canvas.'
+                      }
                     </p>
                   </div>
                 </div>

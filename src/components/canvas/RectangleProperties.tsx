@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useShapes } from '../../hooks/useShapes'
+import { MIN_SHAPE_SIZE, MAX_SHAPE_SIZE, CANVAS_HALF } from '../../lib/constants'
 
 interface RectanglePropertiesProps {
   selectedShapeId: string | null
@@ -44,7 +45,7 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
       const numValue = parseFloat(value)
       if (!isNaN(numValue) && numValue > 0) {
         // Clamp within bounds and round to nearest integer
-        const clampedWidth = Math.min(1000, Math.max(20, numValue))
+        const clampedWidth = Math.min(MAX_SHAPE_SIZE, Math.max(MIN_SHAPE_SIZE, numValue))
         const roundedWidth = Math.round(clampedWidth)
         updateShape(selectedShapeId, { width: roundedWidth })
       }
@@ -59,7 +60,7 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
       const numValue = parseFloat(value)
       if (!isNaN(numValue) && numValue > 0) {
         // Clamp within bounds and round to nearest integer
-        const clampedHeight = Math.min(1000, Math.max(20, numValue))
+        const clampedHeight = Math.min(MAX_SHAPE_SIZE, Math.max(MIN_SHAPE_SIZE, numValue))
         const roundedHeight = Math.round(clampedHeight)
         updateShape(selectedShapeId, { height: roundedHeight })
       }
@@ -74,7 +75,7 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
       const numValue = parseFloat(value)
       if (!isNaN(numValue)) {
         // Clamp within canvas bounds and round to nearest integer
-        const clampedX = Math.min(32000, Math.max(-32000, numValue))
+        const clampedX = Math.min(CANVAS_HALF, Math.max(-CANVAS_HALF, numValue))
         const roundedX = Math.round(clampedX)
         updateShape(selectedShapeId, { x: roundedX })
       }
@@ -89,7 +90,7 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
       const numValue = parseFloat(value)
       if (!isNaN(numValue)) {
         // Clamp within canvas bounds and round to nearest integer
-        const clampedY = Math.min(32000, Math.max(-32000, numValue))
+        const clampedY = Math.min(CANVAS_HALF, Math.max(-CANVAS_HALF, numValue))
         const roundedY = Math.round(clampedY)
         updateShape(selectedShapeId, { y: roundedY })
       }
@@ -214,8 +215,8 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
               onBlur={handleWidthBlur}
               className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
               placeholder="W"
-              min="20"
-              max="1000"
+              min={MIN_SHAPE_SIZE}
+              max={MAX_SHAPE_SIZE}
             />
           </div>
           
@@ -228,8 +229,8 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
               onBlur={handleHeightBlur}
               className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
               placeholder="H"
-              min="20"
-              max="1000"
+              min={MIN_SHAPE_SIZE}
+              max={MAX_SHAPE_SIZE}
             />
           </div>
         </div>
@@ -239,7 +240,6 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
       <div className="space-y-2">
         <label className="text-xs font-medium text-gray-700">Rotation</label>
         <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-500 w-6">°:</label>
           <input
             type="number"
             value={rotation}

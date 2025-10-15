@@ -2,6 +2,8 @@
  * Utility functions for the CollabCanvas application
  */
 
+import { COLOR_PALETTE } from './constants'
+
 /**
  * Generate a unique ID using crypto.randomUUID
  * Falls back to timestamp + random if crypto.randomUUID is not available
@@ -16,22 +18,27 @@ export const generateId = (): string => {
 }
 
 /**
- * Predefined color palette for rectangles
+ * Throttle function to limit how often a function can be called.
+ * Useful for performance-critical events like mousemove or resize.
  */
-const COLOR_PALETTE = [
-  '#FF6B6B', // Red
-  '#4ECDC4', // Teal
-  '#45B7D1', // Blue
-  '#96CEB4', // Green
-  '#FFEAA7', // Yellow
-  '#DDA0DD', // Plum
-  '#98D8C8', // Mint
-  '#F7DC6F', // Gold
-  '#BB8FCE', // Lavender
-  '#85C1E9', // Sky Blue
-  '#F8C471', // Orange
-  '#82E0AA', // Light Green
-]
+export const throttle = <T extends (...args: unknown[]) => unknown>(func: T, delay: number) => {
+  let timeoutId: NodeJS.Timeout | null = null
+  let lastExecTime = 0
+  return (...args: Parameters<T>): void => {
+    const currentTime = Date.now()
+    
+    if (currentTime - lastExecTime > delay) {
+      func(...args)
+      lastExecTime = currentTime
+    } else {
+      if (timeoutId) clearTimeout(timeoutId)
+      timeoutId = setTimeout(() => {
+        func(...args)
+        lastExecTime = Date.now()
+      }, delay - (currentTime - lastExecTime))
+    }
+  }
+}
 
 /**
  * Get a random color from the predefined palette

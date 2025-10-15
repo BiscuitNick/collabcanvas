@@ -1,8 +1,0 @@
-{
-  "rules": {
-    // Allow read/write access to all data for authenticated users
-    // This is a simple rule for MVP - in production, you'd want more specific rules
-    ".read": "auth != null",
-    ".write": "auth != null"
-  }
-}

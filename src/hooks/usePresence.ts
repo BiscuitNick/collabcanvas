@@ -10,6 +10,8 @@ import {
 } from 'firebase/firestore'
 import { firestore } from '../lib/firebase'
 import { getUserColor } from '../lib/utils'
+import { STALE_PRESENCE_THRESHOLD, OFFLINE_PRESENCE_THRESHOLD } from '../lib/constants'
+import { PRESENCE_UPDATE_INTERVAL_MS, PRESENCE_CLEANUP_INTERVAL_MS, ENABLE_PERFORMANCE_LOGGING } from '../lib/config'
 import type { PresenceUser } from '../types'
 
 interface UsePresenceReturn {
@@ -43,7 +45,6 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
       const presenceRef = collection(firestore, 'presence')
       const snapshot = await getDocs(presenceRef)
       const now = Date.now()
-      const STALE_THRESHOLD = 300000 // 5 minutes
       
       const staleUsers: string[] = []
       
@@ -51,7 +52,7 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
         const data = doc.data()
         const lastSeen = data.lastSeen?.toMillis() || data.joinedAt?.toMillis() || now
         
-        if (now - lastSeen > STALE_THRESHOLD) {
+        if (now - lastSeen > STALE_PRESENCE_THRESHOLD) {
           staleUsers.push(doc.id)
         }
       })
@@ -78,6 +79,8 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
     }
 
     const writePresence = async () => {
+      const startTime = ENABLE_PERFORMANCE_LOGGING ? performance.now() : 0
+      
       try {
         const presenceRef = doc(firestore, 'presence', userId)
         const presenceData = {
@@ -88,10 +91,18 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
           lastSeen: serverTimestamp()
         }
         
-        console.log('👤 Writing presence to Firestore:', presenceData)
+        if (ENABLE_PERFORMANCE_LOGGING) {
+          console.log('👤 Writing presence to Firestore:', presenceData)
+        }
         await setDoc(presenceRef, presenceData, { merge: true })
         setError(null)
-        console.log('✅ Presence written successfully')
+        
+        if (ENABLE_PERFORMANCE_LOGGING) {
+          const duration = performance.now() - startTime
+          console.log(`💓 Presence update took ${duration.toFixed(2)}ms for user: ${userId}`)
+        } else {
+          console.log('✅ Presence written successfully')
+        }
       } catch (err) {
         console.error('❌ Error writing presence:', err)
         setError('Failed to write presence data')
@@ -111,12 +122,12 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
       } catch (err) {
         console.error('❌ Error updating heartbeat:', err)
       }
-    }, 30000) // 30 seconds
+    }, PRESENCE_UPDATE_INTERVAL_MS)
 
-    // Set up stale cleanup every 5 minutes
+    // Set up stale cleanup at configured interval
     const staleCleanupInterval = setInterval(() => {
       cleanupStalePresence()
-    }, 300000) // 5 minutes
+    }, PRESENCE_CLEANUP_INTERVAL_MS)
 
     // Cleanup on page unload
     const handleBeforeUnload = () => {
@@ -143,7 +154,7 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       cleanupPresence()
     }
-  }, [userId, userName, cleanupPresence])
+  }, [userId, userName, cleanupPresence, cleanupStalePresence])
 
   // Listen to presence changes
   useEffect(() => {
@@ -163,16 +174,13 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
         try {
           const presenceData: PresenceUser[] = []
           const now = Date.now()
-          const OFFLINE_THRESHOLD = 60000 // 60 seconds - consider user offline if no heartbeat for 1 minute
-          
-          console.log('📡 Received presence data from Firestore:', snapshot.docs.length, 'documents')
           
           snapshot.forEach((doc) => {
             const data = doc.data()
             const lastSeen = data.lastSeen?.toMillis() || data.joinedAt?.toMillis() || now
             
             // Only include users who have been seen recently (within 1 minute)
-            if (now - lastSeen < OFFLINE_THRESHOLD) {
+            if (now - lastSeen < OFFLINE_PRESENCE_THRESHOLD) {
               const presenceUser: PresenceUser = {
                 userId: data.userId,
                 userName: data.userName,

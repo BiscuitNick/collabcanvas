@@ -256,4 +256,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Built with ❤️ for real-time collaboration**
 
-**Live MVP Demo:** [https://collabcanvas-neon.vercel.app/canvas](https://collabcanvas-neon.vercel.app/canvas)
+**Live MVP Demo:** [https://collabcanvas-git-mvp-biscuitnick-s-team.vercel.app](https://collabcanvas-git-mvp-biscuitnick-s-team.vercel.app)
+**Latest Version Demo:** [https://collabcanvas-neon.vercel.app](https://collabcanvas-neon.vercel.app)

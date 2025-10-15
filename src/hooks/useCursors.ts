@@ -96,6 +96,14 @@ export const useCursors = (userId: string, userName: string, stagePosition?: { x
           
           snapshot.forEach((doc) => {
             const data = doc.data()
+            const now = Date.now()
+            const lastUpdated = data.lastUpdated?.toMillis() || Date.now()
+            
+            // Only include cursors that have been updated recently (within 30 seconds)
+            if (now - lastUpdated > 30000) {
+              console.log('🧹 Filtering out stale cursor for user:', data.userName)
+              return
+            }
             
             // Use coordinates as-is since they're now stored as absolute coordinates
             const screenX = data.x
@@ -107,7 +115,7 @@ export const useCursors = (userId: string, userName: string, stagePosition?: { x
               x: screenX,
               y: screenY,
               color: data.color,
-              lastUpdated: data.lastUpdated?.toMillis() || Date.now()
+              lastUpdated: lastUpdated
             }
             
             // Check if cursor is within viewport for performance

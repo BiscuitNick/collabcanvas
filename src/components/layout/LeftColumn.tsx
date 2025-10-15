@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useCanvasStore } from '../../store/canvasStore'
 import { useAuth } from '../../hooks/useAuth'
 import { getRandomColor, getViewportCenter } from '../../lib/utils'
@@ -79,6 +79,7 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
   const [panYInput, setPanYInput] = useState('')
   const [expandedUser, setExpandedUser] = useState<string | null>(null)
   const [showSelfCursor, setShowSelfCursor] = useState(false)
+  const zoomTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const handleDeleteRectangle = useCallback(async () => {
     if (selectedShapeId) {
@@ -105,6 +106,15 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
       onDebugStateChange(showSelfCursor)
     }
   }, [showSelfCursor, onDebugStateChange])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (zoomTimeoutRef.current) {
+        clearTimeout(zoomTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -162,7 +172,37 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
   }
 
   const handleZoomInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setZoomInput(e.target.value)
+    const value = e.target.value
+    setZoomInput(value)
+    
+    // Clear existing timeout
+    if (zoomTimeoutRef.current) {
+      clearTimeout(zoomTimeoutRef.current)
+    }
+    
+    // Apply zoom in real-time as user types (with debounce)
+    const numValue = parseFloat(value)
+    if (!isNaN(numValue) && numValue > 0) {
+      zoomTimeoutRef.current = setTimeout(() => {
+        const clampedValue = Math.max(10, Math.min(300, numValue)) // 10% to 300%
+        const newScale = clampedValue / 100
+        
+        // Calculate new position to keep canvas center fixed
+        const centerX = viewportWidth / 2
+        const centerY = viewportHeight / 2
+        
+        // Current center in canvas space
+        const currentCenterX = (centerX - stagePosition.x) / stageScale
+        const currentCenterY = (centerY - stagePosition.y) / stageScale
+        
+        // New stage position to keep the same center point
+        const newX = centerX - currentCenterX * newScale
+        const newY = centerY - currentCenterY * newScale
+        
+        updateScale(newScale)
+        updatePosition(newX, newY)
+      }, 100) // 100ms debounce
+    }
   }
 
   const applyZoomFromInput = () => {
@@ -500,33 +540,39 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
       {/* Users Section */}
       <CollapsibleSection title="Online Users" defaultOpen={true}>
         <div className="space-y-2">
-          {presenceUsers.map((user) => {
-            const userCursor = getUserCursor(user.userId)
-            const isExpanded = expandedUser === user.userId
+          {(() => {
+            // Filter users who have cursors (are actively using the canvas)
+            const activeUsers = presenceUsers.filter(user => getUserCursor(user.userId))
             
-            return (
-              <div key={user.userId} className="space-y-1">
-                <button
-                  onClick={() => handleUserClick(user.userId)}
-                  className={`w-full flex items-center gap-2 p-2 rounded hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    userCursor ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'
-                  }`}
-                >
-                  <div 
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: user.color }}
-                  />
-                  <span className="text-sm text-gray-700 flex-1 text-left">{user.userName}</span>
-                  {userCursor ? (
+            if (activeUsers.length === 0) {
+              return (
+                <div className="text-gray-500 text-sm p-2">
+                  No other users online
+                </div>
+              )
+            }
+            
+            return activeUsers.map((user) => {
+              const userCursor = getUserCursor(user.userId)
+              const isExpanded = expandedUser === user.userId
+              
+              return (
+                <div key={user.userId} className="space-y-1">
+                  <button
+                    onClick={() => handleUserClick(user.userId)}
+                    className="w-full flex items-center gap-2 p-2 rounded hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50 border border-blue-200"
+                  >
+                    <div 
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: user.color }}
+                    />
+                    <span className="text-sm text-gray-700 flex-1 text-left">{user.userName}</span>
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-gray-500">
                         {isExpanded ? '▼' : '▶'}
                       </span>
                     </div>
-                  ) : (
-                    <span className="text-xs text-gray-400">No cursor</span>
-                  )}
-                </button>
+                  </button>
                 
                 {/* Cursor Information */}
                 {isExpanded && userCursor && (
@@ -559,9 +605,10 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
                     </div>
                   </div>
                 )}
-              </div>
-            )
-          })}
+                </div>
+              )
+            })
+          })()}
         </div>
       </CollapsibleSection>
 
@@ -592,6 +639,10 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
               <div className="flex justify-between">
                 <span>Total Users:</span>
                 <span>{presenceUsers.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Active Users:</span>
+                <span>{presenceUsers.filter(user => getUserCursor(user.userId)).length}</span>
               </div>
               <div className="flex justify-between">
                 <span>Active Cursors:</span>

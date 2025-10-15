@@ -3,7 +3,10 @@ import {
   signInWithPopup, 
   GoogleAuthProvider, 
   signOut, 
-  onAuthStateChanged
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile
 } from 'firebase/auth'
 import type { User as FirebaseUser } from 'firebase/auth'
 import { auth } from '../lib/firebase'
@@ -56,9 +59,47 @@ export const useAuth = (): AuthHookReturn => {
       
       const result = await signInWithPopup(auth, googleProvider)
       console.log('Google sign-in successful:', result.user)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Google sign-in error:', error)
-      setError(error.message)
+      setError((error as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Sign up with email and password
+  const signUpWithEmail = async (email: string, password: string, displayName?: string): Promise<void> => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const result = await createUserWithEmailAndPassword(auth, email, password)
+      
+      // Update the user's display name if provided
+      if (displayName && result.user) {
+        await updateProfile(result.user, { displayName })
+      }
+      
+      console.log('Email sign-up successful:', result.user)
+    } catch (error: unknown) {
+      console.error('Email sign-up error:', error)
+      setError((error as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Sign in with email and password
+  const signInWithEmail = async (email: string, password: string): Promise<void> => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const result = await signInWithEmailAndPassword(auth, email, password)
+      console.log('Email sign-in successful:', result.user)
+    } catch (error: unknown) {
+      console.error('Email sign-in error:', error)
+      setError((error as Error).message)
     } finally {
       setLoading(false)
     }
@@ -72,9 +113,9 @@ export const useAuth = (): AuthHookReturn => {
       
       await signOut(auth)
       console.log('Sign out successful')
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Sign out error:', error)
-      setError(error.message)
+      setError((error as Error).message)
     } finally {
       setLoading(false)
     }
@@ -85,6 +126,8 @@ export const useAuth = (): AuthHookReturn => {
     loading,
     error,
     loginWithGoogle,
+    signUpWithEmail,
+    signInWithEmail,
     logout
   }
 }

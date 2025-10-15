@@ -14,11 +14,6 @@ vi.mock('../lib/firebase', () => ({
     setDoc: vi.fn(),
     onSnapshot: vi.fn()
   },
-  realtimeDb: {
-    ref: vi.fn(),
-    get: vi.fn(),
-    set: vi.fn()
-  },
 }))
 
 // Global test setup

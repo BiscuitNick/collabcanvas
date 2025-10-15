@@ -1,17 +1,20 @@
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, useCallback } from 'react'
 import { Rect, Transformer } from 'react-konva'
+import Konva from 'konva' // Import Konva for types
 import type { Rectangle } from '../../types'
 import { clamp } from '../../lib/utils'
+import { CANVAS_HALF, MIN_SHAPE_SIZE, MAX_SHAPE_SIZE } from '../../lib/constants'
+import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS, ENABLE_PERFORMANCE_LOGGING } from '../../lib/config'
 
 interface RectangleProps {
   shape: Rectangle
   isSelected: boolean
   onSelect: () => void
   onUpdate: (updates: Partial<Rectangle>) => void
+  onDragMove?: (x: number, y: number) => void
   onDragEnd: (x: number, y: number) => void
   onDragStart: () => void
   onDragEndCallback: () => void
-  onMouseMove?: (x: number, y: number) => void
 }
 
 const RectangleComponent: React.FC<RectangleProps> = ({
@@ -19,19 +22,58 @@ const RectangleComponent: React.FC<RectangleProps> = ({
   isSelected,
   onSelect,
   onUpdate,
+  onDragMove,
   onDragEnd,
   onDragStart,
   onDragEndCallback,
-  onMouseMove
 }) => {
-  const rectRef = useRef<any>(null)
-  const transformerRef = useRef<any>(null)
+  const rectRef = useRef<Konva.Rect>(null)
+  const transformerRef = useRef<Konva.Transformer>(null)
+  const lastUpdateRef = useRef<number>(0)
+  const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const pendingUpdateRef = useRef<{ x: number; y: number } | null>(null)
 
-  // Canvas bounds - 64000x64000 with center at (0,0)
-  const CANVAS_SIZE = 64000
-  const CANVAS_HALF = CANVAS_SIZE / 2
-  const MIN_SIZE = 20
-  const MAX_SIZE = 1000
+  // Canvas bounds - 64000x64000 with center at (0,0) for infinite feel
+  // Moved to src/lib/constants.ts
+
+  // Throttled drag move function
+  const throttledDragMove = useCallback((x: number, y: number) => {
+    if (!onDragMove) return
+
+    const now = Date.now()
+    
+    // Store the latest position for debouncing
+    pendingUpdateRef.current = { x, y }
+    
+    // Clear existing timeout
+    if (throttleTimeoutRef.current) {
+      clearTimeout(throttleTimeoutRef.current)
+    }
+
+    // Debounce: only update after configured delay
+    throttleTimeoutRef.current = setTimeout(() => {
+      const pendingUpdate = pendingUpdateRef.current
+      if (!pendingUpdate) return
+
+      // Throttle: only update if enough time has passed since last update
+      if (now - lastUpdateRef.current >= RECTANGLE_DRAG_THROTTLE_MS) {
+        const startTime = ENABLE_PERFORMANCE_LOGGING ? performance.now() : 0
+        
+        // Clamp position within canvas bounds
+        const clampedX = clamp(pendingUpdate.x, -CANVAS_HALF, CANVAS_HALF - shape.width)
+        const clampedY = clamp(pendingUpdate.y, -CANVAS_HALF, CANVAS_HALF - shape.height)
+        
+        onDragMove(clampedX, clampedY)
+        lastUpdateRef.current = now
+        pendingUpdateRef.current = null
+        
+        if (ENABLE_PERFORMANCE_LOGGING) {
+          const duration = performance.now() - startTime
+          console.log(`📦 Rectangle drag update took ${duration.toFixed(2)}ms`)
+        }
+      }
+    }, RECTANGLE_DRAG_DEBOUNCE_MS)
+  }, [onDragMove, shape.width, shape.height])
 
   // Update transformer when selection changes
   useEffect(() => {
@@ -39,14 +81,24 @@ const RectangleComponent: React.FC<RectangleProps> = ({
       try {
         transformerRef.current.nodes([rectRef.current])
         transformerRef.current.getLayer()?.batchDraw()
-      } catch (error) {
+      } catch (error: unknown) {
         // Ignore errors in test environment
         console.warn('Transformer setup failed:', error)
       }
     }
   }, [isSelected])
 
-  const handleClick = (e: any) => {
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (throttleTimeoutRef.current) {
+        clearTimeout(throttleTimeoutRef.current)
+      }
+      pendingUpdateRef.current = null
+    }
+  }, [])
+
+  const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true
     onSelect()
   }
@@ -56,7 +108,16 @@ const RectangleComponent: React.FC<RectangleProps> = ({
     onDragStart()
   }
 
-  const handleDragEnd = (e: any) => {
+  const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+    // Get the current position of the rectangle
+    const rectX = e.target.x()
+    const rectY = e.target.y()
+    
+    // Use throttled drag move to update position in real-time
+    throttledDragMove(rectX, rectY)
+  }
+
+  const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     // Get the current position of the rectangle
     const rectX = e.target.x()
     const rectY = e.target.y()
@@ -68,14 +129,7 @@ const RectangleComponent: React.FC<RectangleProps> = ({
     // Update position in store (React will handle the re-render)
     onDragEnd(clampedX, clampedY)
     
-    // Update cursor position with mouse position
-    if (onMouseMove) {
-      const stage = e.target.getStage()
-      const pointer = stage.getPointerPosition()
-      if (pointer) {
-        onMouseMove(pointer.x, pointer.y)
-      }
-    }
+    // Removed as it is handled by the Canvas component directly
     
     // Notify parent that dragging has ended
     onDragEndCallback()
@@ -85,7 +139,7 @@ const RectangleComponent: React.FC<RectangleProps> = ({
     // Transform started - no locking needed
   }
 
-  const handleTransformEnd = (e: any) => {
+  const handleTransformEnd = () => {
     if (!rectRef.current) return
 
     const node = rectRef.current
@@ -94,8 +148,8 @@ const RectangleComponent: React.FC<RectangleProps> = ({
     const rotation = node.rotation ? node.rotation() : 0
 
     // Calculate new dimensions
-    const newWidth = Math.max(MIN_SIZE, Math.min(MAX_SIZE, shape.width * scaleX))
-    const newHeight = Math.max(MIN_SIZE, Math.min(MAX_SIZE, shape.height * scaleY))
+    const newWidth = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_SIZE, shape.width * scaleX))
+    const newHeight = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_SIZE, shape.height * scaleY))
 
     // Calculate new position (accounting for scaling)
     const newX = node.x()
@@ -117,14 +171,7 @@ const RectangleComponent: React.FC<RectangleProps> = ({
       rotation: normalizedRotation
     })
 
-    // Update cursor position with mouse position
-    if (onMouseMove) {
-      const stage = e.target.getStage()
-      const pointer = stage.getPointerPosition()
-      if (pointer) {
-        onMouseMove(pointer.x, pointer.y)
-      }
-    }
+    // Removed as it is handled by the Canvas component directly
 
     // Reset scale and position
     node.scaleX(1)
@@ -155,27 +202,28 @@ const RectangleComponent: React.FC<RectangleProps> = ({
         onClick={handleClick}
         onTap={handleClick}
         onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
         onTransformStart={handleTransformStart}
         onTransformEnd={handleTransformEnd}
         // Hover effects
-        onMouseEnter={(e) => {
+        onMouseEnter={(e: Konva.KonvaEventObject<MouseEvent>) => {
           try {
             const container = e.target.getStage()?.container()
             if (container) {
               container.style.cursor = 'pointer'
             }
-          } catch (error) {
+          } catch {
             // Ignore errors in test environment
           }
         }}
-        onMouseLeave={(e) => {
+        onMouseLeave={(e: Konva.KonvaEventObject<MouseEvent>) => {
           try {
             const container = e.target.getStage()?.container()
             if (container) {
               container.style.cursor = 'default'
             }
-          } catch (error) {
+          } catch {
             // Ignore errors in test environment
           }
         }}
@@ -185,10 +233,10 @@ const RectangleComponent: React.FC<RectangleProps> = ({
           ref={transformerRef}
           boundBoxFunc={(oldBox, newBox) => {
             // Limit resize
-            if (newBox.width < MIN_SIZE || newBox.height < MIN_SIZE) {
+            if (newBox.width < MIN_SHAPE_SIZE || newBox.height < MIN_SHAPE_SIZE) {
               return oldBox
             }
-            if (newBox.width > MAX_SIZE || newBox.height > MAX_SIZE) {
+            if (newBox.width > MAX_SHAPE_SIZE || newBox.height > MAX_SHAPE_SIZE) {
               return oldBox
             }
             return newBox

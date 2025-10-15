@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  onSnapshot, 
+import {
+  collection,
+  doc,
+  setDoc,
+  onSnapshot,
   deleteDoc,
   serverTimestamp,
   query,
@@ -11,35 +11,44 @@ import {
 } from 'firebase/firestore'
 import { firestore } from '../lib/firebase'
 import { getUserColor } from '../lib/utils'
+import { CURSOR_THROTTLE_MS, CURSOR_DEBOUNCE_MS, ENABLE_PERFORMANCE_LOGGING } from '../lib/config'
 import type { Cursor } from '../types'
 
 interface UseCursorsReturn {
   cursors: Cursor[]
-  updateCursor: (x: number, y: number, canvasWidth?: number, canvasHeight?: number) => void
+  updateCursor: (x: number, y: number) => void
   error: string | null
 }
 
-export const useCursors = (userId: string, userName: string, canvasWidth?: number, canvasHeight?: number, stagePosition?: { x: number; y: number }, viewportWidth?: number, viewportHeight?: number, stageScale?: number): UseCursorsReturn => {
+export const useCursors = (userId: string, userName: string, stagePosition?: { x: number; y: number }, viewportWidth?: number, viewportHeight?: number, stageScale?: number): UseCursorsReturn => {
   const [cursors, setCursors] = useState<Cursor[]>([])
   const [error, setError] = useState<string | null>(null)
   const lastUpdateRef = useRef<number>(0)
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const pendingUpdateRef = useRef<{ x: number; y: number } | null>(null)
 
-  // Throttle cursor updates to 50ms
+  // Throttled cursor updates with debouncing for mouse movement
   // x,y MUST be canvas coordinates (pre-transform)
-  const updateCursor = useCallback((x: number, y: number, canvasWidth?: number, canvasHeight?: number) => {
+  const updateCursor = useCallback((x: number, y: number) => {
     const now = Date.now()
     
-    console.log('🖱️ updateCursor called:', { x, y, userId, userName, canvasWidth, canvasHeight })
+    // Store the latest position for debouncing
+    pendingUpdateRef.current = { x, y }
     
     // Clear existing timeout
     if (throttleTimeoutRef.current) {
       clearTimeout(throttleTimeoutRef.current)
     }
 
-    // Throttle to 50ms
+    // Debounce: only update after configured delay
     throttleTimeoutRef.current = setTimeout(async () => {
-      if (now - lastUpdateRef.current >= 50) {
+      const pendingUpdate = pendingUpdateRef.current
+      if (!pendingUpdate) return
+
+      // Throttle: only update if enough time has passed since last update
+      if (now - lastUpdateRef.current >= CURSOR_THROTTLE_MS) {
+        const startTime = ENABLE_PERFORMANCE_LOGGING ? performance.now() : 0
+        
         try {
           const cursorRef = doc(firestore, 'cursors', userId)
           
@@ -47,29 +56,32 @@ export const useCursors = (userId: string, userName: string, canvasWidth?: numbe
           const cursorData = {
             userId,
             userName,
-            x: x, // Store as absolute coordinate
-            y: y, // Store as absolute coordinate
+            x: pendingUpdate.x,
+            y: pendingUpdate.y,
             color: getUserColor(userId),
             lastUpdated: serverTimestamp()
           }
           
-          // optional debug left in place
-          
           await setDoc(cursorRef, cursorData, { merge: true })
           lastUpdateRef.current = now
+          pendingUpdateRef.current = null
           setError(null)
+          
+          if (ENABLE_PERFORMANCE_LOGGING) {
+            const duration = performance.now() - startTime
+            console.log(`🎯 Cursor update took ${duration.toFixed(2)}ms`)
+          }
         } catch (err) {
           console.error('❌ Error updating cursor:', err)
           setError('Failed to update cursor position')
         }
       }
-    }, 50)
+    }, CURSOR_DEBOUNCE_MS)
   }, [userId, userName])
 
   // Listen to cursor changes
   useEffect(() => {
     if (!userId) {
-      console.log('⚠️ No userId provided, skipping cursor listener setup')
       return
     }
 
@@ -98,20 +110,6 @@ export const useCursors = (userId: string, userName: string, canvasWidth?: numbe
               lastUpdated: data.lastUpdated?.toMillis() || Date.now()
             }
             
-            // Debug logging for cursor positioning
-            if (cursor.userId === userId) {
-              console.log('🎯 Current user cursor retrieved:', {
-                userId: cursor.userId,
-                userName: cursor.userName,
-                x: cursor.x,
-                y: cursor.y,
-                stagePosition,
-                viewportWidth,
-                viewportHeight
-              })
-            }
-            
-            // Include all cursors (including current user for debugging)
             // Check if cursor is within viewport for performance
             // Cursors are stored in canvas coordinates, so check against canvas viewport bounds
             const isInViewport = stagePosition && viewportWidth && viewportHeight && stageScale
@@ -121,7 +119,7 @@ export const useCursors = (userId: string, userName: string, canvasWidth?: numbe
                 cursor.y <= (-stagePosition.y + viewportHeight) / stageScale
               : true // Include all if viewport info not available
             
-            // Always include cursor for debug info, but mark if it's visible
+            // Include cursor with visibility info
             cursorsData.push({
               ...cursor,
               isVisible: isInViewport,
@@ -148,7 +146,7 @@ export const useCursors = (userId: string, userName: string, canvasWidth?: numbe
     )
 
     return () => unsubscribe()
-  }, [userId, canvasWidth, canvasHeight, stagePosition])
+  }, [userId, stagePosition, stageScale, viewportHeight, viewportWidth])
 
   // Clean up on unmount
   useEffect(() => {
@@ -157,6 +155,9 @@ export const useCursors = (userId: string, userName: string, canvasWidth?: numbe
       if (throttleTimeoutRef.current) {
         clearTimeout(throttleTimeoutRef.current)
       }
+      
+      // Clear pending update
+      pendingUpdateRef.current = null
       
       // Remove own cursor from Firestore
       if (userId) {

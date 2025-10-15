@@ -12,7 +12,7 @@ vi.mock('firebase/auth', () => ({
   signInWithPopup: () => mockSignInWithPopup(),
   GoogleAuthProvider: vi.fn(() => ({})),
   signOut: () => mockSignOut(),
-  onAuthStateChanged: (_auth: any, callback: any) => {
+  onAuthStateChanged: (_auth: unknown, callback: (user: unknown) => void) => {
     mockOnAuthStateChanged(callback)
     return () => {} // unsubscribe function
   }
@@ -206,11 +206,7 @@ describe('Authentication Flow', () => {
     mockSignInWithPopup.mockRejectedValue(new Error(errorMessage))
 
     const mockLoginWithGoogle = vi.fn().mockImplementation(async () => {
-      try {
-        await mockSignInWithPopup()
-      } catch (error) {
-        throw error
-      }
+      await mockSignInWithPopup()
     })
 
     mockUseAuth.mockReturnValue({

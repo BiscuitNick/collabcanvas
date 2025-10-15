@@ -1,10 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react'
 import { Stage, Layer } from 'react-konva'
+import Konva from 'konva' // Import Konva for types
 import { useCanvasStore } from '../../store/canvasStore'
 import CanvasErrorBoundary from './CanvasErrorBoundary'
 import RectangleComponent from './Rectangle'
 import Cursor from '../multiplayer/Cursor'
 import type { Rectangle, Cursor as CursorType } from '../../types'
+import { CANVAS_HALF } from '../../lib/constants'
 
 interface CanvasProps {
   width: number
@@ -12,21 +14,25 @@ interface CanvasProps {
   shapes: Rectangle[]
   cursors: CursorType[]
   updateShape: (id: string, updates: Partial<Rectangle>) => Promise<void>
-  onMouseMove?: (x: number, y: number, canvasWidth?: number, canvasHeight?: number) => void
+  onMouseMove: (x: number, y: number, canvasWidth: number, canvasHeight: number) => void
+  showSelfCursor?: boolean
+  currentUserId?: string
 }
 
-const Canvas: React.FC<CanvasProps> = ({ 
-  width, 
-  height, 
+const Canvas: React.FC<CanvasProps> = ({
+  width,
+  height,
   shapes,
   cursors,
   updateShape,
-  onMouseMove 
+  onMouseMove,
+  showSelfCursor = true,
+  currentUserId
 }) => {
-  const stageRef = useRef<any>(null)
+  const stageRef = useRef<Konva.Stage>(null)
   const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null)
   const [lastTouchCenter, setLastTouchCenter] = useState<{ x: number; y: number } | null>(null)
-  
+
   const {
     stagePosition,
     stageScale,
@@ -43,8 +49,7 @@ const Canvas: React.FC<CanvasProps> = ({
   } = useCanvasStore()
 
   // Canvas bounds - 64000x64000 with center at (0,0) for infinite feel
-  const CANVAS_SIZE = 64000
-  const CANVAS_HALF = CANVAS_SIZE / 2
+  // Moved to src/lib/constants.ts
 
   // Clamp position within canvas bounds
   const clampPosition = (x: number, y: number) => {
@@ -52,7 +57,7 @@ const Canvas: React.FC<CanvasProps> = ({
     const maxX = CANVAS_HALF
     const minY = -CANVAS_HALF
     const maxY = CANVAS_HALF
-    
+
     return {
       x: Math.max(minX, Math.min(maxX, x)),
       y: Math.max(minY, Math.min(maxY, y))
@@ -64,7 +69,7 @@ const Canvas: React.FC<CanvasProps> = ({
     try {
       // Don't start panning if we're dragging a shape
       if (isDraggingShape) return
-      
+
       setPanning(true)
       setZooming(false)
     } catch (error) {
@@ -72,26 +77,28 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   }
 
-  const handleDragEnd = (e: any) => {
+  const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     try {
       // Don't handle stage drag if we're dragging a shape
       if (isDraggingShape) return
-      
+
       setPanning(false)
       const clampedPos = clampPosition(e.target.x(), e.target.y())
       updatePosition(clampedPos.x, clampedPos.y)
-      
+
       // Update cursor position on drag end
       if (onMouseMove) {
         const stage = e.target.getStage()
-        const pointer = stage.getPointerPosition()
-        if (pointer) {
-          // Use the stage's live transform (avoids any store lag)
-          const transform = stage.getAbsoluteTransform().copy().invert()
-          const canvasPoint = transform.point({ x: pointer.x, y: pointer.y })
-          const canvasX = canvasPoint.x
-          const canvasY = canvasPoint.y
-          onMouseMove(canvasX, canvasY, width, height)
+        if (stage) {
+          const pointer = stage.getPointerPosition()
+          if (pointer) {
+            // Use the stage's live transform (avoids any store lag)
+            const transform = stage.getAbsoluteTransform().copy().invert()
+            const canvasPoint = transform.point({ x: pointer.x, y: pointer.y })
+            const canvasX = canvasPoint.x
+            const canvasY = canvasPoint.y
+            onMouseMove(canvasX, canvasY, width, height)
+          }
         }
       }
     } catch (error) {
@@ -100,39 +107,41 @@ const Canvas: React.FC<CanvasProps> = ({
   }
 
   // Handle zoom functionality
-  const handleWheel = (e: any) => {
+  const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     try {
       e.evt.preventDefault()
-      
+
       if (isPanning || isDraggingShape) return // Disable zoom while panning or dragging shapes
-      
+
       setZooming(true)
-      
+
       const scaleBy = 1.1
       const stage = e.target.getStage()
-      const oldScale = stage.scaleX()
-      const pointer = stage.getPointerPosition()
-      
-      if (!pointer) {
+      const oldScale = stage?.scaleX()
+      const pointer = stage?.getPointerPosition()
+
+      if (!pointer || !stage || oldScale === undefined) {
         setZooming(false)
         return
       }
-      
+
+      // Get the point in canvas space before zoom
       const mousePointTo = {
         x: (pointer.x - stage.x()) / oldScale,
         y: (pointer.y - stage.y()) / oldScale,
       }
-      
+
       const newScale = e.evt.deltaY > 0 ? oldScale * scaleBy : oldScale / scaleBy
       const clampedScale = Math.max(0.1, Math.min(3, newScale))
-      
-      setZooming(false)
-      updateScale(clampedScale)
-      
+
+      // Calculate new stage position to keep the mouse point fixed
       const newPos = {
         x: pointer.x - mousePointTo.x * clampedScale,
         y: pointer.y - mousePointTo.y * clampedScale,
       }
+
+      setZooming(false)
+      updateScale(clampedScale)
       
       const clampedPos = clampPosition(newPos.x, newPos.y)
       updatePosition(clampedPos.x, clampedPos.y)
@@ -143,23 +152,34 @@ const Canvas: React.FC<CanvasProps> = ({
   }
 
 
-  // Handle stage click to deselect and update cursor
-  const handleStageClick = (e: any) => {
+  // Handle stage click to deselect
+  const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     if (e.target === e.target.getStage()) {
       selectShape(null)
     }
-    // Also update cursor position on stage click
+  }
+
+  // Handle mouse movement for cursor tracking
+  const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
     if (onMouseMove) {
       const stage = e.target.getStage()
-      const pointer = stage.getPointerPosition()
-      if (pointer) {
-        const transform = stage.getAbsoluteTransform().copy().invert()
-        const canvasPoint = transform.point({ x: pointer.x, y: pointer.y })
-        const canvasX = canvasPoint.x
-        const canvasY = canvasPoint.y
-        onMouseMove(canvasX, canvasY, width, height)
+      if (stage) {
+        const pointer = stage.getPointerPosition()
+        if (pointer) {
+          const transform = stage.getAbsoluteTransform().copy().invert()
+          const canvasPoint = transform.point({ x: pointer.x, y: pointer.y })
+          const canvasX = canvasPoint.x
+          const canvasY = canvasPoint.y
+          onMouseMove(canvasX, canvasY, width, height)
+        }
       }
     }
+  }
+
+  // Handle mouse leave to hide cursor
+  const handleMouseLeave = () => {
+    // We could implement cursor hiding logic here if needed
+    // For now, we'll let the cursor remain visible
   }
 
   // Handle rectangle selection
@@ -168,8 +188,13 @@ const Canvas: React.FC<CanvasProps> = ({
   }
 
   // Handle rectangle updates
-  const handleRectangleUpdate = (shapeId: string, updates: any) => {
+  const handleRectangleUpdate = (shapeId: string, updates: Partial<Rectangle>) => {
     updateShape(shapeId, updates)
+  }
+
+  // Handle rectangle drag move (real-time updates while dragging)
+  const handleRectangleDragMove = (shapeId: string, x: number, y: number) => {
+    updateShape(shapeId, { x, y })
   }
 
   // Handle rectangle drag end
@@ -183,7 +208,7 @@ const Canvas: React.FC<CanvasProps> = ({
     const touch1 = touches[0]
     const touch2 = touches[1]
     return Math.sqrt(
-      Math.pow(touch2.clientX - touch1.clientX, 2) + 
+      Math.pow(touch2.clientX - touch1.clientX, 2) +
       Math.pow(touch2.clientY - touch1.clientY, 2)
     )
   }
@@ -198,10 +223,10 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   }
 
-  const handleTouchStart = (e: any) => {
+  const handleTouchStart = (e: Konva.KonvaEventObject<TouchEvent>) => {
     e.evt.preventDefault()
     const touches = e.evt.touches
-    
+
     if (touches.length === 1) {
       // Single touch - start panning
       setPanning(true)
@@ -217,57 +242,61 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   }
 
-  const handleTouchMove = (e: any) => {
+  const handleTouchMove = (e: Konva.KonvaEventObject<TouchEvent>) => {
     e.evt.preventDefault()
     const touches = e.evt.touches
-    
+
     if (touches.length === 1 && isPanning) {
       // Single touch panning
       const touch = touches[0]
       const stage = e.target.getStage()
-      const rect = stage.container().getBoundingClientRect()
-      const x = touch.clientX - rect.left
-      const y = touch.clientY - rect.top
-      const clampedPos = clampPosition(x, y)
-      updatePosition(clampedPos.x, clampedPos.y)
+      if (stage) {
+        const rect = stage.container().getBoundingClientRect()
+        const x = touch.clientX - rect.left
+        const y = touch.clientY - rect.top
+        const clampedPos = clampPosition(x, y)
+        updatePosition(clampedPos.x, clampedPos.y)
+      }
     } else if (touches.length === 2 && isZooming) {
       // Two touch pinch zoom
       const distance = getTouchDistance(touches)
       const center = getTouchCenter(touches)
-      
+
       if (distance && lastTouchDistance && center && lastTouchCenter) {
         const scaleBy = distance / lastTouchDistance
         const newScale = stageScale * scaleBy
         const clampedScale = Math.max(0.1, Math.min(3, newScale))
-        
+
         updateScale(clampedScale)
-        
+
         // Adjust position to zoom towards center
         const stage = e.target.getStage()
-        const rect = stage.container().getBoundingClientRect()
-        const stageX = center.x - rect.left
-        const stageY = center.y - rect.top
-        
-        const mousePointTo = {
-          x: (stageX - stagePosition.x) / stageScale,
-          y: (stageY - stagePosition.y) / stageScale,
+        if (stage) {
+          const rect = stage.container().getBoundingClientRect()
+          const stageX = center.x - rect.left
+          const stageY = center.y - rect.top
+
+          const mousePointTo = {
+            x: (stageX - stagePosition.x) / stageScale,
+            y: (stageY - stagePosition.y) / stageScale,
+          }
+
+          const newPos = {
+            x: stageX - mousePointTo.x * clampedScale,
+            y: stageY - mousePointTo.y * clampedScale,
+          }
+
+          const clampedPos = clampPosition(newPos.x, newPos.y)
+          updatePosition(clampedPos.x, clampedPos.y)
         }
-        
-        const newPos = {
-          x: stageX - mousePointTo.x * clampedScale,
-          y: stageY - mousePointTo.y * clampedScale,
-        }
-        
-        const clampedPos = clampPosition(newPos.x, newPos.y)
-        updatePosition(clampedPos.x, clampedPos.y)
       }
-      
+
       if (distance) setLastTouchDistance(distance)
       if (center) setLastTouchCenter(center)
     }
   }
 
-  const handleTouchEnd = (e: any) => {
+  const handleTouchEnd = (e: Konva.KonvaEventObject<TouchEvent>) => {
     e.evt.preventDefault()
     setPanning(false)
     setZooming(false)
@@ -317,6 +346,8 @@ const Canvas: React.FC<CanvasProps> = ({
           onDragEnd={!isDraggingShape ? handleDragEnd : undefined}
           onWheel={handleWheel}
           onClick={handleStageClick}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -330,18 +361,26 @@ const Canvas: React.FC<CanvasProps> = ({
                 isSelected={selectedShapeId === shape.id}
                 onSelect={() => handleRectangleSelect(shape.id)}
                 onUpdate={(updates) => handleRectangleUpdate(shape.id, updates)}
+                onDragMove={(x, y) => handleRectangleDragMove(shape.id, x, y)}
                 onDragEnd={(x, y) => handleRectangleDragEnd(shape.id, x, y)}
                 onDragStart={() => setDraggingShape(true)}
                 onDragEndCallback={() => setDraggingShape(false)}
-                onMouseMove={onMouseMove ? (x, y) => onMouseMove(x, y, width, height) : undefined}
               />
             ))}
           </Layer>
           
-          {/* Cursors Layer - Only render visible cursors for performance */}
+          {/* Cursors Layer */}
           <Layer>
             {cursors
-              .filter(cursor => cursor.isVisible !== false) // Include all if isVisible is undefined
+              .filter(cursor => {
+                // Filter out invisible cursors
+                if (cursor.isVisible === false) return false
+                
+                // Filter out self cursor if showSelfCursor is false
+                if (!showSelfCursor && currentUserId && cursor.userId === currentUserId) return false
+                
+                return true
+              })
               .map((cursor) => (
                 <Cursor key={cursor.userId} cursor={cursor} />
               ))}

@@ -12,6 +12,8 @@ export interface AuthHookReturn {
   loading: boolean
   error: string | null
   loginWithGoogle: () => Promise<void>
+  signUpWithEmail: (email: string, password: string, displayName?: string) => Promise<void>
+  signInWithEmail: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -25,8 +27,8 @@ export interface Rectangle {
   rotation: number
   fill: string
   createdBy: string
-  createdAt: number | any // Firestore Timestamp
-  updatedAt: number | any // Firestore Timestamp
+  createdAt: number | Date // Firestore Timestamp can be Date object too
+  updatedAt: number | Date // Firestore Timestamp can be Date object too
   syncStatus?: SyncStatus // Local sync state
 }
 
@@ -58,19 +60,9 @@ export interface PresenceUser {
   userId: string
   userName: string
   color: string
-  joinedAt: number | any // Firestore Timestamp
-  lastSeen?: number | any // Firestore Timestamp
+  joinedAt: number | Date // Firestore Timestamp can be Date object too
+  lastSeen?: number | Date // Firestore Timestamp can be Date object too
 }
-
-// Manipulation state enum
-export const ManipulationState = {
-  IDLE: 'idle',           // Not being manipulated
-  DRAGGING: 'dragging',   // Being dragged
-  RESIZING: 'resizing',   // Being resized
-  LOCKED: 'locked'        // Locked by another user
-} as const
-
-export type ManipulationState = typeof ManipulationState[keyof typeof ManipulationState]
 
 // Stage configuration type
 export interface StageConfig {

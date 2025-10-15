@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore'
 import { firestore } from '../lib/firebase'
 import { useCanvasStore } from '../store/canvasStore'
+import { SHAPE_RETRY_DELAY_MS, SHAPE_MAX_RETRIES, ENABLE_PERFORMANCE_LOGGING } from '../lib/config'
 import type { Rectangle } from '../types'
 
 interface UseShapesReturn {
@@ -25,62 +26,42 @@ interface UseShapesReturn {
   retry: () => void
 }
 
-// Throttle function for updates
-const throttle = (func: Function, delay: number) => {
-  let timeoutId: NodeJS.Timeout | null = null
-  let lastExecTime = 0
-  return (...args: any[]) => {
-    const currentTime = Date.now()
-    
-    if (currentTime - lastExecTime > delay) {
-      func(...args)
-      lastExecTime = currentTime
-    } else {
-      if (timeoutId) clearTimeout(timeoutId)
-      timeoutId = setTimeout(() => {
-        func(...args)
-        lastExecTime = Date.now()
-      }, delay - (currentTime - lastExecTime))
-    }
-  }
-}
-
 export const useShapes = (): UseShapesReturn => {
   const [shapes, setShapes] = useState<Rectangle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { addShape, updateShape: updateStoreShape, deleteShape: deleteStoreShape, setSyncStatus, clearAllShapes: clearAllShapesStore } = useCanvasStore()
-  const pendingUpdates = useRef<Map<string, Partial<Rectangle>>>(new Map())
   const retryCount = useRef(0)
-  const maxRetries = 3
 
   // Throttled update function
-  const throttledUpdate = useCallback(
-    throttle(async (id: string, updates: Partial<Rectangle>) => {
-      try {
-        const shapeRef = doc(firestore, 'shapes', id)
-        const updateData = {
-          ...updates,
-          updatedAt: serverTimestamp()
-        }
+  const throttledUpdate = useCallback(async (id: string, updates: Partial<Rectangle>) => {
+    try {
+      const shapeRef = doc(firestore, 'shapes', id)
+      const updateData = {
+        ...updates,
+        updatedAt: serverTimestamp()
+      }
+      
+      await updateDoc(shapeRef, updateData)
+      setSyncStatus(id, 'synced')
+      retryCount.current = 0
+    } catch (err) {
+      console.error('Error updating shape:', err)
+      setSyncStatus(id, 'error')
+      setError('Failed to update shape')
+      
+      // Retry logic
+      if (retryCount.current < SHAPE_MAX_RETRIES) {
+        retryCount.current++
+        const retryDelay = SHAPE_RETRY_DELAY_MS * retryCount.current
+        setTimeout(() => throttledUpdate(id, updates), retryDelay)
         
-        await updateDoc(shapeRef, updateData)
-        setSyncStatus(id, 'synced')
-        retryCount.current = 0
-      } catch (err) {
-        console.error('Error updating shape:', err)
-        setSyncStatus(id, 'error')
-        setError('Failed to update shape')
-        
-        // Retry logic
-        if (retryCount.current < maxRetries) {
-          retryCount.current++
-          setTimeout(() => throttledUpdate(id, updates), 1000 * retryCount.current)
+        if (ENABLE_PERFORMANCE_LOGGING) {
+          console.log(`🔄 Shape update retry ${retryCount.current}/${SHAPE_MAX_RETRIES} in ${retryDelay}ms`)
         }
       }
-    }, 300), // 300ms throttle
-    [setSyncStatus, setError]
-  )
+    }
+  }, [setSyncStatus, setError])
 
   // Listen to shapes changes
   useEffect(() => {
@@ -161,9 +142,6 @@ export const useShapes = (): UseShapesReturn => {
   // Update shape with throttling
   const updateShape = useCallback(async (id: string, updates: Partial<Rectangle>): Promise<void> => {
     try {
-      // Store pending update
-      pendingUpdates.current.set(id, updates)
-      
       // Update local store immediately (optimistic update)
       updateStoreShape(id, { ...updates, syncStatus: 'pending' })
       setSyncStatus(id, 'pending')
@@ -232,20 +210,20 @@ export const useShapes = (): UseShapesReturn => {
       retryCount.current = 0
       
       // Retry pending updates
-      for (const [id, updates] of pendingUpdates.current) {
-        await throttledUpdate(id, updates)
-      }
+      // The pendingUpdates.current logic has been removed as it was redundant.
+      // Optimistic updates are handled by updateStoreShape, and the onSnapshot listener
+      // is the single source of truth for the shapes array.
       
     } catch (err) {
       console.error('Error retrying operations:', err)
       setError('Failed to retry operations')
     }
-  }, [throttledUpdate])
+  }, [])
 
   // Clean up pending updates on unmount
   useEffect(() => {
     return () => {
-      pendingUpdates.current.clear()
+      // The pendingUpdates.current.clear() logic has been removed as pendingUpdates is no longer used.
     }
   }, [])
 

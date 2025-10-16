@@ -30,6 +30,11 @@ export interface Rectangle {
   createdAt: number | Date // Firestore Timestamp can be Date object too
   updatedAt: number | Date // Firestore Timestamp can be Date object too
   syncStatus?: SyncStatus // Local sync state
+  // Collaborative locking (optional)
+  lockedByUserId?: string | null
+  lockedByUserName?: string | null
+  lockedByUserColor?: string | null
+  lockedAt?: number | Date | null
 }
 
 

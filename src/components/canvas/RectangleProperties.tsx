@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useShapes } from '../../hooks/useShapes'
+import { useAuth } from '../../hooks/useAuth'
 import { MIN_SHAPE_SIZE, CANVAS_HALF } from '../../lib/constants'
 
 interface RectanglePropertiesProps {
@@ -8,6 +9,7 @@ interface RectanglePropertiesProps {
 
 const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShapeId }) => {
   const { shapes, updateShape } = useShapes()
+  const { user } = useAuth()
   const [width, setWidth] = useState('')
   const [height, setHeight] = useState('')
   const [x, setX] = useState('')
@@ -17,6 +19,9 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
 
   // Get the selected shape
   const selectedShape = selectedShapeId ? shapes.find(shape => shape.id === selectedShapeId) : null
+
+  // Check if shape is locked by another user
+  const isLockedByOther = !!(selectedShape?.lockedByUserId && selectedShape.lockedByUserId !== user?.uid)
 
   // Update inputs when selected shape changes
   useEffect(() => {
@@ -172,6 +177,18 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
 
   return (
     <div className="space-y-3 bg-white border border-gray-300 rounded p-3 shadow-sm">
+      {/* Lock status indicator */}
+      {isLockedByOther && (
+        <div className="p-2 bg-red-50 border border-red-200 rounded text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+            <span className="text-red-700 font-medium">
+              Locked by {selectedShape.lockedByUserName || 'Another User'}
+            </span>
+          </div>
+        </div>
+      )}
+      
       {/* Position */}
       <div className="space-y-2">
         <label className="text-xs font-medium text-gray-700">Position</label>
@@ -183,7 +200,8 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
               value={x}
               onChange={handleXChange}
               onBlur={handleXBlur}
-              className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              disabled={isLockedByOther}
+              className={`flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${isLockedByOther ? 'bg-gray-100 cursor-not-allowed' : ''}`}
               placeholder="X"
             />
           </div>
@@ -195,7 +213,8 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
               value={y}
               onChange={handleYChange}
               onBlur={handleYBlur}
-              className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              disabled={isLockedByOther}
+              className={`flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${isLockedByOther ? 'bg-gray-100 cursor-not-allowed' : ''}`}
               placeholder="Y"
             />
           </div>
@@ -213,7 +232,8 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
               value={width}
               onChange={handleWidthChange}
               onBlur={handleWidthBlur}
-              className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              disabled={isLockedByOther}
+              className={`flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${isLockedByOther ? 'bg-gray-100 cursor-not-allowed' : ''}`}
               placeholder="W"
               min={MIN_SHAPE_SIZE}
             />
@@ -226,7 +246,8 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
               value={height}
               onChange={handleHeightChange}
               onBlur={handleHeightBlur}
-              className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              disabled={isLockedByOther}
+              className={`flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${isLockedByOther ? 'bg-gray-100 cursor-not-allowed' : ''}`}
               placeholder="H"
               min={MIN_SHAPE_SIZE}
             />
@@ -243,7 +264,8 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
             value={rotation}
             onChange={handleRotationChange}
             onBlur={handleRotationBlur}
-            className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+            disabled={isLockedByOther}
+            className={`flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${isLockedByOther ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             placeholder="0"
             min="0"
             max="360"
@@ -261,8 +283,9 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
             type="color"
             value={fill}
             onChange={handleFillChange}
-            className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
-            title="Choose color"
+            disabled={isLockedByOther}
+            className={`w-8 h-8 border border-gray-300 rounded ${isLockedByOther ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+            title={isLockedByOther ? "Locked by another user" : "Choose color"}
           />
           <span className="text-xs text-gray-500 font-mono">{fill}</span>
         </div>

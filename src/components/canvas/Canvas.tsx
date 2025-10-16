@@ -19,6 +19,8 @@ interface CanvasProps {
   currentUserId?: string
   enableViewportCulling?: boolean
   onVisibleShapesChange?: (visibleCount: number) => void
+  lockShape?: (id: string) => Promise<void>
+  unlockShape?: (id: string) => Promise<void>
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -31,7 +33,9 @@ const Canvas: React.FC<CanvasProps> = ({
   showSelfCursor = true,
   currentUserId,
   enableViewportCulling = false,
-  onVisibleShapesChange
+  onVisibleShapesChange,
+  lockShape,
+  unlockShape
 }) => {
   const stageRef = useRef<Konva.Stage>(null)
   const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null)
@@ -159,6 +163,11 @@ const Canvas: React.FC<CanvasProps> = ({
   // Handle stage click to deselect
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     if (e.target === e.target.getStage()) {
+      // Unlock current shape before deselecting
+      if (selectedShapeId && unlockShape) {
+        console.log('🔓 Attempting to unlock shape:', selectedShapeId)
+        unlockShape(selectedShapeId)
+      }
       selectShape(null)
     }
   }
@@ -188,8 +197,28 @@ const Canvas: React.FC<CanvasProps> = ({
 
   // Handle rectangle selection
   const handleRectangleSelect = useCallback((shapeId: string) => {
+    console.log('🎯 Selecting shape:', shapeId)
+    
+    // Find the shape to check if it's locked
+    const shape = shapes.find(s => s.id === shapeId)
+    const isLockedByOther = shape?.lockedByUserId && shape.lockedByUserId !== currentUserId
+    
+    // Unlock previously selected shape if different
+    if (selectedShapeId && selectedShapeId !== shapeId && unlockShape) {
+      console.log('🔓 Unlocking previous shape:', selectedShapeId)
+      unlockShape(selectedShapeId)
+    }
+    
     selectShape(shapeId)
-  }, [selectShape])
+    
+    // Only lock if not already locked by another user
+    if (lockShape && !isLockedByOther) {
+      console.log('🔒 Attempting to lock shape:', shapeId)
+      lockShape(shapeId)
+    } else if (isLockedByOther) {
+      console.log('👁️ Shape is locked by another user, viewing only')
+    }
+  }, [selectShape, lockShape, unlockShape, selectedShapeId, shapes, currentUserId])
 
   // Handle rectangle updates
   const handleRectangleUpdate = useCallback((shapeId: string, updates: Partial<Rectangle>) => {
@@ -392,9 +421,10 @@ const Canvas: React.FC<CanvasProps> = ({
         onDragEnd={(x, y) => handleRectangleDragEnd(shape.id, x, y)}
         onDragStart={() => setDraggingShape(true)}
         onDragEndCallback={() => setDraggingShape(false)}
+        currentUserId={currentUserId}
       />
     ))
-  }, [visibleShapes, selectedShapeId, handleRectangleSelect, handleRectangleUpdate, handleRectangleDragMove, handleRectangleDragEnd, setDraggingShape])
+  }, [visibleShapes, selectedShapeId, handleRectangleSelect, handleRectangleUpdate, handleRectangleDragMove, handleRectangleDragEnd, setDraggingShape, currentUserId])
 
   return (
     <CanvasErrorBoundary>

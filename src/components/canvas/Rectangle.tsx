@@ -15,6 +15,7 @@ interface RectangleProps {
   onDragEnd: (x: number, y: number) => void
   onDragStart: () => void
   onDragEndCallback: () => void
+  currentUserId?: string
 }
 
 const RectangleComponent: React.FC<RectangleProps> = memo(({
@@ -26,12 +27,32 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   onDragEnd,
   onDragStart,
   onDragEndCallback,
+  currentUserId,
 }) => {
   const rectRef = useRef<Konva.Rect>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
   const lastUpdateRef = useRef<number>(0)
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingUpdateRef = useRef<{ x: number; y: number } | null>(null)
+  const initialBoundsRef = useRef<{ x: number; y: number; width: number; height: number; rotation: number } | null>(null)
+  const activeAnchorRef = useRef<string>('')
+  const lastTransformUpdateRef = useRef<number>(0)
+  const transformTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Check if shape is locked by another user
+  const isLockedByOther = shape.lockedByUserId && shape.lockedByUserId !== currentUserId
+  // const isLockedByCurrent = shape.lockedByUserId === currentUserId
+  
+  // Debug: Log lock color info
+  if (isLockedByOther) {
+    console.log('🎨 Locked shape color:', {
+      shapeId: shape.id,
+      lockedByUserId: shape.lockedByUserId,
+      lockedByUserName: shape.lockedByUserName,
+      lockedByUserColor: shape.lockedByUserColor,
+      currentUserId
+    })
+  }
 
   // Canvas bounds - 64000x64000 with center at (0,0) for infinite feel
   // Moved to src/lib/constants.ts
@@ -100,10 +121,20 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true
+    // Allow viewing details but not editing if locked by another user
+    if (isLockedByOther) {
+      console.log('👁️ Viewing locked shape details:', shape.lockedByUserName)
+    }
+    // Always call onSelect to show details in panel
     onSelect()
   }
 
   const handleDragStart = () => {
+    // Only allow drag if shape is selected
+    if (!isSelected) {
+      console.log('❌ Cannot drag - shape must be selected first')
+      return
+    }
     // Notify parent that dragging has started
     onDragStart()
   }
@@ -136,24 +167,63 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   }
 
   const handleTransformStart = () => {
-    // Transform started - no locking needed
+    // Only allow transform if shape is selected
+    if (!isSelected) {
+      console.log('❌ Cannot transform - shape must be selected first')
+      return
+    }
+    // Capture initial bounds and active anchor at the start of transform
+    initialBoundsRef.current = {
+      x: shape.x,
+      y: shape.y,
+      width: shape.width,
+      height: shape.height,
+      rotation: shape.rotation || 0,
+    }
+    activeAnchorRef.current = transformerRef.current?.getActiveAnchor() || ''
   }
 
   const handleTransformEnd = () => {
     if (!rectRef.current) return
 
     const node = rectRef.current
+    const initial = initialBoundsRef.current || {
+      x: shape.x,
+      y: shape.y,
+      width: shape.width,
+      height: shape.height,
+      rotation: shape.rotation || 0,
+    }
+    const anchor = activeAnchorRef.current || transformerRef.current?.getActiveAnchor() || ''
+
+    // Clear any pending transform updates since we're ending
+    if (transformTimeoutRef.current) {
+      clearTimeout(transformTimeoutRef.current)
+      transformTimeoutRef.current = null
+    }
+
+    // Final update to ensure we have the latest state
     const scaleX = node.scaleX()
     const scaleY = node.scaleY()
     const rotation = node.rotation ? node.rotation() : 0
 
-    // Calculate new dimensions
-    const newWidth = Math.max(MIN_SHAPE_SIZE, shape.width * scaleX)
-    const newHeight = Math.max(MIN_SHAPE_SIZE, shape.height * scaleY)
+    // Calculate new dimensions using initial bounds
+    const newWidth = Math.max(MIN_SHAPE_SIZE, initial.width * scaleX)
+    const newHeight = Math.max(MIN_SHAPE_SIZE, initial.height * scaleY)
 
-    // Calculate new position (accounting for scaling)
-    const newX = node.x()
-    const newY = node.y()
+    // Keep opposite edges locked based on active anchor
+    const rightEdge = initial.x + initial.width
+    const bottomEdge = initial.y + initial.height
+
+    let newX = initial.x
+    let newY = initial.y
+
+    if (anchor.includes('left')) {
+      newX = rightEdge - newWidth
+    }
+    if (anchor.includes('top')) {
+      newY = bottomEdge - newHeight
+    }
 
     // Clamp position within canvas bounds
     const clampedX = clamp(newX, -CANVAS_HALF, CANVAS_HALF - newWidth)
@@ -171,13 +241,105 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
       rotation: normalizedRotation
     })
 
-    // Removed as it is handled by the Canvas component directly
-
-    // Reset scale and position
+    // Reset visual scale and apply final dimensions/position immediately
     node.scaleX(1)
     node.scaleY(1)
+    node.width(newWidth)
+    node.height(newHeight)
     node.x(clampedX)
     node.y(clampedY)
+
+    // Clear initial refs
+    initialBoundsRef.current = null
+    activeAnchorRef.current = ''
+  }
+
+  // Live transform handler (throttled) to update Firestore during resize
+  const handleTransform = () => {
+    const node = rectRef.current
+    if (!node) return
+
+    // Use initial bounds captured at transform start
+    const initial = initialBoundsRef.current || {
+      x: shape.x,
+      y: shape.y,
+      width: shape.width,
+      height: shape.height,
+      rotation: shape.rotation || 0,
+    }
+    const anchor = activeAnchorRef.current || transformerRef.current?.getActiveAnchor() || ''
+
+    // If rotating, just update rotation and bail from size/position logic
+    if (anchor === 'rotater') {
+      const rotation = node.rotation ? node.rotation() : 0
+      const normalizedRotation = ((rotation % 360) + 360) % 360
+      const now = Date.now()
+      if (transformTimeoutRef.current) {
+        clearTimeout(transformTimeoutRef.current)
+      }
+      transformTimeoutRef.current = setTimeout(() => {
+        if (now - lastTransformUpdateRef.current >= RECTANGLE_DRAG_THROTTLE_MS) {
+          onUpdate({ rotation: normalizedRotation })
+          lastTransformUpdateRef.current = now
+        }
+      }, RECTANGLE_DRAG_DEBOUNCE_MS)
+      return
+    }
+
+    // Compute new dimensions based on scale
+    const scaleX = node.scaleX()
+    const scaleY = node.scaleY()
+    const newWidth = Math.max(MIN_SHAPE_SIZE, initial.width * scaleX)
+    const newHeight = Math.max(MIN_SHAPE_SIZE, initial.height * scaleY)
+
+    // Keep opposite edges locked
+    const rightEdge = initial.x + initial.width
+    const bottomEdge = initial.y + initial.height
+    let newX = initial.x
+    let newY = initial.y
+    if (anchor.includes('left')) {
+      newX = rightEdge - newWidth
+    }
+    if (anchor.includes('top')) {
+      newY = bottomEdge - newHeight
+    }
+
+    // Clamp within bounds for the new size
+    const clampedX = clamp(newX, -CANVAS_HALF, CANVAS_HALF - newWidth)
+    const clampedY = clamp(newY, -CANVAS_HALF, CANVAS_HALF - newHeight)
+
+    // Normalize rotation
+    const rotation = node.rotation ? node.rotation() : 0
+    const normalizedRotation = ((rotation % 360) + 360) % 360
+
+    // Apply visual updates immediately to avoid jumpiness
+    node.scaleX(1)
+    node.scaleY(1)
+    node.width(newWidth)
+    node.height(newHeight)
+    node.x(clampedX)
+    node.y(clampedY)
+
+    // Debounce + throttle (persist updates)
+    const now = Date.now()
+
+    if (transformTimeoutRef.current) {
+      clearTimeout(transformTimeoutRef.current)
+    }
+
+    transformTimeoutRef.current = setTimeout(() => {
+      if (now - lastTransformUpdateRef.current >= RECTANGLE_DRAG_THROTTLE_MS) {
+        onUpdate({
+          x: Math.round(clampedX),
+          y: Math.round(clampedY),
+          width: Math.round(newWidth),
+          height: Math.round(newHeight),
+          rotation: normalizedRotation,
+        })
+
+        lastTransformUpdateRef.current = now
+      }
+    }, RECTANGLE_DRAG_DEBOUNCE_MS)
   }
 
   // Visual state - no locking logic needed
@@ -192,26 +354,27 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
         height={shape.height}
         rotation={shape.rotation}
         fill={shape.fill}
-        stroke={isSelected ? '#007AFF' : 'transparent'}
-        strokeWidth={isSelected ? 2 : 0}
+        stroke={isLockedByOther ? (shape.lockedByUserColor || '#FF0000') : (isSelected ? '#007AFF' : 'transparent')}
+        strokeWidth={isLockedByOther ? Math.min(20, ((shape.width + shape.height) / 2) * 0.1) : (isSelected ? 2 : 0)}
         shadowColor="rgba(0, 0, 0, 0.1)"
         shadowBlur={4}
         shadowOffset={{ x: 2, y: 2 }}
         shadowOpacity={0.3}
-        draggable={true}
+        draggable={isSelected && !isLockedByOther}
         onClick={handleClick}
         onTap={handleClick}
-        onDragStart={handleDragStart}
-        onDragMove={handleDragMove}
-        onDragEnd={handleDragEnd}
-        onTransformStart={handleTransformStart}
-        onTransformEnd={handleTransformEnd}
+        onDragStart={isSelected && !isLockedByOther ? handleDragStart : undefined}
+        onDragMove={isSelected && !isLockedByOther ? handleDragMove : undefined}
+        onDragEnd={isSelected && !isLockedByOther ? handleDragEnd : undefined}
+        onTransformStart={isSelected && !isLockedByOther ? handleTransformStart : undefined}
+        onTransform={isSelected && !isLockedByOther ? handleTransform : undefined}
+        onTransformEnd={isSelected && !isLockedByOther ? handleTransformEnd : undefined}
         // Hover effects
         onMouseEnter={(e: Konva.KonvaEventObject<MouseEvent>) => {
           try {
             const container = e.target.getStage()?.container()
             if (container) {
-              container.style.cursor = 'pointer'
+              container.style.cursor = isLockedByOther ? 'not-allowed' : 'pointer'
             }
           } catch {
             // Ignore errors in test environment
@@ -228,7 +391,7 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
           }
         }}
       />
-      {isSelected && (
+      {isSelected && !isLockedByOther && (
         <Transformer
           ref={transformerRef}
           boundBoxFunc={(oldBox, newBox) => {

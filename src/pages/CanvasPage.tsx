@@ -37,7 +37,9 @@ export const CanvasPage: React.FC = () => {
     clearAllShapes,
     loading: shapesLoading,
     error: shapesError,
-    retry: retryShapes
+    retry: retryShapes,
+    lockShape,
+    unlockShape
   } = useShapes()
 
   const { stagePosition, stageScale, updatePosition, selectShape } = useCanvasStore()
@@ -212,6 +214,8 @@ export const CanvasPage: React.FC = () => {
               currentUserId={user?.uid}
               enableViewportCulling={enableViewportCulling}
               onVisibleShapesChange={setVisibleShapesCount}
+              lockShape={lockShape}
+              unlockShape={unlockShape}
             />
           </div>
         </div>

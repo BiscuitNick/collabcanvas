@@ -14,6 +14,8 @@ import { firestore } from '../lib/firebase'
 import { useCanvasStore } from '../store/canvasStore'
 import { SHAPE_RETRY_DELAY_MS, SHAPE_MAX_RETRIES, ENABLE_PERFORMANCE_LOGGING } from '../lib/config'
 import type { Rectangle } from '../types'
+import { useAuth } from './useAuth'
+import { getUserColor } from '../lib/utils'
 
 interface UseShapesReturn {
   shapes: Rectangle[]
@@ -24,9 +26,12 @@ interface UseShapesReturn {
   loading: boolean
   error: string | null
   retry: () => void
+  lockShape: (id: string) => Promise<void>
+  unlockShape: (id: string) => Promise<void>
 }
 
 export const useShapes = (): UseShapesReturn => {
+  const { user } = useAuth()
   const [shapes, setShapes] = useState<Rectangle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +39,19 @@ export const useShapes = (): UseShapesReturn => {
   const retryCount = useRef(0)
   const isCreatingShape = useRef(false)
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Track shapes that were recently updated locally to avoid snapshot snapback
+  const locallyUpdatingRef = useRef<Record<string, number>>({})
+  const shapesStateRef = useRef<Rectangle[]>([])
+  const RECENT_LOCAL_WINDOW_MS = 400
+  
+  // Lock TTL and cleanup
+  const LOCK_TTL_MS = 30000 // 30 seconds
+  const lockCleanupIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    shapesStateRef.current = shapes
+  }, [shapes])
 
   // Throttled update function
   const throttledUpdate = useCallback(async (id: string, updates: Partial<Rectangle>) => {
@@ -87,20 +105,66 @@ export const useShapes = (): UseShapesReturn => {
             createdBy: data.createdBy,
             createdAt: data.createdAt,
             updatedAt: data.updatedAt,
+            lockedByUserId: data.lockedByUserId || null,
+            lockedByUserName: data.lockedByUserName || null,
+            lockedByUserColor: data.lockedByUserColor || null,
+            lockedAt: data.lockedAt || null,
             syncStatus: 'synced'
           })
         })
         
+        // Merge: prefer recent local edits to avoid snapback while user is updating
+        const now = Date.now()
+        const mergedShapes = shapesData.map((remoteShape) => {
+          // Always apply lock updates from Firestore
+          const local = shapesStateRef.current.find(s => s.id === remoteShape.id)
+          
+          // If current user holds the lock, preserve their local position/size changes
+          if (remoteShape.lockedByUserId && user?.uid && remoteShape.lockedByUserId === user.uid) {
+            if (local) {
+              return { 
+                ...remoteShape, 
+                x: local.x,
+                y: local.y,
+                width: local.width,
+                height: local.height,
+                rotation: local.rotation
+              }
+            }
+          }
+          
+          // For other cases, check recent local updates
+          const lastLocal = locallyUpdatingRef.current[remoteShape.id] || 0
+          if (now - lastLocal <= RECENT_LOCAL_WINDOW_MS && local) {
+            return {
+              ...remoteShape,
+              x: local.x,
+              y: local.y,
+              width: local.width,
+              height: local.height,
+              rotation: local.rotation
+            }
+          }
+          
+          return remoteShape
+        })
+
         // Debounced update to prevent rapid re-renders during shape creation
         if (updateTimeoutRef.current) {
           clearTimeout(updateTimeoutRef.current)
         }
         
         updateTimeoutRef.current = setTimeout(() => {
-          setShapes(shapesData)
+          setShapes(mergedShapes)
           setLoading(false)
           setError(null)
           retryCount.current = 0
+          // Cleanup stale locally-updating markers
+          Object.keys(locallyUpdatingRef.current).forEach((id) => {
+            if (now - (locallyUpdatingRef.current[id] || 0) > RECENT_LOCAL_WINDOW_MS) {
+              delete locallyUpdatingRef.current[id]
+            }
+          })
         }, isCreatingShape.current ? 100 : 0) // Longer delay if creating shape
       },
       (err) => {
@@ -155,6 +219,8 @@ export const useShapes = (): UseShapesReturn => {
       // Update local store immediately (optimistic update)
       updateStoreShape(id, { ...updates, syncStatus: 'pending' })
       setSyncStatus(id, 'pending')
+      // Mark this shape as recently updated locally
+      locallyUpdatingRef.current[id] = Date.now()
       
       // Throttled Firestore update
       throttledUpdate(id, updates)
@@ -206,6 +272,58 @@ export const useShapes = (): UseShapesReturn => {
     }
   }, [shapes, clearAllShapesStore])
 
+  // Lock a shape for current user
+  const lockShape = useCallback(async (id: string): Promise<void> => {
+    if (!user) return
+    try {
+      const userColor = getUserColor(user.uid)
+      console.log('🔒 Locking shape:', id, 'for user:', user.uid, 'with color:', userColor)
+      // Optimistic local lock
+      updateStoreShape(id, {
+        lockedByUserId: user.uid,
+        lockedByUserName: user.displayName || 'User',
+        lockedByUserColor: userColor,
+        lockedAt: Date.now(),
+      })
+      const shapeRef = doc(firestore, 'shapes', id)
+      await updateDoc(shapeRef, {
+        lockedByUserId: user.uid,
+        lockedByUserName: user.displayName || 'User',
+        lockedByUserColor: userColor,
+        lockedAt: serverTimestamp(),
+      })
+      console.log('✅ Shape locked successfully:', id, 'Color stored:', userColor)
+    } catch (err) {
+      console.error('Error locking shape:', err)
+      setError('Failed to lock shape')
+    }
+  }, [user, updateStoreShape, setError])
+
+  // Unlock a shape
+  const unlockShape = useCallback(async (id: string): Promise<void> => {
+    try {
+      console.log('🔓 Unlocking shape:', id)
+      // Optimistic local unlock
+      updateStoreShape(id, {
+        lockedByUserId: null,
+        lockedByUserName: null,
+        lockedByUserColor: null,
+        lockedAt: null,
+      })
+      const shapeRef = doc(firestore, 'shapes', id)
+      await updateDoc(shapeRef, {
+        lockedByUserId: null,
+        lockedByUserName: null,
+        lockedByUserColor: null,
+        lockedAt: null,
+      })
+      console.log('✅ Shape unlocked successfully:', id)
+    } catch (err) {
+      console.error('Error unlocking shape:', err)
+      setError('Failed to unlock shape')
+    }
+  }, [updateStoreShape, setError])
+
   // Retry failed operations
   const retry = useCallback(async () => {
     try {
@@ -220,6 +338,53 @@ export const useShapes = (): UseShapesReturn => {
     } catch (err) {
       console.error('Error retrying operations:', err)
       setError('Failed to retry operations')
+    }
+  }, [])
+
+  // Auto-cleanup stale locks
+  useEffect(() => {
+    const cleanupStaleLocks = () => {
+      const now = Date.now()
+      const staleShapes: string[] = []
+      
+      shapesStateRef.current.forEach(shape => {
+        if (shape.lockedByUserId && shape.lockedAt) {
+          const lockTime = typeof shape.lockedAt === 'number' ? shape.lockedAt : shape.lockedAt.getTime()
+          if (now - lockTime > LOCK_TTL_MS) {
+            staleShapes.push(shape.id)
+          }
+        }
+      })
+      
+      // Unlock stale shapes
+      staleShapes.forEach(shapeId => {
+        updateStoreShape(shapeId, {
+          lockedByUserId: null,
+          lockedByUserName: null,
+          lockedByUserColor: null,
+          lockedAt: null,
+        })
+        
+        // Update Firestore
+        const shapeRef = doc(firestore, 'shapes', shapeId)
+        updateDoc(shapeRef, {
+          lockedByUserId: null,
+          lockedByUserName: null,
+          lockedByUserColor: null,
+          lockedAt: null,
+        }).catch(err => {
+          console.error('Error cleaning up stale lock:', err)
+        })
+      })
+    }
+    
+    // Run cleanup every 10 seconds
+    lockCleanupIntervalRef.current = setInterval(cleanupStaleLocks, 10000)
+    
+    return () => {
+      if (lockCleanupIntervalRef.current) {
+        clearInterval(lockCleanupIntervalRef.current)
+      }
     }
   }, [])
 
@@ -238,6 +403,8 @@ export const useShapes = (): UseShapesReturn => {
     clearAllShapes,
     loading,
     error,
-    retry
+    retry,
+    lockShape,
+    unlockShape
   }
 }

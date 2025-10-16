@@ -28,6 +28,8 @@ interface UseShapesReturn {
   retry: () => void
   lockShape: (id: string) => Promise<void>
   unlockShape: (id: string) => Promise<void>
+  startEditingShape: (id: string) => void
+  stopEditingShape: (id: string) => void
 }
 
 export const useShapes = (): UseShapesReturn => {
@@ -40,10 +42,9 @@ export const useShapes = (): UseShapesReturn => {
   const isCreatingShape = useRef(false)
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
-  // Track shapes that were recently updated locally to avoid snapshot snapback
-  const locallyUpdatingRef = useRef<Record<string, number>>({})
+  // Track shapes that the current user is actively editing - ignore ALL Firestore updates for these
+  const activelyEditingRef = useRef<Set<string>>(new Set())
   const shapesStateRef = useRef<Rectangle[]>([])
-  const RECENT_LOCAL_WINDOW_MS = 400
   
   // Lock TTL and cleanup
   const LOCK_TTL_MS = 30000 // 30 seconds
@@ -113,39 +114,33 @@ export const useShapes = (): UseShapesReturn => {
           })
         })
         
-        // Merge: prefer recent local edits to avoid snapback while user is updating
-        const now = Date.now()
+        // COMPLETELY IGNORE Firestore updates for shapes the current user is actively editing OR has locked
         const mergedShapes = shapesData.map((remoteShape) => {
-          // Always apply lock updates from Firestore
           const local = shapesStateRef.current.find(s => s.id === remoteShape.id)
           
-          // If current user holds the lock, preserve their local position/size changes
-          if (remoteShape.lockedByUserId && user?.uid && remoteShape.lockedByUserId === user.uid) {
-            if (local) {
-              return { 
-                ...remoteShape, 
-                x: local.x,
-                y: local.y,
-                width: local.width,
-                height: local.height,
-                rotation: local.rotation
-              }
-            }
+          // If current user is actively editing this shape OR has it locked, use ONLY local state
+          const isActivelyEditing = activelyEditingRef.current.has(remoteShape.id)
+          const isLockedByCurrentUser = remoteShape.lockedByUserId && user?.uid && remoteShape.lockedByUserId === user.uid
+          
+          if ((isActivelyEditing || isLockedByCurrentUser) && local) {
+            return local // Use local state completely, ignore all Firestore data
           }
           
-          // For other cases, check recent local updates
-          const lastLocal = locallyUpdatingRef.current[remoteShape.id] || 0
-          if (now - lastLocal <= RECENT_LOCAL_WINDOW_MS && local) {
-            return {
-              ...remoteShape,
-              x: local.x,
-              y: local.y,
-              width: local.width,
-              height: local.height,
-              rotation: local.rotation
-            }
+          // Log Firestore updates for non-editing, non-locked shapes only
+          if (!isActivelyEditing && !isLockedByCurrentUser && local && (
+            local.x !== remoteShape.x || 
+            local.y !== remoteShape.y || 
+            local.width !== remoteShape.width || 
+            local.height !== remoteShape.height || 
+            local.rotation !== remoteShape.rotation
+          )) {
+            console.log('📥 Firestore update received for shape:', remoteShape.id, {
+              from: { x: local.x, y: local.y, width: local.width, height: local.height, rotation: local.rotation },
+              to: { x: remoteShape.x, y: remoteShape.y, width: remoteShape.width, height: remoteShape.height, rotation: remoteShape.rotation }
+            })
           }
           
+          // For all other shapes, use Firestore data (with lock info preserved)
           return remoteShape
         })
 
@@ -159,12 +154,6 @@ export const useShapes = (): UseShapesReturn => {
           setLoading(false)
           setError(null)
           retryCount.current = 0
-          // Cleanup stale locally-updating markers
-          Object.keys(locallyUpdatingRef.current).forEach((id) => {
-            if (now - (locallyUpdatingRef.current[id] || 0) > RECENT_LOCAL_WINDOW_MS) {
-              delete locallyUpdatingRef.current[id]
-            }
-          })
         }, isCreatingShape.current ? 100 : 0) // Longer delay if creating shape
       },
       (err) => {
@@ -216,11 +205,12 @@ export const useShapes = (): UseShapesReturn => {
   // Update shape with throttling
   const updateShape = useCallback(async (id: string, updates: Partial<Rectangle>): Promise<void> => {
     try {
+      // Mark this shape as actively being edited
+      activelyEditingRef.current.add(id)
+      
       // Update local store immediately (optimistic update)
       updateStoreShape(id, { ...updates, syncStatus: 'pending' })
       setSyncStatus(id, 'pending')
-      // Mark this shape as recently updated locally
-      locallyUpdatingRef.current[id] = Date.now()
       
       // Throttled Firestore update
       throttledUpdate(id, updates)
@@ -324,6 +314,18 @@ export const useShapes = (): UseShapesReturn => {
     }
   }, [updateStoreShape, setError])
 
+  // Start editing a shape - ignore all Firestore updates for this shape
+  const startEditingShape = useCallback((id: string): void => {
+    activelyEditingRef.current.add(id)
+    console.log('✏️ Started editing shape:', id)
+  }, [])
+
+  // Stop editing a shape - resume Firestore updates for this shape
+  const stopEditingShape = useCallback((id: string): void => {
+    activelyEditingRef.current.delete(id)
+    console.log('✏️ Stopped editing shape:', id)
+  }, [])
+
   // Retry failed operations
   const retry = useCallback(async () => {
     try {
@@ -372,8 +374,8 @@ export const useShapes = (): UseShapesReturn => {
           lockedByUserName: null,
           lockedByUserColor: null,
           lockedAt: null,
-        }).catch(err => {
-          console.error('Error cleaning up stale lock:', err)
+        }).catch(() => {
+          // Silent cleanup - no logging
         })
       })
     }
@@ -405,6 +407,8 @@ export const useShapes = (): UseShapesReturn => {
     error,
     retry,
     lockShape,
-    unlockShape
+    unlockShape,
+    startEditingShape,
+    stopEditingShape
   }
 }

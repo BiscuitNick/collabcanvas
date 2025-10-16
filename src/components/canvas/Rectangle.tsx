@@ -3,7 +3,7 @@ import { Rect, Transformer } from 'react-konva'
 import Konva from 'konva' // Import Konva for types
 import type { Rectangle } from '../../types'
 import { clamp } from '../../lib/utils'
-import { CANVAS_HALF, MIN_SHAPE_SIZE } from '../../lib/constants'
+import { CANVAS_HALF, MIN_SHAPE_SIZE, MAX_SHAPE_SIZE } from '../../lib/constants'
 import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS, ENABLE_PERFORMANCE_LOGGING } from '../../lib/config'
 
 interface RectangleProps {
@@ -34,10 +34,6 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   const lastUpdateRef = useRef<number>(0)
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingUpdateRef = useRef<{ x: number; y: number } | null>(null)
-  const initialBoundsRef = useRef<{ x: number; y: number; width: number; height: number; rotation: number } | null>(null)
-  const activeAnchorRef = useRef<string>('')
-  const lastTransformUpdateRef = useRef<number>(0)
-  const transformTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Check if shape is locked by another user
   const isLockedByOther = shape.lockedByUserId && shape.lockedByUserId !== currentUserId
@@ -167,63 +163,26 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   }
 
   const handleTransformStart = () => {
-    // Only allow transform if shape is selected
-    if (!isSelected) {
-      console.log('❌ Cannot transform - shape must be selected first')
-      return
-    }
-    // Capture initial bounds and active anchor at the start of transform
-    initialBoundsRef.current = {
-      x: shape.x,
-      y: shape.y,
-      width: shape.width,
-      height: shape.height,
-      rotation: shape.rotation || 0,
-    }
-    activeAnchorRef.current = transformerRef.current?.getActiveAnchor() || ''
+    // Transform started - no locking needed
   }
 
   const handleTransformEnd = () => {
     if (!rectRef.current) return
 
     const node = rectRef.current
-    const initial = initialBoundsRef.current || {
-      x: shape.x,
-      y: shape.y,
-      width: shape.width,
-      height: shape.height,
-      rotation: shape.rotation || 0,
-    }
-    const anchor = activeAnchorRef.current || transformerRef.current?.getActiveAnchor() || ''
-
-    // Clear any pending transform updates since we're ending
-    if (transformTimeoutRef.current) {
-      clearTimeout(transformTimeoutRef.current)
-      transformTimeoutRef.current = null
-    }
-
-    // Final update to ensure we have the latest state
     const scaleX = node.scaleX()
     const scaleY = node.scaleY()
     const rotation = node.rotation ? node.rotation() : 0
 
-    // Calculate new dimensions using initial bounds
-    const newWidth = Math.max(MIN_SHAPE_SIZE, initial.width * scaleX)
-    const newHeight = Math.max(MIN_SHAPE_SIZE, initial.height * scaleY)
+    // Calculate new dimensions using current node dimensions
+    const currentWidth = node.width() * node.scaleX()
+    const currentHeight = node.height() * node.scaleY()
+    const newWidth = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_SIZE, currentWidth))
+    const newHeight = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_SIZE, currentHeight))
 
-    // Keep opposite edges locked based on active anchor
-    const rightEdge = initial.x + initial.width
-    const bottomEdge = initial.y + initial.height
-
-    let newX = initial.x
-    let newY = initial.y
-
-    if (anchor.includes('left')) {
-      newX = rightEdge - newWidth
-    }
-    if (anchor.includes('top')) {
-      newY = bottomEdge - newHeight
-    }
+    // Calculate new position - use the current node position as Konva handles the transform
+    const newX = node.x()
+    const newY = node.y()
 
     // Clamp position within canvas bounds
     const clampedX = clamp(newX, -CANVAS_HALF, CANVAS_HALF - newWidth)
@@ -241,106 +200,17 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
       rotation: normalizedRotation
     })
 
-    // Reset visual scale and apply final dimensions/position immediately
+    // Removed as it is handled by the Canvas component directly
+
+    // Reset scale and position
     node.scaleX(1)
     node.scaleY(1)
     node.width(newWidth)
     node.height(newHeight)
     node.x(clampedX)
     node.y(clampedY)
-
-    // Clear initial refs
-    initialBoundsRef.current = null
-    activeAnchorRef.current = ''
   }
 
-  // Live transform handler (throttled) to update Firestore during resize
-  const handleTransform = () => {
-    const node = rectRef.current
-    if (!node) return
-
-    // Use initial bounds captured at transform start
-    const initial = initialBoundsRef.current || {
-      x: shape.x,
-      y: shape.y,
-      width: shape.width,
-      height: shape.height,
-      rotation: shape.rotation || 0,
-    }
-    const anchor = activeAnchorRef.current || transformerRef.current?.getActiveAnchor() || ''
-
-    // If rotating, just update rotation and bail from size/position logic
-    if (anchor === 'rotater') {
-      const rotation = node.rotation ? node.rotation() : 0
-      const normalizedRotation = ((rotation % 360) + 360) % 360
-      const now = Date.now()
-      if (transformTimeoutRef.current) {
-        clearTimeout(transformTimeoutRef.current)
-      }
-      transformTimeoutRef.current = setTimeout(() => {
-        if (now - lastTransformUpdateRef.current >= RECTANGLE_DRAG_THROTTLE_MS) {
-          onUpdate({ rotation: normalizedRotation })
-          lastTransformUpdateRef.current = now
-        }
-      }, RECTANGLE_DRAG_DEBOUNCE_MS)
-      return
-    }
-
-    // Compute new dimensions based on scale
-    const scaleX = node.scaleX()
-    const scaleY = node.scaleY()
-    const newWidth = Math.max(MIN_SHAPE_SIZE, initial.width * scaleX)
-    const newHeight = Math.max(MIN_SHAPE_SIZE, initial.height * scaleY)
-
-    // Keep opposite edges locked
-    const rightEdge = initial.x + initial.width
-    const bottomEdge = initial.y + initial.height
-    let newX = initial.x
-    let newY = initial.y
-    if (anchor.includes('left')) {
-      newX = rightEdge - newWidth
-    }
-    if (anchor.includes('top')) {
-      newY = bottomEdge - newHeight
-    }
-
-    // Clamp within bounds for the new size
-    const clampedX = clamp(newX, -CANVAS_HALF, CANVAS_HALF - newWidth)
-    const clampedY = clamp(newY, -CANVAS_HALF, CANVAS_HALF - newHeight)
-
-    // Normalize rotation
-    const rotation = node.rotation ? node.rotation() : 0
-    const normalizedRotation = ((rotation % 360) + 360) % 360
-
-    // Apply visual updates immediately to avoid jumpiness
-    node.scaleX(1)
-    node.scaleY(1)
-    node.width(newWidth)
-    node.height(newHeight)
-    node.x(clampedX)
-    node.y(clampedY)
-
-    // Debounce + throttle (persist updates)
-    const now = Date.now()
-
-    if (transformTimeoutRef.current) {
-      clearTimeout(transformTimeoutRef.current)
-    }
-
-    transformTimeoutRef.current = setTimeout(() => {
-      if (now - lastTransformUpdateRef.current >= RECTANGLE_DRAG_THROTTLE_MS) {
-        onUpdate({
-          x: Math.round(clampedX),
-          y: Math.round(clampedY),
-          width: Math.round(newWidth),
-          height: Math.round(newHeight),
-          rotation: normalizedRotation,
-        })
-
-        lastTransformUpdateRef.current = now
-      }
-    }, RECTANGLE_DRAG_DEBOUNCE_MS)
-  }
 
   // Visual state - no locking logic needed
 
@@ -367,7 +237,6 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
         onDragMove={isSelected && !isLockedByOther ? handleDragMove : undefined}
         onDragEnd={isSelected && !isLockedByOther ? handleDragEnd : undefined}
         onTransformStart={isSelected && !isLockedByOther ? handleTransformStart : undefined}
-        onTransform={isSelected && !isLockedByOther ? handleTransform : undefined}
         onTransformEnd={isSelected && !isLockedByOther ? handleTransformEnd : undefined}
         // Hover effects
         onMouseEnter={(e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -395,8 +264,11 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
         <Transformer
           ref={transformerRef}
           boundBoxFunc={(oldBox, newBox) => {
-            // Only limit minimum size
+            // Limit resize
             if (newBox.width < MIN_SHAPE_SIZE || newBox.height < MIN_SHAPE_SIZE) {
+              return oldBox
+            }
+            if (newBox.width > MAX_SHAPE_SIZE || newBox.height > MAX_SHAPE_SIZE) {
               return oldBox
             }
             return newBox

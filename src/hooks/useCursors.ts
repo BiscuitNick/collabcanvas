@@ -101,7 +101,6 @@ export const useCursors = (userId: string, userName: string, stagePosition?: { x
             
             // Only include cursors that have been updated recently (within 30 seconds)
             if (now - lastUpdated > 30000) {
-              console.log('🧹 Filtering out stale cursor for user:', data.userName)
               return
             }
             

@@ -39,7 +39,9 @@ export const CanvasPage: React.FC = () => {
     error: shapesError,
     retry: retryShapes,
     lockShape,
-    unlockShape
+    unlockShape,
+    startEditingShape,
+    stopEditingShape
   } = useShapes()
 
   const { stagePosition, stageScale, updatePosition, selectShape } = useCanvasStore()
@@ -216,6 +218,8 @@ export const CanvasPage: React.FC = () => {
               onVisibleShapesChange={setVisibleShapesCount}
               lockShape={lockShape}
               unlockShape={unlockShape}
+              startEditingShape={startEditingShape}
+              stopEditingShape={stopEditingShape}
             />
           </div>
         </div>

@@ -1,0 +1,455 @@
+Description: Performance optimization patterns and guidelines for CollabCanvas
+Globs: src/components/**/*.{ts,tsx}, src/hooks/**/*.{ts,tsx}
+
+# Performance Optimization Patterns
+
+## Project Context
+CollabCanvas is a real-time collaborative canvas application that must maintain 60 FPS during all interactions. The MVP is complete and production-ready.
+
+## Performance Targets
+
+### Canvas Performance
+- **60 FPS** - Maintained during pan, zoom, and drag operations
+- **<100ms Latency** - Real-time updates appear almost instantly
+- **Smooth Animations** - All UI transitions are fluid
+- **Memory Efficiency** - Proper cleanup and garbage collection
+
+### Real-time Performance
+- **Debounced Writes** - 300ms delay for shape updates
+- **Throttled Cursors** - 100ms delay for cursor updates
+- **Optimistic Updates** - UI updates immediately
+- **Connection Handling** - Graceful offline/online transitions
+
+## Canvas Optimization Patterns
+
+### Konva.js Performance
+```typescript
+// Pattern for optimal Konva rendering
+export function Canvas() {
+  const stageRef = useRef<Konva.Stage>(null);
+  const layerRef = useRef<Konva.Layer>(null);
+
+  // Use single layer for all shapes (performance optimization)
+  return (
+    <Stage
+      ref={stageRef}
+      width={canvasWidth}
+      height={canvasHeight}
+      draggable={!isDraggingShape}
+      onDragEnd={handleStageDragEnd}
+    >
+      <Layer ref={layerRef}>
+        {shapes.map(shape => (
+          <Rectangle
+            key={shape.id}
+            shape={shape}
+            isSelected={selectedShapeId === shape.id}
+            onSelect={handleShapeSelect}
+            onDragEnd={handleShapeDragEnd}
+          />
+        ))}
+        {cursors.map(cursor => (
+          <Cursor
+            key={cursor.userId}
+            cursor={cursor}
+            stagePosition={stagePosition}
+            stageScale={stageScale}
+          />
+        ))}
+      </Layer>
+    </Stage>
+  );
+}
+```
+
+### Viewport Culling
+```typescript
+// Pattern for viewport-based rendering
+const getVisibleShapes = (shapes: Rectangle[], viewport: Viewport) => {
+  return shapes.filter(shape => {
+    const shapeRight = shape.x + shape.width;
+    const shapeBottom = shape.y + shape.height;
+    const viewportRight = viewport.x + viewport.width;
+    const viewportBottom = viewport.y + viewport.height;
+    
+    return !(
+      shapeRight < viewport.x ||
+      shape.x > viewportRight ||
+      shapeBottom < viewport.y ||
+      shape.y > viewportBottom
+    );
+  });
+};
+```
+
+### Event Handling Optimization
+```typescript
+// Pattern for optimized event handling
+export function Rectangle({ shape, onDragEnd }: RectangleProps) {
+  const handleDragEnd = useCallback((e: KonvaEventObject<DragEvent>) => {
+    const node = e.target;
+    onDragEnd(shape.id, node.x(), node.y());
+  }, [shape.id, onDragEnd]);
+
+  return (
+    <Rect
+      x={shape.x}
+      y={shape.y}
+      width={shape.width}
+      height={shape.height}
+      fill={shape.fill}
+      draggable
+      onDragEnd={handleDragEnd}
+    />
+  );
+}
+```
+
+## React Performance Patterns
+
+### Memoization
+```typescript
+// Pattern for component memoization
+export const Rectangle = React.memo(({ shape, isSelected, onSelect, onDragEnd }: RectangleProps) => {
+  // Component implementation
+}, (prevProps, nextProps) => {
+  // Custom comparison function
+  return (
+    prevProps.shape.id === nextProps.shape.id &&
+    prevProps.shape.x === nextProps.shape.x &&
+    prevProps.shape.y === nextProps.shape.y &&
+    prevProps.isSelected === nextProps.isSelected
+  );
+});
+```
+
+### Callback Optimization
+```typescript
+// Pattern for optimized callbacks
+export function CanvasControls() {
+  const { createShape } = useShapes();
+  const { stagePosition, stageScale } = useCanvasStore();
+
+  const handleAddRectangle = useCallback(() => {
+    const centerX = (window.innerWidth / 2 - stagePosition.x) / stageScale;
+    const centerY = (window.innerHeight / 2 - stagePosition.y) / stageScale;
+    
+    createShape({
+      x: centerX,
+      y: centerY,
+      width: 100,
+      height: 80,
+      fill: getRandomColor(),
+      createdBy: user.uid,
+    });
+  }, [createShape, stagePosition, stageScale, user.uid]);
+
+  return (
+    <button onClick={handleAddRectangle}>
+      Add Rectangle
+    </button>
+  );
+}
+```
+
+### State Optimization
+```typescript
+// Pattern for optimized state updates
+const useCanvasStore = create<CanvasState>((set, get) => ({
+  stagePosition: { x: 0, y: 0 },
+  stageScale: 1,
+  shapes: [],
+  selectedShapeId: null,
+  
+  updatePosition: (x: number, y: number) => 
+    set(state => ({ ...state, stagePosition: { x, y } })),
+  
+  updateScale: (scale: number) => 
+    set(state => ({ ...state, stageScale: Math.max(0.1, Math.min(3, scale)) })),
+    
+  addShape: (shape: Rectangle) => 
+    set(state => ({ ...state, shapes: [...state.shapes, shape] })),
+});
+```
+
+## Real-time Performance Patterns
+
+### Debounced Writes
+```typescript
+// Pattern for debounced Firebase writes
+export function useShapes() {
+  const debouncedUpdateShape = useCallback(
+    debounce(async (shapeId: string, updates: Partial<Rectangle>) => {
+      try {
+        await updateDoc(doc(firestore, 'shapes', shapeId), {
+          ...updates,
+          updatedAt: serverTimestamp()
+        });
+      } catch (error) {
+        console.error('Error updating shape:', error);
+      }
+    }, 300),
+    []
+  );
+
+  const updateShape = useCallback((shapeId: string, updates: Partial<Rectangle>) => {
+    // Update local state immediately (optimistic update)
+    setShapes(prev => prev.map(shape => 
+      shape.id === shapeId ? { ...shape, ...updates } : shape
+    ));
+    
+    // Debounce Firebase write
+    debouncedUpdateShape(shapeId, updates);
+  }, [debouncedUpdateShape]);
+
+  return { updateShape };
+}
+```
+
+### Throttled Updates
+```typescript
+// Pattern for throttled cursor updates
+export function useCursors() {
+  const { user } = useAuth();
+  
+  const throttledUpdateCursor = useCallback(
+    throttle((x: number, y: number) => {
+      if (!user) return;
+      
+      set(ref(realtimeDb, `cursors/${user.uid}`), {
+        userId: user.uid,
+        userName: user.displayName,
+        x,
+        y,
+        color: getUserColor(user.uid),
+        lastUpdated: Date.now()
+      });
+    }, 100),
+    [user]
+  );
+
+  return { updateCursor: throttledUpdateCursor };
+}
+```
+
+### Connection State Handling
+```typescript
+// Pattern for connection state management
+export function useConnectionState() {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isConnected, setIsConnected] = useState(false);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  return { isOnline, isConnected };
+}
+```
+
+## Memory Management Patterns
+
+### Cleanup on Unmount
+```typescript
+// Pattern for proper cleanup
+export function useShapes() {
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(firestore, 'shapes'), (snapshot) => {
+      // Handle updates
+    });
+
+    return () => {
+      unsubscribe();
+      // Additional cleanup if needed
+    };
+  }, []);
+}
+```
+
+### Event Listener Cleanup
+```typescript
+// Pattern for event listener cleanup
+export function useCanvasEvents() {
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      // Handle zoom
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Handle keyboard shortcuts
+    };
+
+    window.addEventListener('wheel', handleWheel);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+}
+```
+
+### Reference Cleanup
+```typescript
+// Pattern for ref cleanup
+export function Canvas() {
+  const stageRef = useRef<Konva.Stage>(null);
+  const layerRef = useRef<Konva.Layer>(null);
+
+  useEffect(() => {
+    return () => {
+      // Clean up Konva references
+      if (stageRef.current) {
+        stageRef.current.destroy();
+      }
+      if (layerRef.current) {
+        layerRef.current.destroy();
+      }
+    };
+  }, []);
+
+  return (
+    <Stage ref={stageRef}>
+      <Layer ref={layerRef}>
+        {/* Canvas content */}
+      </Layer>
+    </Stage>
+  );
+}
+```
+
+## Bundle Size Optimization
+
+### Code Splitting
+```typescript
+// Pattern for lazy loading
+const CanvasPage = lazy(() => import('./pages/CanvasPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+
+export function App() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <Routes>
+        <Route path="/canvas" element={<CanvasPage />} />
+        <Route path="/login" element={<LoginPage />} />
+      </Routes>
+    </Suspense>
+  );
+}
+```
+
+### Tree Shaking
+```typescript
+// Pattern for tree shaking optimization
+import { collection, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { ref, set, remove, onValue } from 'firebase/database';
+
+// Instead of importing entire Firebase modules
+// import * as firebase from 'firebase/app';
+```
+
+### Asset Optimization
+```typescript
+// Pattern for asset optimization
+const optimizedImage = useMemo(() => {
+  return new Image();
+}, []);
+
+useEffect(() => {
+  optimizedImage.src = '/path/to/optimized-image.webp';
+  optimizedImage.onload = () => {
+    // Handle loaded image
+  };
+}, [optimizedImage]);
+```
+
+## Performance Monitoring
+
+### FPS Monitoring
+```typescript
+// Pattern for FPS monitoring
+export function useFPSMonitor() {
+  const [fps, setFps] = useState(0);
+  const frameCount = useRef(0);
+  const lastTime = useRef(performance.now());
+
+  useEffect(() => {
+    const measureFPS = () => {
+      frameCount.current++;
+      const currentTime = performance.now();
+      
+      if (currentTime - lastTime.current >= 1000) {
+        setFps(Math.round((frameCount.current * 1000) / (currentTime - lastTime.current)));
+        frameCount.current = 0;
+        lastTime.current = currentTime;
+      }
+      
+      requestAnimationFrame(measureFPS);
+    };
+
+    measureFPS();
+  }, []);
+
+  return fps;
+}
+```
+
+### Performance Logging
+```typescript
+// Pattern for performance logging
+const logPerformance = (operation: string, startTime: number) => {
+  const endTime = performance.now();
+  const duration = endTime - startTime;
+  
+  if (duration > 16) { // Log operations taking longer than one frame
+    console.warn(`Slow operation: ${operation} took ${duration.toFixed(2)}ms`);
+  }
+};
+
+// Usage
+const startTime = performance.now();
+await updateShape(shapeId, updates);
+logPerformance('updateShape', startTime);
+```
+
+## Best Practices
+
+### Canvas Performance
+- Use single Konva layer for all shapes
+- Implement viewport culling for large datasets
+- Throttle frequent updates (cursors, real-time data)
+- Use requestAnimationFrame for smooth animations
+
+### React Performance
+- Use React.memo for expensive components
+- Implement proper dependency arrays
+- Use useCallback and useMemo for expensive calculations
+- Avoid unnecessary re-renders
+
+### Real-time Performance
+- Debounce writes to prevent excessive API calls
+- Use throttling for frequent updates
+- Implement optimistic updates for immediate feedback
+- Handle offline/online state gracefully
+
+### Memory Management
+- Clean up event listeners and subscriptions
+- Remove Firebase listeners on unmount
+- Use proper ref cleanup
+- Monitor memory usage with dev tools
+
+### Bundle Optimization
+- Use code splitting for large components
+- Implement tree shaking for unused code
+- Optimize images and assets
+- Monitor bundle size regularly

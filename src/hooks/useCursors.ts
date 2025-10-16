@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore'
 import { firestore } from '../lib/firebase'
 import { getUserColor } from '../lib/utils'
-import { CURSOR_THROTTLE_MS, CURSOR_DEBOUNCE_MS, ENABLE_PERFORMANCE_LOGGING } from '../lib/config'
+import { CURSOR_THROTTLE_MS, CURSOR_DEBOUNCE_MS, ENABLE_PERFORMANCE_LOGGING, CANVAS_ID } from '../lib/config'
 import type { Cursor } from '../types'
 
 interface UseCursorsReturn {
@@ -50,7 +50,7 @@ export const useCursors = (userId: string, userName: string, stagePosition?: { x
         const startTime = ENABLE_PERFORMANCE_LOGGING ? performance.now() : 0
         
         try {
-          const cursorRef = doc(firestore, 'cursors', userId)
+          const cursorRef = doc(firestore, 'canvases', CANVAS_ID, 'cursors', userId)
           
           // Store absolute coordinates in canvas space
           const cursorData = {
@@ -85,7 +85,7 @@ export const useCursors = (userId: string, userName: string, stagePosition?: { x
       return
     }
 
-    const cursorsRef = collection(firestore, 'cursors')
+    const cursorsRef = collection(firestore, 'canvases', CANVAS_ID, 'cursors')
     const q = query(cursorsRef, orderBy('lastUpdated', 'desc'))
     
     const unsubscribe = onSnapshot(
@@ -169,7 +169,7 @@ export const useCursors = (userId: string, userName: string, stagePosition?: { x
       // Remove own cursor from Firestore
       if (userId) {
         try {
-          const cursorRef = doc(firestore, 'cursors', userId)
+          const cursorRef = doc(firestore, 'canvases', CANVAS_ID, 'cursors', userId)
           deleteDoc(cursorRef)
           console.log('🧹 Cleaned up cursor on unmount')
         } catch (err) {

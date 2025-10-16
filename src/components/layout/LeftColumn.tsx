@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { getRandomColor, getViewportCenter } from '../../lib/utils'
 import { CANVAS_HALF } from '../../lib/constants'
 import type { Rectangle } from '../../types'
+import { ShapeType, ShapeVersion } from '../../types'
 import RectangleProperties from '../canvas/RectangleProperties'
 import AIWidget from '../canvas/AIWidget'
 import type { PresenceUser, Cursor as CursorType } from '../../types'
@@ -319,6 +320,8 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
       
       // Create new rectangle data
       const newRectangleData = {
+        type: ShapeType.RECTANGLE,
+        version: ShapeVersion.V2,
         x: center.x - 50, // Center the rectangle (100px width / 2)
         y: center.y - 40, // Center the rectangle (80px height / 2)
         width: 100,

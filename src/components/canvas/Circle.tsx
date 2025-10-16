@@ -1,16 +1,16 @@
 import React, { useRef, useEffect, useCallback, memo } from 'react'
-import { Rect, Transformer } from 'react-konva'
+import { Circle as KonvaCircle, Transformer } from 'react-konva'
 import Konva from 'konva' // Import Konva for types
-import type { Rectangle } from '../../types'
+import type { Circle } from '../../types'
 import { clamp } from '../../lib/utils'
 import { CANVAS_HALF, MIN_SHAPE_SIZE, MAX_SHAPE_SIZE } from '../../lib/constants'
 import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS, ENABLE_PERFORMANCE_LOGGING } from '../../lib/config'
 
-interface RectangleProps {
-  shape: Rectangle
+interface CircleProps {
+  shape: Circle
   isSelected: boolean
   onSelect: () => void
-  onUpdate: (updates: Partial<Rectangle>) => void
+  onUpdate: (updates: Partial<Circle>) => void
   onDragMove?: (x: number, y: number) => void
   onDragEnd: (x: number, y: number) => void
   onDragStart: () => void
@@ -18,7 +18,7 @@ interface RectangleProps {
   currentUserId?: string
 }
 
-const RectangleComponent: React.FC<RectangleProps> = memo(({
+const CircleComponent: React.FC<CircleProps> = memo(({
   shape,
   isSelected,
   onSelect,
@@ -29,7 +29,7 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   onDragEndCallback,
   currentUserId,
 }) => {
-  const rectRef = useRef<Konva.Rect>(null)
+  const circleRef = useRef<Konva.Circle>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
   const lastUpdateRef = useRef<number>(0)
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -37,11 +37,10 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
 
   // Check if shape is locked by another user
   const isLockedByOther = shape.lockedByUserId && shape.lockedByUserId !== currentUserId
-  // const isLockedByCurrent = shape.lockedByUserId === currentUserId
   
   // Debug: Log lock color info
   if (isLockedByOther) {
-    console.log('🎨 Locked shape color:', {
+    console.log('🎨 Locked circle color:', {
       shapeId: shape.id,
       lockedByUserId: shape.lockedByUserId,
       lockedByUserName: shape.lockedByUserName,
@@ -49,9 +48,6 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
       currentUserId
     })
   }
-
-  // Canvas bounds - 64000x64000 with center at (0,0) for infinite feel
-  // Moved to src/lib/constants.ts
 
   // Throttled drag move function
   const throttledDragMove = useCallback((x: number, y: number) => {
@@ -76,9 +72,10 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
       if (now - lastUpdateRef.current >= RECTANGLE_DRAG_THROTTLE_MS) {
         const startTime = ENABLE_PERFORMANCE_LOGGING ? performance.now() : 0
         
-        // Clamp position within canvas bounds
-        const clampedX = clamp(pendingUpdate.x, -CANVAS_HALF, CANVAS_HALF - shape.width)
-        const clampedY = clamp(pendingUpdate.y, -CANVAS_HALF, CANVAS_HALF - shape.height)
+        // Clamp position within canvas bounds (using diameter for bounds checking)
+        const diameter = shape.radius * 2
+        const clampedX = clamp(pendingUpdate.x, -CANVAS_HALF, CANVAS_HALF - diameter)
+        const clampedY = clamp(pendingUpdate.y, -CANVAS_HALF, CANVAS_HALF - diameter)
         
         onDragMove(clampedX, clampedY)
         lastUpdateRef.current = now
@@ -86,17 +83,17 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
         
         if (ENABLE_PERFORMANCE_LOGGING) {
           const duration = performance.now() - startTime
-          console.log(`📦 Rectangle drag update took ${duration.toFixed(2)}ms`)
+          console.log(`⭕ Circle drag update took ${duration.toFixed(2)}ms`)
         }
       }
     }, RECTANGLE_DRAG_DEBOUNCE_MS)
-  }, [onDragMove, shape.width, shape.height])
+  }, [onDragMove, shape.radius])
 
   // Update transformer when selection changes
   useEffect(() => {
-    if (isSelected && transformerRef.current && rectRef.current) {
+    if (isSelected && transformerRef.current && circleRef.current) {
       try {
-        transformerRef.current.nodes([rectRef.current])
+        transformerRef.current.nodes([circleRef.current])
         transformerRef.current.getLayer()?.batchDraw()
       } catch (error: unknown) {
         // Ignore errors in test environment
@@ -119,7 +116,7 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
     e.cancelBubble = true
     // Allow viewing details but not editing if locked by another user
     if (isLockedByOther) {
-      console.log('👁️ Viewing locked shape details:', shape.lockedByUserName)
+      console.log('👁️ Viewing locked circle details:', shape.lockedByUserName)
     }
     // Always call onSelect to show details in panel
     onSelect()
@@ -128,7 +125,7 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   const handleDragStart = () => {
     // Only allow drag if shape is selected
     if (!isSelected) {
-      console.log('❌ Cannot drag - shape must be selected first')
+      console.log('❌ Cannot drag - circle must be selected first')
       return
     }
     // Notify parent that dragging has started
@@ -136,27 +133,26 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   }
 
   const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
-    // Get the current position of the rectangle
-    const rectX = e.target.x()
-    const rectY = e.target.y()
+    // Get the current position of the circle
+    const circleX = e.target.x()
+    const circleY = e.target.y()
     
     // Use throttled drag move to update position in real-time
-    throttledDragMove(rectX, rectY)
+    throttledDragMove(circleX, circleY)
   }
 
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
-    // Get the current position of the rectangle
-    const rectX = e.target.x()
-    const rectY = e.target.y()
+    // Get the current position of the circle
+    const circleX = e.target.x()
+    const circleY = e.target.y()
     
-    // Clamp position within canvas bounds
-    const clampedX = clamp(rectX, -CANVAS_HALF, CANVAS_HALF - shape.width)
-    const clampedY = clamp(rectY, -CANVAS_HALF, CANVAS_HALF - shape.height)
+    // Clamp position within canvas bounds (using diameter for bounds checking)
+    const diameter = shape.radius * 2
+    const clampedX = clamp(circleX, -CANVAS_HALF, CANVAS_HALF - diameter)
+    const clampedY = clamp(circleY, -CANVAS_HALF, CANVAS_HALF - diameter)
     
     // Update position in store (React will handle the re-render)
     onDragEnd(clampedX, clampedY)
-    
-    // Removed as it is handled by the Canvas component directly
     
     // Notify parent that dragging has ended
     onDragEndCallback()
@@ -167,63 +163,51 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   }
 
   const handleTransformEnd = () => {
-    if (!rectRef.current) return
+    if (!circleRef.current) return
 
-    const node = rectRef.current
-    const rotation = node.rotation ? node.rotation() : 0
+    const node = circleRef.current
+    const scaleX = node.scaleX()
+    const scaleY = node.scaleY()
 
-    // Calculate new dimensions using current node dimensions
-    const currentWidth = node.width() * node.scaleX()
-    const currentHeight = node.height() * node.scaleY()
-    const newWidth = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_SIZE, currentWidth))
-    const newHeight = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_SIZE, currentHeight))
+    // Calculate new radius using the average of scaleX and scaleY to maintain circular shape
+    const averageScale = (scaleX + scaleY) / 2
+    const currentRadius = node.radius() * averageScale
+    const newRadius = Math.max(MIN_SHAPE_SIZE / 2, Math.min(MAX_SHAPE_SIZE / 2, currentRadius))
 
     // Calculate new position - use the current node position as Konva handles the transform
     const newX = node.x()
     const newY = node.y()
 
-    // Clamp position within canvas bounds
-    const clampedX = clamp(newX, -CANVAS_HALF, CANVAS_HALF - newWidth)
-    const clampedY = clamp(newY, -CANVAS_HALF, CANVAS_HALF - newHeight)
-
-    // Normalize rotation to 0-360 degrees
-    const normalizedRotation = ((rotation % 360) + 360) % 360
+    // Clamp position within canvas bounds (using diameter for bounds checking)
+    const diameter = newRadius * 2
+    const clampedX = clamp(newX, -CANVAS_HALF, CANVAS_HALF - diameter)
+    const clampedY = clamp(newY, -CANVAS_HALF, CANVAS_HALF - diameter)
 
     // Update shape in store
     onUpdate({
       x: clampedX,
       y: clampedY,
-      width: newWidth,
-      height: newHeight,
-      rotation: normalizedRotation
+      radius: newRadius
     })
-
-    // Removed as it is handled by the Canvas component directly
 
     // Reset scale and position
     node.scaleX(1)
     node.scaleY(1)
-    node.width(newWidth)
-    node.height(newHeight)
+    node.radius(newRadius)
     node.x(clampedX)
     node.y(clampedY)
   }
 
-
-  // Visual state - no locking logic needed
-
   return (
     <>
-      <Rect
-        ref={rectRef}
+      <KonvaCircle
+        ref={circleRef}
         x={shape.x}
         y={shape.y}
-        width={shape.width}
-        height={shape.height}
-        rotation={shape.rotation}
+        radius={shape.radius}
         fill={shape.fill}
-        stroke={isLockedByOther ? (shape.lockedByUserColor || '#FF0000') : (isSelected ? '#007AFF' : 'transparent')}
-        strokeWidth={isLockedByOther ? Math.min(20, ((shape.width + shape.height) / 2) * 0.1) : (isSelected ? 2 : 0)}
+        stroke={shape.stroke || 'transparent'}
+        strokeWidth={shape.strokeWidth || 0}
         shadowColor="rgba(0, 0, 0, 0.1)"
         shadowBlur={4}
         shadowOffset={{ x: 2, y: 2 }}
@@ -262,31 +246,34 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
         <Transformer
           ref={transformerRef}
           boundBoxFunc={(oldBox, newBox) => {
-            // Limit resize
-            if (newBox.width < MIN_SHAPE_SIZE || newBox.height < MIN_SHAPE_SIZE) {
+            // Limit resize - use diameter for circle bounds checking
+            const minDiameter = MIN_SHAPE_SIZE
+            const maxDiameter = MAX_SHAPE_SIZE
+            
+            if (newBox.width < minDiameter || newBox.height < minDiameter) {
               return oldBox
             }
-            if (newBox.width > MAX_SHAPE_SIZE || newBox.height > MAX_SHAPE_SIZE) {
+            if (newBox.width > maxDiameter || newBox.height > maxDiameter) {
               return oldBox
             }
             return newBox
           }}
-          keepRatio={false}
-          enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top-center', 'bottom-center', 'left-center', 'right-center']}
+          keepRatio={true} // Maintain circular shape
+          enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
           anchorSize={8}
           anchorStroke="#007AFF"
           anchorFill="#FFFFFF"
           anchorStrokeWidth={2}
-          borderStroke="#007AFF"
-          borderStrokeWidth={2}
+          borderStroke={isLockedByOther ? (shape.lockedByUserColor || '#FF0000') : '#007AFF'}
+          borderStrokeWidth={isLockedByOther ? Math.min(20, shape.radius * 0.1) : 2}
           borderDash={[5, 5]}
-          rotateEnabled={true}
+          rotateEnabled={false} // No rotation for circles as per requirements
         />
       )}
     </>
   )
 })
 
-RectangleComponent.displayName = 'RectangleComponent'
+CircleComponent.displayName = 'CircleComponent'
 
-export default RectangleComponent
+export default CircleComponent

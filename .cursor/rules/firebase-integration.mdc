@@ -1,0 +1,407 @@
+Description: Firebase integration patterns and best practices for CollabCanvas
+Globs: src/hooks/**/*.{ts,tsx}, src/lib/firebase.ts
+
+# Firebase Integration Patterns
+
+## Project Context
+CollabCanvas uses Firebase for authentication, data persistence, and real-time features. The MVP is complete and production-ready.
+
+## Firebase Services Used
+
+### Firebase Authentication
+- **Google OAuth** - Primary authentication method
+- **Email/Password** - Alternative authentication method
+- **Session Management** - Automatic token refresh
+- **User Context** - Available throughout the application
+
+### Firestore Database
+- **Shapes Collection** - Persistent rectangle data
+- **Real-time Listeners** - Live updates across users
+- **Security Rules** - Server-side validation
+- **Batch Operations** - Efficient multiple writes
+
+### Realtime Database
+- **Cursors Collection** - Live cursor positions
+- **Presence Collection** - Online user tracking
+- **Auto-cleanup** - Remove data on disconnect
+- **Throttled Updates** - Prevent excessive writes
+
+## Authentication Patterns
+
+### useAuth Hook
+```typescript
+// Pattern for authentication state management
+export function useAuth() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const loginWithGoogle = async () => {
+    try {
+      setLoading(true);
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { user, loading, error, loginWithGoogle, logout };
+}
+```
+
+### Protected Routes
+```typescript
+// Pattern for route protection
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (loading) return <div>Loading...</div>;
+  if (!user) return <Navigate to="/login" />;
+  
+  return <>{children}</>;
+}
+```
+
+## Firestore Integration
+
+### Shapes Management
+```typescript
+// Pattern for shapes CRUD operations
+export function useShapes() {
+  const [shapes, setShapes] = useState<Rectangle[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(firestore, 'shapes'),
+      (snapshot) => {
+        const shapesData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Rectangle[];
+        setShapes(shapesData);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error fetching shapes:', error);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const createShape = async (shape: Omit<Rectangle, 'id'>) => {
+    try {
+      await addDoc(collection(firestore, 'shapes'), {
+        ...shape,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('Error creating shape:', error);
+    }
+  };
+
+  return { shapes, loading, createShape, updateShape, deleteShape };
+}
+```
+
+### Real-time Updates
+```typescript
+// Pattern for real-time data synchronization
+useEffect(() => {
+  const unsubscribe = onSnapshot(
+    query(collection(firestore, 'shapes'), orderBy('updatedAt', 'desc')),
+    (snapshot) => {
+      const changes = snapshot.docChanges();
+      changes.forEach(change => {
+        if (change.type === 'added') {
+          // Handle new shape
+        } else if (change.type === 'modified') {
+          // Handle shape update
+        } else if (change.type === 'removed') {
+          // Handle shape deletion
+        }
+      });
+    }
+  );
+
+  return () => unsubscribe();
+}, []);
+```
+
+## Realtime Database Integration
+
+### Cursor Tracking
+```typescript
+// Pattern for cursor position tracking
+export function useCursors() {
+  const [cursors, setCursors] = useState<Cursor[]>([]);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+
+    const cursorsRef = ref(realtimeDb, 'cursors');
+    const unsubscribe = onValue(cursorsRef, (snapshot) => {
+      const cursorsData = snapshot.val() || {};
+      const cursorsList = Object.values(cursorsData).filter(
+        cursor => cursor.userId !== user.uid
+      ) as Cursor[];
+      setCursors(cursorsList);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const updateCursor = useCallback(
+    throttle((x: number, y: number) => {
+      if (!user) return;
+      
+      set(ref(realtimeDb, `cursors/${user.uid}`), {
+        userId: user.uid,
+        userName: user.displayName,
+        x,
+        y,
+        color: getUserColor(user.uid),
+        lastUpdated: Date.now()
+      });
+    }, 100),
+    [user]
+  );
+
+  return { cursors, updateCursor };
+}
+```
+
+### Presence Management
+```typescript
+// Pattern for user presence tracking
+export function usePresence() {
+  const [users, setUsers] = useState<PresenceUser[]>([]);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+
+    // Write user presence
+    const presenceRef = ref(realtimeDb, `presence/${user.uid}`);
+    set(presenceRef, {
+      userId: user.uid,
+      userName: user.displayName,
+      color: getUserColor(user.uid),
+      joinedAt: Date.now()
+    });
+
+    // Set up disconnect cleanup
+    onDisconnect(presenceRef).remove();
+
+    // Listen to all users
+    const usersRef = ref(realtimeDb, 'presence');
+    const unsubscribe = onValue(usersRef, (snapshot) => {
+      const usersData = snapshot.val() || {};
+      const usersList = Object.values(usersData) as PresenceUser[];
+      setUsers(usersList);
+    });
+
+    return () => {
+      unsubscribe();
+      remove(presenceRef);
+    };
+  }, [user]);
+
+  return { users };
+}
+```
+
+## Security Rules
+
+### Firestore Rules
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /shapes/{shapeId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+### Realtime Database Rules
+```json
+{
+  "rules": {
+    "cursors": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "presence": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}
+```
+
+## Error Handling Patterns
+
+### Network Errors
+```typescript
+// Pattern for handling network errors
+const handleFirebaseError = (error: any) => {
+  if (error.code === 'unavailable') {
+    // Handle offline state
+    setError('You are offline. Changes will sync when you reconnect.');
+  } else if (error.code === 'permission-denied') {
+    // Handle permission errors
+    setError('You do not have permission to perform this action.');
+  } else {
+    // Handle other errors
+    setError('An error occurred. Please try again.');
+  }
+};
+```
+
+### Retry Logic
+```typescript
+// Pattern for retry logic with exponential backoff
+const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3) => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+    }
+  }
+};
+```
+
+## Performance Optimization
+
+### Debouncing Writes
+```typescript
+// Pattern for debounced Firebase writes
+const debouncedUpdateShape = useCallback(
+  debounce(async (shapeId: string, updates: Partial<Rectangle>) => {
+    try {
+      await updateDoc(doc(firestore, 'shapes', shapeId), {
+        ...updates,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('Error updating shape:', error);
+    }
+  }, 300),
+  []
+);
+```
+
+### Throttling Updates
+```typescript
+// Pattern for throttled real-time updates
+const throttledUpdateCursor = useCallback(
+  throttle((x: number, y: number) => {
+    // Update cursor position
+  }, 100),
+  []
+);
+```
+
+### Batch Operations
+```typescript
+// Pattern for batch writes
+const batchCreateShapes = async (shapes: Omit<Rectangle, 'id'>[]) => {
+  const batch = writeBatch(firestore);
+  
+  shapes.forEach(shape => {
+    const docRef = doc(collection(firestore, 'shapes'));
+    batch.set(docRef, {
+      ...shape,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  });
+  
+  await batch.commit();
+};
+```
+
+## Data Structure Patterns
+
+### Shape Document
+```typescript
+interface Rectangle {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fill: string;
+  createdBy: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+### Cursor Document
+```typescript
+interface Cursor {
+  userId: string;
+  userName: string;
+  x: number;
+  y: number;
+  color: string;
+  lastUpdated: number;
+}
+```
+
+### Presence Document
+```typescript
+interface PresenceUser {
+  userId: string;
+  userName: string;
+  color: string;
+  joinedAt: number;
+}
+```
+
+## Best Practices
+
+### Cleanup
+- Always unsubscribe from Firebase listeners
+- Remove presence data on disconnect
+- Clear cursors on component unmount
+- Handle cleanup in useEffect return functions
+
+### Error Handling
+- Implement comprehensive error handling
+- Provide user-friendly error messages
+- Log errors for debugging
+- Implement retry logic for transient errors
+
+### Performance
+- Use debouncing for frequent writes
+- Use throttling for real-time updates
+- Implement batch operations for multiple writes
+- Monitor Firebase usage and costs
+
+### Security
+- Always validate user authentication
+- Use server-side security rules
+- Validate input data before sending
+- Implement proper user isolation

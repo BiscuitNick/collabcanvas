@@ -1,0 +1,225 @@
+Description: CollabCanvas-specific development patterns and conventions
+Globs: src/**/*.{ts,tsx}
+
+# CollabCanvas Development Patterns
+
+## Project Context
+This is a real-time collaborative canvas application built with React 19, TypeScript, Konva.js, and Firebase. The MVP is complete and production-ready.
+
+## Key Architecture Patterns
+
+### State Management
+- Use Zustand for global state management (canvasStore.ts)
+- Custom hooks for Firebase integration (useAuth, useShapes, useCursors, usePresence)
+- Local component state for UI-only state
+- Avoid prop drilling - use hooks to access global state
+
+### Canvas Rendering
+- Konva.js for all canvas operations
+- Single Layer for all shapes (performance optimization)
+- Viewport culling for large numbers of shapes
+- Throttled updates (300ms for shapes, 100ms for cursors)
+
+### Real-time Synchronization
+- Firestore for persistent data (shapes)
+- Realtime Database for ephemeral data (cursors, presence)
+- Optimistic updates for immediate UI feedback
+- Debounced writes to prevent excessive API calls
+
+### Error Handling
+- Error boundaries for component errors
+- Try-catch blocks for async operations
+- Graceful degradation with fallback UI
+- User-friendly error messages
+
+## Code Conventions
+
+### File Organization
+- Components in `src/components/` with subdirectories by feature
+- Hooks in `src/hooks/` with descriptive names
+- Utils in `src/lib/` for shared functions
+- Types in `src/types/index.ts` for TypeScript definitions
+- Tests in `src/__tests__/` with descriptive names
+
+### Naming Conventions
+- Components: PascalCase (e.g., `Rectangle`, `CanvasControls`)
+- Hooks: camelCase starting with 'use' (e.g., `useAuth`, `useShapes`)
+- Files: kebab-case for components, camelCase for utilities
+- Types: PascalCase with descriptive names (e.g., `Rectangle`, `User`)
+
+### Import Patterns
+- Use absolute imports with `src/` prefix
+- Group imports: external → internal → relative
+- Separate type imports from value imports
+- Use barrel exports from index files when appropriate
+
+## Performance Guidelines
+
+### Canvas Performance
+- Maintain 60 FPS during all interactions
+- Use single Konva layer for all shapes
+- Implement viewport culling for large datasets
+- Throttle frequent updates (cursors, real-time data)
+
+### React Performance
+- Use React.memo for expensive components
+- Avoid unnecessary re-renders with proper dependency arrays
+- Use useCallback and useMemo for expensive calculations
+- Clean up event listeners and subscriptions
+
+### Firebase Performance
+- Debounce writes to prevent excessive API calls
+- Use batch operations for multiple updates
+- Implement proper cleanup on component unmount
+- Handle offline/online state transitions
+
+## Testing Patterns
+
+### Test Organization
+- Unit tests for pure functions and utilities
+- Component tests for React components
+- Integration tests for Firebase operations
+- Manual testing for real-time features
+
+### Test Naming
+- Describe blocks for feature areas
+- It blocks for specific behaviors
+- Use descriptive test names that explain the expected behavior
+- Group related tests together
+
+### Mocking Strategy
+- Mock Firebase functions for unit tests
+- Use real Firebase for integration tests
+- Mock external dependencies consistently
+- Keep mocks simple and focused
+
+## Security Considerations
+
+### Authentication
+- Always check authentication state before Firebase operations
+- Use Firebase Auth for all user management
+- Implement proper logout cleanup
+- Validate user permissions on the client side
+
+### Data Validation
+- Validate input data before sending to Firebase
+- Use TypeScript types for data structure validation
+- Implement client-side validation for user inputs
+- Trust but verify server-side validation
+
+### Environment Variables
+- Never commit sensitive data to version control
+- Use environment variables for configuration
+- Validate required environment variables at startup
+- Use different configurations for different environments
+
+## Common Patterns
+
+### Custom Hooks
+```typescript
+// Pattern for Firebase integration hooks
+export function useShapes() {
+  const [shapes, setShapes] = useState<Rectangle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Implementation with cleanup
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(firestore, 'shapes'), 
+      (snapshot) => {
+        // Handle updates
+      },
+      (err) => {
+        setError(err.message);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  return { shapes, loading, error, createShape, updateShape, deleteShape };
+}
+```
+
+### Component Structure
+```typescript
+// Pattern for canvas components
+interface RectangleProps {
+  shape: Rectangle;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+  onDragEnd: (id: string, x: number, y: number) => void;
+}
+
+export function Rectangle({ shape, isSelected, onSelect, onDragEnd }: RectangleProps) {
+  // Component implementation
+}
+```
+
+### Error Boundaries
+```typescript
+// Pattern for error boundaries
+export function CanvasErrorBoundary({ children }: { children: React.ReactNode }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return <div>Something went wrong with the canvas.</div>;
+  }
+
+  return <ErrorBoundary onError={() => setHasError(true)}>{children}</ErrorBoundary>;
+}
+```
+
+## Firebase Integration
+
+### Firestore Rules
+- Always require authentication for read/write operations
+- Validate data structure in security rules
+- Use server timestamps for conflict resolution
+- Implement proper user isolation
+
+### Realtime Database Rules
+- Require authentication for all operations
+- Implement proper cleanup on disconnect
+- Use security rules to prevent unauthorized access
+- Handle connection state changes gracefully
+
+### Data Structure
+- Use consistent naming conventions
+- Include timestamps for all data
+- Implement proper indexing for queries
+- Use batch operations for multiple writes
+
+## Performance Monitoring
+
+### Key Metrics
+- Canvas FPS (target: 60 FPS)
+- Real-time update latency (target: <100ms)
+- Bundle size and loading performance
+- Memory usage and garbage collection
+
+### Monitoring Tools
+- Browser dev tools for performance analysis
+- Firebase console for backend monitoring
+- Vercel analytics for deployment monitoring
+- Custom logging for application-specific metrics
+
+## Maintenance Guidelines
+
+### Code Quality
+- Run ESLint and fix all warnings
+- Use TypeScript strict mode
+- Write tests for new features
+- Update documentation when making changes
+
+### Dependencies
+- Keep dependencies up to date
+- Use npm audit to check for vulnerabilities
+- Test thoroughly after dependency updates
+- Document any breaking changes
+
+### Performance
+- Monitor performance metrics regularly
+- Optimize based on real usage patterns
+- Profile memory usage for leaks
+- Test with realistic data volumes

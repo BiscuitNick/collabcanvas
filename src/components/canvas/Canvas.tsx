@@ -21,6 +21,8 @@ interface CanvasProps {
   onVisibleShapesChange?: (visibleCount: number) => void
   lockShape?: (id: string) => Promise<void>
   unlockShape?: (id: string) => Promise<void>
+  startEditingShape?: (id: string) => void
+  stopEditingShape?: (id: string) => void
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -35,7 +37,9 @@ const Canvas: React.FC<CanvasProps> = ({
   enableViewportCulling = false,
   onVisibleShapesChange,
   lockShape,
-  unlockShape
+  unlockShape,
+  startEditingShape,
+  stopEditingShape
 }) => {
   const stageRef = useRef<Konva.Stage>(null)
   const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null)
@@ -225,6 +229,12 @@ const Canvas: React.FC<CanvasProps> = ({
     updateShape(shapeId, updates)
   }, [updateShape])
 
+  // Handle rectangle drag start
+  const handleRectangleDragStart = useCallback((shapeId: string) => {
+    setDraggingShape(true)
+    startEditingShape?.(shapeId)
+  }, [startEditingShape])
+
   // Handle rectangle drag move (real-time updates while dragging)
   const handleRectangleDragMove = useCallback((shapeId: string, x: number, y: number) => {
     updateShape(shapeId, { x, y })
@@ -233,7 +243,8 @@ const Canvas: React.FC<CanvasProps> = ({
   // Handle rectangle drag end
   const handleRectangleDragEnd = useCallback((shapeId: string, x: number, y: number) => {
     updateShape(shapeId, { x, y })
-  }, [updateShape])
+    stopEditingShape?.(shapeId)
+  }, [updateShape, stopEditingShape])
 
   // Mobile touch handlers
   const getTouchDistance = (touches: TouchList) => {
@@ -419,12 +430,12 @@ const Canvas: React.FC<CanvasProps> = ({
         onUpdate={(updates) => handleRectangleUpdate(shape.id, updates)}
         onDragMove={(x, y) => handleRectangleDragMove(shape.id, x, y)}
         onDragEnd={(x, y) => handleRectangleDragEnd(shape.id, x, y)}
-        onDragStart={() => setDraggingShape(true)}
+        onDragStart={() => handleRectangleDragStart(shape.id)}
         onDragEndCallback={() => setDraggingShape(false)}
         currentUserId={currentUserId}
       />
     ))
-  }, [visibleShapes, selectedShapeId, handleRectangleSelect, handleRectangleUpdate, handleRectangleDragMove, handleRectangleDragEnd, setDraggingShape, currentUserId])
+  }, [visibleShapes, selectedShapeId, handleRectangleSelect, handleRectangleUpdate, handleRectangleDragMove, handleRectangleDragEnd, handleRectangleDragStart, setDraggingShape, currentUserId])
 
   return (
     <CanvasErrorBoundary>

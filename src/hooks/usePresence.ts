@@ -11,7 +11,7 @@ import {
 import { firestore } from '../lib/firebase'
 import { getUserColor } from '../lib/utils'
 import { STALE_PRESENCE_THRESHOLD, OFFLINE_PRESENCE_THRESHOLD } from '../lib/constants'
-import { PRESENCE_UPDATE_INTERVAL_MS, PRESENCE_CLEANUP_INTERVAL_MS, ENABLE_PERFORMANCE_LOGGING } from '../lib/config'
+import { PRESENCE_UPDATE_INTERVAL_MS, PRESENCE_CLEANUP_INTERVAL_MS, ENABLE_PERFORMANCE_LOGGING, CANVAS_ID } from '../lib/config'
 import type { PresenceUser } from '../types'
 
 interface UsePresenceReturn {
@@ -31,7 +31,7 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
     
     isCleaningUpRef.current = true
     try {
-      const presenceRef = doc(firestore, 'presence', userId)
+      const presenceRef = doc(firestore, 'canvases', CANVAS_ID, 'presence', userId)
       await deleteDoc(presenceRef)
       console.log('🧹 Cleaned up presence for user:', userId)
     } catch (err) {
@@ -42,7 +42,7 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
   // Cleanup stale presence entries (runs every 5 minutes)
   const cleanupStalePresence = useCallback(async () => {
     try {
-      const presenceRef = collection(firestore, 'presence')
+      const presenceRef = collection(firestore, 'canvases', CANVAS_ID, 'presence')
       const snapshot = await getDocs(presenceRef)
       const now = Date.now()
       
@@ -60,7 +60,7 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
       // Remove stale users
       for (const userId of staleUsers) {
         try {
-          await deleteDoc(doc(firestore, 'presence', userId))
+          await deleteDoc(doc(firestore, 'canvases', CANVAS_ID, 'presence', userId))
           console.log('🧹 Removed stale presence for user:', userId)
         } catch (err) {
           console.error('❌ Error removing stale presence:', err)
@@ -82,7 +82,7 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
       const startTime = ENABLE_PERFORMANCE_LOGGING ? performance.now() : 0
       
       try {
-        const presenceRef = doc(firestore, 'presence', userId)
+        const presenceRef = doc(firestore, 'canvases', CANVAS_ID, 'presence', userId)
         const presenceData = {
           userId,
           userName,

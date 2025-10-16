@@ -5,6 +5,7 @@ import { getRandomColor, getViewportCenter } from '../../lib/utils'
 import { CANVAS_HALF } from '../../lib/constants'
 import type { Rectangle } from '../../types'
 import RectangleProperties from '../canvas/RectangleProperties'
+import AIWidget from '../canvas/AIWidget'
 import type { PresenceUser, Cursor as CursorType } from '../../types'
 
 interface CollapsibleSectionProps {
@@ -459,7 +460,17 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
               Reset Canvas
             </button>
           </div>
+
         </div>
+      </CollapsibleSection>
+
+      {/* AI Assistant Section */}
+      <CollapsibleSection title="AI Assistant" defaultOpen={true}>
+        <AIWidget
+          stageScale={stageScale}
+          stagePosition={stagePosition}
+          createShape={createShape}
+        />
       </CollapsibleSection>
 
       {/* Shape Controls Section */}

@@ -7,6 +7,7 @@ import { useCanvasStore } from '../store/canvasStore'
 import Layout from '../components/layout/Layout'
 import LeftColumn from '../components/layout/LeftColumn'
 import Canvas from '../components/canvas/Canvas'
+import FPSMonitor from '../components/canvas/FPSMonitor'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { CANVAS_HALF } from '../lib/constants'
 
@@ -15,6 +16,17 @@ export const CanvasPage: React.FC = () => {
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const [pendingUserClick, setPendingUserClick] = useState<string | null>(null)
   const [showSelfCursor, setShowSelfCursor] = useState(true)
+  const [showFPS, setShowFPS] = useState(() => {
+    // Load from localStorage, default to true
+    const saved = localStorage.getItem('showFPS')
+    return saved !== null ? JSON.parse(saved) : true
+  })
+  const [enableViewportCulling, setEnableViewportCulling] = useState(() => {
+    // Load from localStorage, default to false
+    const saved = localStorage.getItem('enableViewportCulling')
+    return saved !== null ? JSON.parse(saved) : false
+  })
+  const [visibleShapesCount, setVisibleShapesCount] = useState(0)
 
   // Initialize hooks
   const {
@@ -129,8 +141,10 @@ export const CanvasPage: React.FC = () => {
   }
 
   // Handle debug state changes from LeftColumn
-  const handleDebugStateChange = (selfCursor: boolean) => {
+  const handleDebugStateChange = (selfCursor: boolean, showFPS: boolean, enableViewportCulling: boolean) => {
     setShowSelfCursor(selfCursor)
+    setShowFPS(showFPS)
+    setEnableViewportCulling(enableViewportCulling)
   }
 
 
@@ -174,6 +188,7 @@ export const CanvasPage: React.FC = () => {
             onUserClick={handleUserClick}
             onShapeSelect={handleShapeSelect}
             onDebugStateChange={handleDebugStateChange}
+            visibleShapesCount={visibleShapesCount}
           />
         }
       >
@@ -195,9 +210,14 @@ export const CanvasPage: React.FC = () => {
               onMouseMove={(x, y) => updateCursor(x, y)}
               showSelfCursor={showSelfCursor}
               currentUserId={user?.uid}
+              enableViewportCulling={enableViewportCulling}
+              onVisibleShapesChange={setVisibleShapesCount}
             />
           </div>
         </div>
+        
+        {/* FPS Monitor Overlay */}
+        <FPSMonitor isEnabled={showFPS} />
       </Layout>
     </ErrorBoundary>
   )

@@ -30,8 +30,10 @@ export const useShapes = (): UseShapesReturn => {
   const [shapes, setShapes] = useState<Rectangle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { addShape, updateShape: updateStoreShape, deleteShape: deleteStoreShape, setSyncStatus, clearAllShapes: clearAllShapesStore } = useCanvasStore()
+  const { updateShape: updateStoreShape, deleteShape: deleteStoreShape, setSyncStatus, clearAllShapes: clearAllShapesStore } = useCanvasStore()
   const retryCount = useRef(0)
+  const isCreatingShape = useRef(false)
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Throttled update function
   const throttledUpdate = useCallback(async (id: string, updates: Partial<Rectangle>) => {
@@ -89,10 +91,17 @@ export const useShapes = (): UseShapesReturn => {
           })
         })
         
-        setShapes(shapesData)
-        setLoading(false)
-        setError(null)
-        retryCount.current = 0
+        // Debounced update to prevent rapid re-renders during shape creation
+        if (updateTimeoutRef.current) {
+          clearTimeout(updateTimeoutRef.current)
+        }
+        
+        updateTimeoutRef.current = setTimeout(() => {
+          setShapes(shapesData)
+          setLoading(false)
+          setError(null)
+          retryCount.current = 0
+        }, isCreatingShape.current ? 100 : 0) // Longer delay if creating shape
       },
       (err) => {
         console.error('Error listening to shapes:', err)
@@ -101,43 +110,44 @@ export const useShapes = (): UseShapesReturn => {
       }
     )
 
-    return () => unsubscribe()
+    return () => {
+      unsubscribe()
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current)
+      }
+    }
   }, [])
 
   // Create shape
   const createShape = useCallback(async (shapeData: Omit<Rectangle, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> => {
     try {
-      setLoading(true)
+      isCreatingShape.current = true
+
       const shapesRef = collection(firestore, 'shapes')
       const now = serverTimestamp()
-      
+
       const newShape = {
         ...shapeData,
         createdAt: now,
         updatedAt: now
       }
-      
+
       const docRef = await addDoc(shapesRef, newShape)
-      
-      // Optimistic update
-      const optimisticShape: Rectangle = {
-        ...shapeData,
-        id: docRef.id,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        syncStatus: 'pending'
-      }
-      
-      addShape(optimisticShape)
+
+      // Don't do optimistic update to prevent double rendering
+      // The Firestore snapshot will handle the update
       setSyncStatus(docRef.id, 'pending')
-      
+
     } catch (err) {
       console.error('Error creating shape:', err)
       setError('Failed to create shape')
     } finally {
-      setLoading(false)
+      // Reset the flag after a short delay to allow Firestore update to complete
+      setTimeout(() => {
+        isCreatingShape.current = false
+      }, 100)
     }
-  }, [addShape, setSyncStatus])
+  }, [setSyncStatus])
 
   // Update shape with throttling
   const updateShape = useCallback(async (id: string, updates: Partial<Rectangle>): Promise<void> => {
@@ -159,47 +169,40 @@ export const useShapes = (): UseShapesReturn => {
   // Delete shape
   const deleteShape = useCallback(async (id: string): Promise<void> => {
     try {
-      setLoading(true)
       const shapeRef = doc(firestore, 'shapes', id)
-      
+
       // Optimistic update
       deleteStoreShape(id)
-      
+
       await deleteDoc(shapeRef)
-      
+
     } catch (err) {
       console.error('Error deleting shape:', err)
       setError('Failed to delete shape')
-    } finally {
-      setLoading(false)
     }
   }, [deleteStoreShape])
 
   // Clear all shapes
   const clearAllShapes = useCallback(async (): Promise<void> => {
     try {
-      setLoading(true)
-      
       // Get all current shapes
       const currentShapes = shapes
-      
+
       // Clear local state immediately (optimistic update)
       setShapes([])
       clearAllShapesStore()
-      
+
       // Delete all shapes from Firestore in parallel
       const deletePromises = currentShapes.map(shape => {
         const shapeRef = doc(firestore, 'shapes', shape.id)
         return deleteDoc(shapeRef)
       })
-      
+
       await Promise.all(deletePromises)
-      
+
     } catch (err) {
       console.error('Error clearing all shapes:', err)
       setError('Failed to clear all shapes')
-    } finally {
-      setLoading(false)
     }
   }, [shapes, clearAllShapesStore])
 

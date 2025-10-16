@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react'
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import { Stage, Layer } from 'react-konva'
 import Konva from 'konva' // Import Konva for types
 import { useCanvasStore } from '../../store/canvasStore'
@@ -17,6 +17,8 @@ interface CanvasProps {
   onMouseMove: (x: number, y: number, canvasWidth: number, canvasHeight: number) => void
   showSelfCursor?: boolean
   currentUserId?: string
+  enableViewportCulling?: boolean
+  onVisibleShapesChange?: (visibleCount: number) => void
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -27,7 +29,9 @@ const Canvas: React.FC<CanvasProps> = ({
   updateShape,
   onMouseMove,
   showSelfCursor = true,
-  currentUserId
+  currentUserId,
+  enableViewportCulling = false,
+  onVisibleShapesChange
 }) => {
   const stageRef = useRef<Konva.Stage>(null)
   const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null)
@@ -183,24 +187,24 @@ const Canvas: React.FC<CanvasProps> = ({
   }
 
   // Handle rectangle selection
-  const handleRectangleSelect = (shapeId: string) => {
+  const handleRectangleSelect = useCallback((shapeId: string) => {
     selectShape(shapeId)
-  }
+  }, [selectShape])
 
   // Handle rectangle updates
-  const handleRectangleUpdate = (shapeId: string, updates: Partial<Rectangle>) => {
+  const handleRectangleUpdate = useCallback((shapeId: string, updates: Partial<Rectangle>) => {
     updateShape(shapeId, updates)
-  }
+  }, [updateShape])
 
   // Handle rectangle drag move (real-time updates while dragging)
-  const handleRectangleDragMove = (shapeId: string, x: number, y: number) => {
+  const handleRectangleDragMove = useCallback((shapeId: string, x: number, y: number) => {
     updateShape(shapeId, { x, y })
-  }
+  }, [updateShape])
 
   // Handle rectangle drag end
-  const handleRectangleDragEnd = (shapeId: string, x: number, y: number) => {
+  const handleRectangleDragEnd = useCallback((shapeId: string, x: number, y: number) => {
     updateShape(shapeId, { x, y })
-  }
+  }, [updateShape])
 
   // Mobile touch handlers
   const getTouchDistance = (touches: TouchList) => {
@@ -330,6 +334,68 @@ const Canvas: React.FC<CanvasProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [stageScale, updateScale, selectShape])
 
+  // Viewport culling: Only render shapes visible in the viewport
+  const getVisibleShapes = useCallback((shapesToFilter: Rectangle[]) => {
+    if (!enableViewportCulling) return shapesToFilter
+
+    // Calculate viewport bounds in canvas coordinates
+    const viewportBounds = {
+      left: -stagePosition.x / stageScale,
+      top: -stagePosition.y / stageScale,
+      right: (-stagePosition.x + width) / stageScale,
+      bottom: (-stagePosition.y + height) / stageScale
+    }
+
+    // Add padding to prevent pop-in during pan/zoom (adjusts with scale)
+    const padding = 500 / stageScale
+
+    return shapesToFilter.filter(shape => {
+      // Check if shape is within visible bounds (with padding)
+      return !(
+        shape.x + shape.width < viewportBounds.left - padding ||
+        shape.x > viewportBounds.right + padding ||
+        shape.y + shape.height < viewportBounds.top - padding ||
+        shape.y > viewportBounds.bottom + padding
+      )
+    })
+  }, [stagePosition.x, stagePosition.y, stageScale, width, height, enableViewportCulling])
+
+  // Get visible shapes for rendering
+  const visibleShapes = useMemo(() => {
+    const visible = getVisibleShapes(shapes)
+
+    // Log performance info when culling is enabled
+    if (enableViewportCulling && visible.length !== shapes.length) {
+      console.log(`🎯 Viewport culling: rendering ${visible.length} of ${shapes.length} shapes (${Math.round(visible.length / shapes.length * 100)}%)`)
+    }
+
+    return visible
+  }, [shapes, getVisibleShapes, enableViewportCulling])
+
+  // Notify parent of visible shapes count
+  useEffect(() => {
+    if (onVisibleShapesChange) {
+      onVisibleShapesChange(visibleShapes.length)
+    }
+  }, [visibleShapes.length, onVisibleShapesChange])
+
+  // Memoize shapes rendering to prevent unnecessary re-renders
+  const renderedShapes = useMemo(() => {
+    return visibleShapes.map((shape) => (
+      <RectangleComponent
+        key={shape.id}
+        shape={shape}
+        isSelected={selectedShapeId === shape.id}
+        onSelect={() => handleRectangleSelect(shape.id)}
+        onUpdate={(updates) => handleRectangleUpdate(shape.id, updates)}
+        onDragMove={(x, y) => handleRectangleDragMove(shape.id, x, y)}
+        onDragEnd={(x, y) => handleRectangleDragEnd(shape.id, x, y)}
+        onDragStart={() => setDraggingShape(true)}
+        onDragEndCallback={() => setDraggingShape(false)}
+      />
+    ))
+  }, [visibleShapes, selectedShapeId, handleRectangleSelect, handleRectangleUpdate, handleRectangleDragMove, handleRectangleDragEnd, setDraggingShape])
+
   return (
     <CanvasErrorBoundary>
       <div className="canvas-container">
@@ -354,19 +420,7 @@ const Canvas: React.FC<CanvasProps> = ({
         >
           {/* Shapes Layer */}
           <Layer>
-            {shapes.map((shape) => (
-              <RectangleComponent
-                key={shape.id}
-                shape={shape}
-                isSelected={selectedShapeId === shape.id}
-                onSelect={() => handleRectangleSelect(shape.id)}
-                onUpdate={(updates) => handleRectangleUpdate(shape.id, updates)}
-                onDragMove={(x, y) => handleRectangleDragMove(shape.id, x, y)}
-                onDragEnd={(x, y) => handleRectangleDragEnd(shape.id, x, y)}
-                onDragStart={() => setDraggingShape(true)}
-                onDragEndCallback={() => setDraggingShape(false)}
-              />
-            ))}
+            {renderedShapes}
           </Layer>
           
           {/* Cursors Layer */}

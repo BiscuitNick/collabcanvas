@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useShapes } from '../../hooks/useShapes'
-import { MIN_SHAPE_SIZE, MAX_SHAPE_SIZE, CANVAS_HALF } from '../../lib/constants'
+import { MIN_SHAPE_SIZE, CANVAS_HALF } from '../../lib/constants'
 
 interface RectanglePropertiesProps {
   selectedShapeId: string | null
@@ -44,8 +44,8 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
     if (selectedShapeId && value) {
       const numValue = parseFloat(value)
       if (!isNaN(numValue) && numValue > 0) {
-        // Clamp within bounds and round to nearest integer
-        const clampedWidth = Math.min(MAX_SHAPE_SIZE, Math.max(MIN_SHAPE_SIZE, numValue))
+        // Clamp to minimum size and round to nearest integer
+        const clampedWidth = Math.max(MIN_SHAPE_SIZE, numValue)
         const roundedWidth = Math.round(clampedWidth)
         updateShape(selectedShapeId, { width: roundedWidth })
       }
@@ -59,8 +59,8 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
     if (selectedShapeId && value) {
       const numValue = parseFloat(value)
       if (!isNaN(numValue) && numValue > 0) {
-        // Clamp within bounds and round to nearest integer
-        const clampedHeight = Math.min(MAX_SHAPE_SIZE, Math.max(MIN_SHAPE_SIZE, numValue))
+        // Clamp to minimum size and round to nearest integer
+        const clampedHeight = Math.max(MIN_SHAPE_SIZE, numValue)
         const roundedHeight = Math.round(clampedHeight)
         updateShape(selectedShapeId, { height: roundedHeight })
       }
@@ -216,7 +216,6 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
               className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
               placeholder="W"
               min={MIN_SHAPE_SIZE}
-              max={MAX_SHAPE_SIZE}
             />
           </div>
           
@@ -230,7 +229,6 @@ const RectangleProperties: React.FC<RectanglePropertiesProps> = ({ selectedShape
               className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
               placeholder="H"
               min={MIN_SHAPE_SIZE}
-              max={MAX_SHAPE_SIZE}
             />
           </div>
         </div>

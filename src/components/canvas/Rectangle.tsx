@@ -1,9 +1,9 @@
-import React, { useRef, useEffect, useCallback } from 'react'
+import React, { useRef, useEffect, useCallback, memo } from 'react'
 import { Rect, Transformer } from 'react-konva'
 import Konva from 'konva' // Import Konva for types
 import type { Rectangle } from '../../types'
 import { clamp } from '../../lib/utils'
-import { CANVAS_HALF, MIN_SHAPE_SIZE, MAX_SHAPE_SIZE } from '../../lib/constants'
+import { CANVAS_HALF, MIN_SHAPE_SIZE } from '../../lib/constants'
 import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS, ENABLE_PERFORMANCE_LOGGING } from '../../lib/config'
 
 interface RectangleProps {
@@ -17,7 +17,7 @@ interface RectangleProps {
   onDragEndCallback: () => void
 }
 
-const RectangleComponent: React.FC<RectangleProps> = ({
+const RectangleComponent: React.FC<RectangleProps> = memo(({
   shape,
   isSelected,
   onSelect,
@@ -148,8 +148,8 @@ const RectangleComponent: React.FC<RectangleProps> = ({
     const rotation = node.rotation ? node.rotation() : 0
 
     // Calculate new dimensions
-    const newWidth = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_SIZE, shape.width * scaleX))
-    const newHeight = Math.max(MIN_SHAPE_SIZE, Math.min(MAX_SHAPE_SIZE, shape.height * scaleY))
+    const newWidth = Math.max(MIN_SHAPE_SIZE, shape.width * scaleX)
+    const newHeight = Math.max(MIN_SHAPE_SIZE, shape.height * scaleY)
 
     // Calculate new position (accounting for scaling)
     const newX = node.x()
@@ -232,11 +232,8 @@ const RectangleComponent: React.FC<RectangleProps> = ({
         <Transformer
           ref={transformerRef}
           boundBoxFunc={(oldBox, newBox) => {
-            // Limit resize
+            // Only limit minimum size
             if (newBox.width < MIN_SHAPE_SIZE || newBox.height < MIN_SHAPE_SIZE) {
-              return oldBox
-            }
-            if (newBox.width > MAX_SHAPE_SIZE || newBox.height > MAX_SHAPE_SIZE) {
               return oldBox
             }
             return newBox
@@ -255,6 +252,8 @@ const RectangleComponent: React.FC<RectangleProps> = ({
       )}
     </>
   )
-}
+})
+
+RectangleComponent.displayName = 'RectangleComponent'
 
 export default RectangleComponent

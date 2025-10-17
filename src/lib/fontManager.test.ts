@@ -50,7 +50,7 @@ const mockCanvas = {
 const originalCreateElement = document.createElement
 vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
   if (tagName === 'canvas') {
-    return mockCanvas as any
+    return mockCanvas as HTMLCanvasElement;
   }
   return originalCreateElement.call(document, tagName)
 })

@@ -121,7 +121,7 @@ export const getKonvaFontFamily = (fontFamily: FontFamily): string => {
 /**
  * Validate if a font style is supported for a given font family
  */
-export const isFontStyleSupported = (fontFamily: FontFamily, _fontStyle: FontStyle): boolean => {
+export const isFontStyleSupported = (fontFamily: FontFamily): boolean => {
   const config = FONT_CONFIG[fontFamily]
   if (!config) {
     return false

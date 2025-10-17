@@ -107,6 +107,8 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   const handleShapeSelect = (shape: ShapeType) => {
     setSelectedShape(shape)
     localStorage.setItem('collabcanvas-selected-shape', shape)
+    // Update the tool selection to the new shape type
+    onToolSelect(shape)
   }
 
 
@@ -115,7 +117,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
   const renderDynamicContent = () => {
     switch (activeTool) {
-      case 'shapes':
+      case 'shapes': {
         const currentShape = getCurrentShape()
         return (
           <div className="flex items-center space-x-2">
@@ -151,6 +153,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
             />
           </div>
         )
+      }
       
       case 'ai':
         return (

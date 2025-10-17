@@ -78,13 +78,13 @@ describe('ZoomWidget', () => {
     expect(mockUpdateScale).toHaveBeenCalledWith(0.01)
   })
 
-  it('clamps zoom input to maximum value of 500%', () => {
+  it('clamps zoom input to maximum value of 300%', () => {
     render(<ZoomWidget />)
-    
+
     const zoomInput = screen.getByDisplayValue('100')
-    fireEvent.change(zoomInput, { target: { value: '600' } })
-    
-    expect(mockUpdateScale).toHaveBeenCalledWith(5)
+    fireEvent.change(zoomInput, { target: { value: '400' } })
+
+    expect(mockUpdateScale).toHaveBeenCalledWith(3)
   })
 
   it('resets input to current value on blur with invalid input', () => {

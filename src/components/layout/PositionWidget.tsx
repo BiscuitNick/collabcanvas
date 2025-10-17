@@ -36,7 +36,7 @@ const PositionWidget: React.FC<PositionWidgetProps> = ({ className }) => {
     const center = getViewportCenter()
     setXValue(center.x)
     setYValue(center.y)
-  }, [stagePosition, stageScale])
+  }, [stagePosition, stageScale, getViewportCenter])
 
   const handleXChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value) || 0

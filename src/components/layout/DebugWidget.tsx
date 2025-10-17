@@ -5,10 +5,12 @@ import { Switch } from '../ui/switch'
 import { Label } from '../ui/label'
 import { useCanvasStore } from '../../store/canvasStore'
 
+import type { Shape, Cursor, PresenceUser } from '../../types';
+
 interface DebugWidgetProps {
-  shapes: any[]
-  cursors: any[]
-  presence: any[]
+  shapes: Shape[];
+  cursors: Cursor[];
+  presence: PresenceUser[];
   selectedShapeId: string | null
   debugMode: boolean
   showSelfCursor: boolean
@@ -86,7 +88,7 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
           <h4 className="font-medium text-gray-700 mb-1">Cursors ({cursors.length})</h4>
           <div className="space-y-1 text-gray-600">
             {cursors.map(cursor => (
-              <div key={cursor.id} className="flex justify-between">
+              <div key={cursor.userId} className="flex justify-between">
                 <span>{cursor.userName || 'Unknown'}</span>
                 <span className="text-gray-400">({Math.round(cursor.x)}, {Math.round(cursor.y)})</span>
               </div>
@@ -145,9 +147,9 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
           <h4 className="font-medium text-gray-700 mb-1">Presence ({presence.length})</h4>
           <div className="space-y-1 text-gray-600">
             {presence.map(user => (
-              <div key={user.id} className="flex justify-between">
-                <span>{user.name}</span>
-                <span className="text-gray-400">{user.status}</span>
+              <div key={user.userId} className="flex justify-between">
+                <span>{user.userName}</span>
+                <span className="text-gray-400">Active</span>
               </div>
             ))}
           </div>

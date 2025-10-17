@@ -19,6 +19,9 @@ export const SHAPE_MAX_RETRIES = parseInt(import.meta.env.VITE_SHAPE_MAX_RETRIES
 export const PRESENCE_UPDATE_INTERVAL_MS = parseInt(import.meta.env.VITE_PRESENCE_UPDATE_INTERVAL_MS || '30000', 10)
 export const PRESENCE_CLEANUP_INTERVAL_MS = parseInt(import.meta.env.VITE_PRESENCE_CLEANUP_INTERVAL_MS || '300000', 10)
 
+// Shape locking configuration
+export const LOCK_TTL_MS = parseInt(import.meta.env.VITE_LOCK_TTL_MS || '30000', 10)
+
 // Performance monitoring
 export const ENABLE_PERFORMANCE_LOGGING = import.meta.env.VITE_ENABLE_PERFORMANCE_LOGGING === 'true'
 

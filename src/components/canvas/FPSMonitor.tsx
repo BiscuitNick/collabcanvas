@@ -57,7 +57,7 @@ const FPSMonitor: React.FC<FPSMonitorProps> = ({ isEnabled, onFPSUpdate }) => {
         cancelAnimationFrame(animationFrameRef.current)
       }
     }
-  }, [isEnabled])
+  }, [isEnabled, onFPSUpdate])
 
   if (!isEnabled) {
     return null

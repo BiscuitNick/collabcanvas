@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useAuth } from './hooks/useAuth'
 import { LoginPage } from './pages/LoginPage'
 import { CanvasPage } from './pages/CanvasPage'
-import AITestPage from './pages/AITestPage'
 
 // Loading component
 const LoadingSpinner: React.FC = () => (
@@ -58,15 +57,6 @@ function App() {
             element={
               <ProtectedRoute>
                 <CanvasPage />
-              </ProtectedRoute>
-            } 
-          />
-          
-          <Route 
-            path="/test-ai" 
-            element={
-              <ProtectedRoute>
-                <AITestPage />
               </ProtectedRoute>
             } 
           />

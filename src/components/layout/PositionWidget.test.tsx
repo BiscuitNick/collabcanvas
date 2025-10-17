@@ -5,12 +5,14 @@ import PositionWidget from './PositionWidget'
 
 // Mock the canvas store
 const mockUpdatePosition = vi.fn()
+const mockUpdateScale = vi.fn()
 
 vi.mock('../../store/canvasStore', () => ({
   useCanvasStore: vi.fn(() => ({
     stagePosition: { x: 0, y: 0 },
     stageScale: 1,
-    updatePosition: mockUpdatePosition
+    updatePosition: mockUpdatePosition,
+    updateScale: mockUpdateScale
   }))
 }))
 
@@ -34,10 +36,11 @@ describe('PositionWidget', () => {
 
   it('renders position controls correctly', () => {
     render(<PositionWidget />)
-    
+
     expect(screen.getByTitle('Reset to Origin')).toBeInTheDocument()
-    expect(screen.getByLabelText('X')).toBeInTheDocument()
-    expect(screen.getByLabelText('Y')).toBeInTheDocument()
+    // Check for input fields by their placeholders and types
+    const inputs = screen.getAllByRole('spinbutton')
+    expect(inputs.length).toBe(2)
   })
 
   it('displays current viewport center coordinates', () => {
@@ -60,31 +63,34 @@ describe('PositionWidget', () => {
 
   it('updates position when X input is changed and blurred', () => {
     render(<PositionWidget />)
-    
-    const xInput = screen.getByLabelText('X')
+
+    const inputs = screen.getAllByRole('spinbutton')
+    const xInput = inputs[0] // First input is X
     fireEvent.change(xInput, { target: { value: '100' } })
     fireEvent.blur(xInput)
-    
+
     expect(mockUpdatePosition).toHaveBeenCalled()
   })
 
   it('updates position when Y input is changed and blurred', () => {
     render(<PositionWidget />)
-    
-    const yInput = screen.getByLabelText('Y')
+
+    const inputs = screen.getAllByRole('spinbutton')
+    const yInput = inputs[1] // Second input is Y
     fireEvent.change(yInput, { target: { value: '200' } })
     fireEvent.blur(yInput)
-    
+
     expect(mockUpdatePosition).toHaveBeenCalled()
   })
 
   it('handles Enter key press', () => {
     render(<PositionWidget />)
-    
-    const xInput = screen.getByLabelText('X')
+
+    const inputs = screen.getAllByRole('spinbutton')
+    const xInput = inputs[0]
     fireEvent.change(xInput, { target: { value: '500' } })
     fireEvent.keyPress(xInput, { key: 'Enter' })
-    
+
     // The component should handle the Enter key without errors
     expect(xInput).toBeInTheDocument()
   })

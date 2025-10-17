@@ -40,8 +40,8 @@ describe('Canvas Store', () => {
 
   it('should clamp scale within bounds', () => {
     // Too small
-    useCanvasStore.getState().updateScale(0.05)
-    expect(useCanvasStore.getState().stageScale).toBe(0.1)
+    useCanvasStore.getState().updateScale(0.005)
+    expect(useCanvasStore.getState().stageScale).toBe(0.01)
 
     // Too large
     useCanvasStore.getState().updateScale(5)

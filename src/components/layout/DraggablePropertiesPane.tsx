@@ -27,8 +27,8 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
 
   // Sort shapes by creation date
   const sortedShapes = [...shapes].sort((a, b) => {
-    const dateA = a.createdAt ? (a.createdAt as any).seconds || a.createdAt : 0;
-    const dateB = b.createdAt ? (b.createdAt as any).seconds || b.createdAt : 0;
+    const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt || 0);
+    const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt || 0);
     return dateA - dateB;
   });
 

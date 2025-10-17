@@ -204,8 +204,8 @@ describe('ShapeFactory Component', () => {
     it('should handle unknown shape types gracefully', () => {
     const unknownShape = {
       id: 'unknown-1',
-      type: 'unknown' as any,
-      version: 'v2' as any,
+      type: 'unknown' as ShapeType,
+      version: 'v2' as ShapeVersion,
       x: 0,
       y: 0,
       createdBy: 'user-1',
@@ -215,7 +215,7 @@ describe('ShapeFactory Component', () => {
 
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       
-      const { container } = render(<ShapeFactory {...defaultProps} shape={unknownShape as any} />)
+      const { container } = render(<ShapeFactory {...defaultProps} shape={unknownShape as Rectangle} />)
       
       expect(container.firstChild).toBeNull()
       expect(consoleSpy).toHaveBeenCalledWith('Unknown shape type:', unknownShape)
@@ -226,7 +226,7 @@ describe('ShapeFactory Component', () => {
     it('should handle missing shape gracefully', () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       
-      const { container } = render(<ShapeFactory {...defaultProps} shape={null as any} />)
+      const { container } = render(<ShapeFactory {...defaultProps} shape={null as unknown as Rectangle} />)
       
       expect(container.firstChild).toBeNull()
       expect(consoleSpy).toHaveBeenCalledWith('ShapeFactory received null or undefined shape')

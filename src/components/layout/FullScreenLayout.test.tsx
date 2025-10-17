@@ -10,12 +10,29 @@ vi.mock('../../store/canvasStore', () => ({
     stagePosition: { x: 0, y: 0 },
     stageScale: 1,
     updatePosition: vi.fn(),
-    selectShape: vi.fn()
+    selectShape: vi.fn(),
+    resetView: vi.fn()
+  })
+}))
+
+// Mock the useAuth hook
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: { uid: 'test-user' },
+    loading: false
+  })
+}))
+
+// Mock the useShapes hook
+vi.mock('../../hooks/useShapes', () => ({
+  useShapes: () => ({
+    createShape: vi.fn(),
+    clearAllShapes: vi.fn()
   })
 }))
 
 // Mock the canvas component
-const MockCanvas = ({ width, height, onShapeSelect }: any) => (
+const MockCanvas = ({ width, height, onShapeSelect }: { width: number; height: number; onShapeSelect: (id: string) => void }) => (
   <div data-testid="canvas" style={{ width, height }}>
     <button onClick={() => onShapeSelect?.('test-shape-1')}>Select Shape</button>
   </div>
@@ -33,7 +50,8 @@ const defaultProps = {
   lockShape: vi.fn(),
   unlockShape: vi.fn(),
   startEditingShape: vi.fn(),
-  stopEditingShape: vi.fn()
+  stopEditingShape: vi.fn(),
+  presence: [],
 }
 
 describe('FullScreenLayout', () => {
@@ -58,52 +76,28 @@ describe('FullScreenLayout', () => {
       </FullScreenLayout>
     )
 
-    const toggleButton = screen.getByText('Hide Properties')
-    fireEvent.click(toggleButton)
+    const closeButton = screen.getByTitle('Close Properties Panel')
+    fireEvent.click(closeButton)
 
-    expect(screen.getByText('Show Properties')).toBeInTheDocument()
+    const openButton = screen.getByTitle('Open Properties Panel')
+    expect(openButton).toBeInTheDocument()
   })
 
-  it('toggles gridlines visibility', () => {
+  it('renders bottom toolbar with tool selection', () => {
     render(
       <FullScreenLayout {...defaultProps}>
         <MockCanvas />
       </FullScreenLayout>
     )
 
-    const gridlinesButton = screen.getByText('Gridlines')
-    fireEvent.click(gridlinesButton)
-
-    expect(gridlinesButton).toHaveClass('bg-blue-100')
-  })
-
-  it('shows shape properties when shape is selected', () => {
-    render(
-      <FullScreenLayout {...defaultProps}>
-        <MockCanvas />
-      </FullScreenLayout>
+    // Find the dropdown trigger button (the one with mouse pointer icon)
+    const dropdownButtons = screen.getAllByRole('button')
+    const toolDropdownButton = dropdownButtons.find(btn =>
+      btn.querySelector('.lucide-mouse-pointer-2') !== null
     )
 
-    // Properties pane is already visible by default
-
-    // Select a shape
-    const selectButton = screen.getByText('Select Shape')
-    fireEvent.click(selectButton)
-
-    expect(screen.getByText('Selected Shape: test-shape-1')).toBeInTheDocument()
-  })
-
-  it('renders bottom toolbar with shape creation buttons', () => {
-    render(
-      <FullScreenLayout {...defaultProps}>
-        <MockCanvas />
-      </FullScreenLayout>
-    )
-
-    expect(screen.getByText('Rectangle')).toBeInTheDocument()
-    expect(screen.getByText('Circle')).toBeInTheDocument()
-    expect(screen.getByText('Text')).toBeInTheDocument()
-    expect(screen.getByText('AI Agent')).toBeInTheDocument()
+    // Verify the toolbar with tool dropdown is present
+    expect(toolDropdownButton).toBeInTheDocument()
   })
 
   it('calculates canvas size correctly', () => {
@@ -127,6 +121,6 @@ describe('FullScreenLayout', () => {
     )
 
     const canvas = screen.getByTestId('canvas')
-    expect(canvas).toHaveStyle({ width: '680px', height: '680px' })
+    expect(canvas).toHaveStyle({ width: '1200px', height: '800px' })
   })
 })

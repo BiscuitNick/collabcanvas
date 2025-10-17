@@ -40,7 +40,7 @@ const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Handle mouse down for dragging
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: MouseEvent | React.MouseEvent) => {
     if (e.target === containerRef.current || (e.target as HTMLElement).closest('[data-drag-handle]')) {
       setIsDragging(true)
       const rect = containerRef.current?.getBoundingClientRect()
@@ -57,9 +57,9 @@ const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
   useEffect(() => {
     const container = containerRef.current
     if (container) {
-      container.addEventListener('mousedown', handleMouseDown as any)
+      container.addEventListener('mousedown', handleMouseDown)
       return () => {
-        container.removeEventListener('mousedown', handleMouseDown as any)
+        container.removeEventListener('mousedown', handleMouseDown)
       }
     }
   }, [handleMouseDown])

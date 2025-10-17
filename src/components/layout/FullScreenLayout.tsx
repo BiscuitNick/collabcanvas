@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { useCanvasStore } from '../../store/canvasStore'
 import type { Shape, Cursor as CursorType, PresenceUser } from '../../types'
+import type { CanvasProps } from '../canvas/Canvas'
 import ZoomWidget from './ZoomWidget'
 import PositionWidget from './PositionWidget'
 import DraggablePropertiesPane from './DraggablePropertiesPane'
@@ -165,9 +166,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     }))
   }, [])
 
-  const handleCreateShape = useCallback((type: 'rectangle' | 'circle' | 'text') => {
+  const handleCreateShape = useCallback(async () => {
     // This function is now deprecated in favor of the new flow, but kept to avoid breaking changes if called elsewhere.
-    console.log('Create shape (legacy):', type)
   }, [])
 
   const handleCreateShapeWithOptions = useCallback((options: {
@@ -209,14 +209,6 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     setUIState(prev => ({ ...prev, isPanning: false }))
   }, [])
 
-  const handleResizeStart = useCallback(() => {
-    setUIState(prev => ({ ...prev, isResizing: true }))
-  }, [])
-
-  const handleResizeEnd = useCallback(() => {
-    setUIState(prev => ({ ...prev, isResizing: false }))
-  }, [])
-
   // Debug toggle handler
   const handleToggleDebug = useCallback(() => {
     setUIState(prev => ({ 
@@ -252,8 +244,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         isCreatingShape: false,
         shapeCreationOptions: undefined
       }))
-    } catch (error) {
-      console.error('Error resetting canvas:', error)
+    } catch {
+      // ignore
     }
   }, [clearAllShapes, resetView])
 
@@ -307,16 +299,14 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
             createdAt: new Date(),
             updatedAt: new Date()
           }
-          console.log('Creating Circle Object:', circle); // DEBUG LOG
           await createShape(circle)
         }
         
-        console.log('Shape created successfully at:', event.x, event.y)
-      } catch (error) {
-        console.error('Failed to create shape:', error)
+      } catch {
+        // ignore
       }
     }
-  }, [uiState.isCreatingShape, uiState.shapeCreationOptions, createShape, user?.uid])
+  }, [createShape, user?.uid, uiState])
 
 
 
@@ -333,7 +323,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           height: canvasSize.height
         }}
       >
-        {React.cloneElement(children as React.ReactElement, {
+        {React.cloneElement(children as React.ReactElement<Partial<CanvasProps>>, {
           width: canvasSize.width,
           height: canvasSize.height,
           shapes,
@@ -348,17 +338,14 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           unlockShape,
           startEditingShape,
           stopEditingShape,
-          onShapeSelect: handleShapeSelect,
           onDragStart: handleDragStart,
           onDragEnd: handleDragEnd,
           onPanStart: handlePanStart,
           onPanEnd: handlePanEnd,
-          onResizeStart: handleResizeStart,
-          onResizeEnd: handleResizeEnd,
           selectedTool: uiState.selectedTool,
           onCanvasClick: handleCanvasClick,
           isCreatingShape: uiState.isCreatingShape
-        } as any)}
+        })}
       </div>
 
       {/* Floating Bottom Toolbar - Center */}

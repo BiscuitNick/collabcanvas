@@ -243,7 +243,7 @@ const PropertiesPane: React.FC<PropertiesPaneProps> = ({
                   <Label htmlFor="font-family">Font Family</Label>
                   <Select
                     value={selectedShape.fontFamily}
-                    onValueChange={(value: string) => onUpdateShape({ fontFamily: value as any })}
+                    onValueChange={(value: string) => onUpdateShape({ fontFamily: value as 'Arial' | 'Helvetica' | 'Times New Roman' | 'Georgia' | 'Verdana' })}
                   >
                     <SelectTrigger>
                       <SelectValue />

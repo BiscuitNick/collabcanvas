@@ -12,7 +12,7 @@ export type CursorContext =
   | 'not-allowed'
 
 interface UseCursorContextProps {
-  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'ai' | 'pan' | null
+  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null
   isDragging?: boolean
   isPanning?: boolean
   isResizing?: boolean

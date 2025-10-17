@@ -1,8 +1,8 @@
-# Enhanced Canvas Features - Task Breakdown
+# Enhanced Canvas Features - Task Breakdown v2
 
 **PRD:** Enhanced Canvas Features - Text and Image Content  
 **Timeline:** Phase 2 Implementation  
-**Total Tasks:** 15 tasks across 3 phases
+**Total Tasks:** 12 tasks across 3 phases
 
 ---
 
@@ -32,9 +32,6 @@
 
 **Files to Modify:**
 - `src/types/canvas/index.ts`
-
-**Files to Create:**
-- None (modify existing)
 
 ---
 
@@ -157,48 +154,55 @@
 
 ## Phase 2: Text Content Implementation
 
-### Task 6: Create Text Content Types
+### Task 3.0: Create Text Content Types
 **Duration:** 1-2 hours  
 **Priority:** High
 
 #### Subtasks:
-- [ ] **6.1 Define Text Content Interface**
-  - [ ] Create `TextContent` interface
-  - [ ] Add text-specific properties
-  - [ ] Add text editing state properties
+- [ ] **3.0.1 Define Text Content Interface**
+  - [ ] Create `TextContent` interface with all required properties
+  - [ ] Add text-specific properties (text, fontSize, fontFamily, etc.)
+  - [ ] Add text editing state properties (isEditing, editedBy)
   - [ ] Add text validation functions
 
-- [ ] **6.2 Add Text Content to Union Types**
-  - [ ] Update `Content` union type
-  - [ ] Add text content type guards
-  - [ ] Update content creation options
-  - [ ] Add text default values
+- [ ] **3.0.2 Add Text Content to Union Types**
+  - [ ] Update `Content` union type to include `TextContent`
+  - [ ] Add text content type guards (`isTextContent`)
+  - [ ] Update content creation options for text
+  - [ ] Add text default values to `DEFAULT_CONTENT_VALUES`
+
+- [ ] **3.0.3 Update Content Type System**
+  - [ ] Add `TEXT` to `ContentType` enum
+  - [ ] Update content type checking throughout codebase
+  - [ ] Add text content to content factory functions
+  - [ ] Update content validation
 
 **Files to Modify:**
 - `src/types/canvas/index.ts`
 
 ---
 
-### Task 7: Create Text Tool and Properties Panel
+### Task 3.1: Create Text Tool and Properties Panel
 **Duration:** 3-4 hours  
 **Priority:** High
 
 #### Subtasks:
-- [ ] **7.1 Create Text Tool Button**
-  - [ ] Add text tool to main toolbar
+- [ ] **3.1.1 Create Text Tool Button**
+  - [ ] Add text tool as PRIMARY tool in main toolbar (not subtool under Shapes)
   - [ ] Implement text tool selection state
   - [ ] Add text tool visual feedback
-  - [ ] Update toolbar layout
+  - [ ] Update toolbar layout to show text as primary tool
 
-- [ ] **7.2 Create Text Properties Panel**
+- [ ] **3.1.2 Create Text Properties Panel**
   - [ ] Create `TextProperties.tsx` component
+  - [ ] Add text content editing field
   - [ ] Add font family dropdown
   - [ ] Add font style selection
   - [ ] Add font size input/slider
   - [ ] Add text color picker
   - [ ] Add text alignment controls
 
-- [ ] **7.3 Integrate with Content Creation Form**
+- [ ] **3.1.3 Integrate with Content Creation Form**
   - [ ] Update `ContentCreationForm` for text
   - [ ] Add text-specific form fields
   - [ ] Implement text property persistence
@@ -213,25 +217,25 @@
 
 ---
 
-### Task 8: Create Text Rendering Component
+### Task 3.2: Create Text Rendering Component
 **Duration:** 4-5 hours  
 **Priority:** High
 
 #### Subtasks:
-- [ ] **8.1 Create Text Content Component**
+- [ ] **3.2.1 Create Text Content Component**
   - [ ] Create `TextContent.tsx` component
   - [ ] Implement Konva Text rendering
   - [ ] Add text selection and highlighting
   - [ ] Add text manipulation (move, resize)
 
-- [ ] **8.2 Implement Text Editing**
+- [ ] **3.2.2 Implement Text Editing**
   - [ ] Create `TextEditor.tsx` component
-  - [ ] Implement in-place text editing
+  - [ ] Implement in-place text editing with "hello world" placeholder
   - [ ] Add blinking cursor
   - [ ] Add text selection within editing
   - [ ] Add keyboard navigation
 
-- [ ] **8.3 Add Text Styling**
+- [ ] **3.2.3 Add Text Styling**
   - [ ] Implement font family rendering
   - [ ] Add font style support (bold, italic)
   - [ ] Add text alignment
@@ -244,28 +248,31 @@
 
 ---
 
-### Task 9: Implement Text Creation and Editing
+### Task 3.3: Implement Text Creation and Editing
 **Duration:** 4-5 hours  
 **Priority:** High
 
 #### Subtasks:
-- [ ] **9.1 Add Text Creation to Canvas**
+- [ ] **3.3.1 Add Text Creation to Canvas**
   - [ ] Update `Canvas.tsx` for text creation
-  - [ ] Implement click-to-create text
+  - [ ] Implement click-to-create text with "hello world" placeholder (selected by default)
   - [ ] Add text creation state management
   - [ ] Add text positioning logic
+  - [ ] Ensure text tool selection persists after creating text
 
-- [ ] **9.2 Implement Text Editing Mode**
+- [ ] **3.3.2 Implement Text Editing Mode**
   - [ ] Add text editing state to store
-  - [ ] Implement double-click to edit
+  - [ ] Implement click with hand/selection tool to edit
   - [ ] Add click-outside to finish editing
   - [ ] Add escape key to cancel editing
+  - [ ] Allow user to immediately start typing to replace placeholder
 
-- [ ] **9.3 Add Text Input Handling**
+- [ ] **3.3.3 Add Text Input Handling**
   - [ ] Implement keyboard event handling
   - [ ] Add text input validation
   - [ ] Add text cursor positioning
   - [ ] Add text selection within editing
+  - [ ] Implement single-line text only (no wrapping)
 
 **Files to Modify:**
 - `src/components/canvas/Canvas.tsx`
@@ -273,24 +280,24 @@
 
 ---
 
-### Task 10: Integrate Text with Sync System
+### Task 3.4: Integrate Text with Sync System
 **Duration:** 3-4 hours  
 **Priority:** High
 
 #### Subtasks:
-- [ ] **10.1 Update Content Sync for Text**
+- [ ] **3.4.1 Update Content Sync for Text**
   - [ ] Extend `useContent` hook for text
   - [ ] Add text-specific sync logic
   - [ ] Implement text conflict resolution
   - [ ] Add text validation
 
-- [ ] **10.2 Implement Text Editing Locks**
+- [ ] **3.4.2 Implement Text Editing Locks**
   - [ ] Extend `useContentLocks` for text
   - [ ] Add text editing state management
   - [ ] Implement text lock acquisition
   - [ ] Add text lock release
 
-- [ ] **10.3 Add Text Real-time Updates**
+- [ ] **3.4.3 Add Text Real-time Updates**
   - [ ] Implement real-time text sync
   - [ ] Add text editing indicators
   - [ ] Add text conflict resolution
@@ -303,26 +310,58 @@
 
 ---
 
+---
+
+### Task 3.5: Fix Layers Panel Editing
+**Duration:** 3-4 hours  
+**Priority:** High
+
+#### Subtasks:
+- [ ] **3.5.1 Fix Layers Panel Click Handlers**
+  - [ ] Fix layers panel click handlers for all content types
+  - [ ] Ensure content selection works from layers panel
+  - [ ] Add content selection synchronization
+  - [ ] Test editing all content types from layers panel
+
+- [ ] **3.5.2 Update Properties Panel Integration**
+  - [ ] Ensure properties panel updates when content selected from layers
+  - [ ] Add content selection synchronization
+  - [ ] Implement consistent editing workflow
+  - [ ] Add visual feedback for selected content
+
+- [ ] **3.5.3 Test Layers Panel Functionality**
+  - [ ] Test clicking content in layers panel selects it on canvas
+  - [ ] Test properties panel shows correct content properties
+  - [ ] Test changes in properties panel update content immediately
+  - [ ] Test all content types work consistently in layers panel
+
+**Files to Modify:**
+- `src/components/layout/UsersContentPanel.tsx`
+- `src/components/layout/ContentProperties.tsx`
+- `src/components/canvas/Canvas.tsx`
+
+---
+
 ## Phase 3: Testing and Polish
 
-### Task 11: Update Tests
+### Task 3.6: Update Tests
 **Duration:** 3-4 hours  
 **Priority:** Medium
 
 #### Subtasks:
-- [ ] **11.1 Update Unit Tests**
+- [ ] **3.6.1 Update Unit Tests**
   - [ ] Update store tests for content terminology
   - [ ] Update hook tests for content
   - [ ] Update utility function tests
   - [ ] Add text content tests
 
-- [ ] **11.2 Update Integration Tests**
+- [ ] **3.6.2 Update Integration Tests**
   - [ ] Update Firestore sync tests
   - [ ] Update content creation tests
   - [ ] Update content manipulation tests
   - [ ] Add text editing tests
 
-- [ ] **11.3 Update Component Tests**
+- [ ] **3.6.3 Update Component Tests**
   - [ ] Update component tests for content
   - [ ] Add text component tests
   - [ ] Update property panel tests
@@ -335,18 +374,18 @@
 
 ---
 
-### Task 12: Performance Optimization
+### Task 3.7: Performance Optimization
 **Duration:** 2-3 hours  
 **Priority:** Medium
 
 #### Subtasks:
-- [ ] **12.1 Optimize Text Rendering**
+- [ ] **3.7.1 Optimize Text Rendering**
   - [ ] Implement text rendering optimization
   - [ ] Add text caching
   - [ ] Optimize text re-rendering
   - [ ] Add performance monitoring
 
-- [ ] **12.2 Optimize Text Editing**
+- [ ] **3.7.2 Optimize Text Editing**
   - [ ] Optimize text input handling
   - [ ] Add text editing performance monitoring
   - [ ] Optimize text selection
@@ -358,18 +397,18 @@
 
 ---
 
-### Task 13: UI/UX Polish
+### Task 3.8: UI/UX Polish
 **Duration:** 2-3 hours  
 **Priority:** Medium
 
 #### Subtasks:
-- [ ] **13.1 Polish Text Tool UI**
+- [ ] **3.8.1 Polish Text Tool UI**
   - [ ] Improve text tool visual feedback
   - [ ] Add text tool animations
   - [ ] Improve text properties panel
   - [ ] Add text tool help text
 
-- [ ] **13.2 Polish Text Editing Experience**
+- [ ] **3.8.2 Polish Text Editing Experience**
   - [ ] Improve text editing visual feedback
   - [ ] Add text editing animations
   - [ ] Improve text selection
@@ -382,18 +421,18 @@
 
 ---
 
-### Task 14: Documentation Update
+### Task 3.9: Documentation Update
 **Duration:** 1-2 hours  
 **Priority:** Low
 
 #### Subtasks:
-- [ ] **14.1 Update Code Documentation**
+- [ ] **3.9.1 Update Code Documentation**
   - [ ] Update component documentation
   - [ ] Update hook documentation
   - [ ] Update type documentation
   - [ ] Add text content examples
 
-- [ ] **14.2 Update User Documentation**
+- [ ] **3.9.2 Update User Documentation**
   - [ ] Update README for content terminology
   - [ ] Add text tool usage instructions
   - [ ] Update setup instructions
@@ -406,18 +445,18 @@
 
 ---
 
-### Task 15: Prepare for Image Content
+### Task 3.10: Prepare for Image Content
 **Duration:** 1-2 hours  
 **Priority:** Low
 
 #### Subtasks:
-- [ ] **15.1 Add Image Content Types**
+- [ ] **3.10.1 Add Image Content Types**
   - [ ] Create `ImageContent` interface
   - [ ] Add image content to union types
   - [ ] Add image content type guards
   - [ ] Add image default values
 
-- [ ] **15.2 Prepare Image Infrastructure**
+- [ ] **3.10.2 Prepare Image Infrastructure**
   - [ ] Add image content to store
   - [ ] Add image content to sync system
   - [ ] Add image content to properties panel
@@ -438,14 +477,17 @@
 - **Day 5:** Task 5 (Firestore Migration)
 
 ### Week 2: Phase 2 (Text Implementation)
-- **Days 1-2:** Tasks 6-7 (Text Types and Tool)
-- **Days 3-4:** Tasks 8-9 (Text Rendering and Editing)
-- **Day 5:** Task 10 (Text Sync Integration)
+- **Days 1-2:** Tasks 3.0-3.1 (Text Types and Tool)
+- **Days 3-4:** Tasks 3.2-3.3 (Text Rendering and Editing)
+- **Day 5:** Task 3.4 (Text Sync Integration)
+
+### Week 2.5: Layers Panel Fix
+- **Day 1:** Task 3.5 (Fix Layers Panel Editing)
 
 ### Week 3: Phase 3 (Testing and Polish)
-- **Days 1-2:** Tasks 11-12 (Tests and Performance)
-- **Days 3-4:** Tasks 13-14 (UI Polish and Documentation)
-- **Day 5:** Task 15 (Image Preparation)
+- **Days 1-2:** Tasks 3.6-3.7 (Tests and Performance)
+- **Days 3-4:** Tasks 3.8-3.9 (UI Polish and Documentation)
+- **Day 5:** Task 3.10 (Image Preparation)
 
 ---
 
@@ -459,9 +501,10 @@
 
 ### Phase 2 Success
 - ✅ Text tool is functional and intuitive
-- ✅ Text editing works in-place with cursor
+- ✅ Text editing works with "hello world" placeholder
 - ✅ Text properties are adjustable and persistent
 - ✅ Text syncs in real-time across users
+- ✅ Layers panel editing works for all content types
 
 ### Phase 3 Success
 - ✅ All tests pass
@@ -477,6 +520,7 @@
 - **Migration Complexity**: Incremental approach with rollback capability
 - **Text Rendering Performance**: Extensive testing and optimization
 - **Real-time Sync Complexity**: Gradual implementation with testing
+- **Layers Panel Complexity**: Focus on fixing existing functionality first
 
 ### Mitigation Strategies
 - **Comprehensive Testing**: Test each phase thoroughly
@@ -486,9 +530,23 @@
 
 ---
 
+## Questions for Clarification
+
+1. **Text Placeholder**: Should the "hello world" placeholder be selected by default so users can immediately start typing to replace it?
+
+2. **Text Editing Mode**: When editing text from the properties panel, should it also enter the in-place editing mode on the canvas?
+
+3. **Text Tool Persistence**: Should the text tool stay selected after creating text, or should it return to the selection tool?
+
+4. **Layers Panel Priority**: Should we fix the layers panel editing issue before implementing text, or can we do it in parallel?
+
+5. **Text Wrapping**: Should text support automatic word wrapping within a defined width, or should it be single-line only for the initial implementation?
+
+---
+
 ## Next Steps
 
-1. **Review and Approve PRD** - Confirm requirements and approach
+1. **Review and Approve Updated PRD** - Confirm requirements and approach
 2. **Begin Phase 1** - Start with terminology migration
 3. **Set up Development Environment** - Ensure all tools are ready
 4. **Create Development Branch** - `feature/content-migration`

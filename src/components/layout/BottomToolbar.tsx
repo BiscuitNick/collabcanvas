@@ -20,12 +20,12 @@ import {
   Trash2
 } from 'lucide-react'
 import ShapeCreationForm from './ShapeCreationForm'
-import type { ShapeType } from '../../types'
+import { ShapeType } from '../../types'
 
 interface BottomToolbarProps {
-  onCreateShape: (type: 'rectangle' | 'circle' | 'text') => void
+  onCreateShape: (type: 'rectangle' | 'circle' | 'text' | 'image') => void
   onCreateShapeWithOptions: (options: {
-    type: 'rectangle' | 'circle' | 'text'
+    type: 'rectangle' | 'circle' | 'text' | 'image'
     width?: number
     height?: number
     radius?: number
@@ -34,8 +34,8 @@ interface BottomToolbarProps {
     strokeWidth: number
   }) => void
   onOpenAIAgent: () => void
-  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'ai' | 'pan' | null
-  onToolSelect: (tool: 'select' | 'rectangle' | 'circle' | 'text' | 'ai' | 'pan' | null) => void
+  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null
+  onToolSelect: (tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null) => void
   debugMode: boolean
   onToggleDebug: () => void
   onResetCanvas: () => void

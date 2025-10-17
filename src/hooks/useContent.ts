@@ -30,5 +30,18 @@ export const useContent = () => {
     unlockContent,
     startEditingContent,
     stopEditingContent,
+    // Legacy exports for backward compatibility during migration
+    shapes: content,
+    createShape: createContent,
+    updateShape: updateContent,
+    deleteShape: deleteContent,
+    clearAllShapes: clearAllContent,
+    lockShape: lockContent,
+    unlockShape: unlockContent,
+    startEditingShape: startEditingContent,
+    stopEditingShape: stopEditingContent,
   };
 };
+
+// Legacy export for backward compatibility during migration
+export const useShapes = useContent;

@@ -1,10 +1,10 @@
 
 import { useMemo, useCallback, useEffect } from 'react';
 import { useCanvasStore } from '../../../store/canvasStore';
-import type { Shape } from '../../../types';
+import type { Content } from '../../../types';
 
 interface ViewportCullingProps {
-  shapes: Shape[];
+  content: Content[];
   width: number;
   height: number;
   enableViewportCulling?: boolean;
@@ -12,7 +12,7 @@ interface ViewportCullingProps {
 }
 
 export const useViewportCulling = ({
-  shapes,
+  content,
   width,
   height,
   enableViewportCulling = true,
@@ -21,7 +21,7 @@ export const useViewportCulling = ({
   const { stagePosition, stageScale } = useCanvasStore();
 
   const getVisibleShapes = useCallback(
-    (shapesToFilter: Shape[]) => {
+    (shapesToFilter: Content[]) => {
       if (!enableViewportCulling) return shapesToFilter;
 
       const viewportBounds = {
@@ -59,8 +59,8 @@ export const useViewportCulling = ({
   );
 
   const visibleShapes = useMemo(() => {
-    return getVisibleShapes(shapes);
-  }, [shapes, getVisibleShapes]);
+    return getVisibleShapes(content);
+  }, [content, getVisibleShapes]);
 
   useEffect(() => {
     if (onVisibleShapesChange) {

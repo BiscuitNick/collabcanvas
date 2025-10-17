@@ -5,7 +5,7 @@ import { useCanvasStore } from '../../store/canvasStore';
 import CanvasErrorBoundary from './CanvasErrorBoundary';
 import ShapeFactory from './ShapeFactory';
 import Cursor from '../multiplayer/Cursor';
-import type { Shape, Cursor as CursorType } from '../../types';
+import type { Content, Cursor as CursorType } from '../../types';
 import { useCursorContext } from '../../hooks/useCursorContext';
 import { useInteractionHandling } from './hooks/useInteractionHandling';
 import { useShapeHandling } from './hooks/useShapeHandling';
@@ -14,9 +14,9 @@ import { useViewportCulling } from './hooks/useViewportCulling';
 export interface CanvasProps {
   width: number;
   height: number;
-  shapes: Shape[];
+  content: Content[];
   cursors: CursorType[];
-  updateShape: (id: string, updates: Partial<Shape>) => Promise<void>;
+  updateShape: (id: string, updates: Partial<Content>) => Promise<void>;
   onMouseMove: (x: number, y: number, canvasWidth: number, canvasHeight: number) => void;
   showSelfCursor?: boolean;
   currentUserId?: string;
@@ -30,7 +30,7 @@ export interface CanvasProps {
   onDragEnd?: () => void;
   onPanStart?: () => void;
   onPanEnd?: () => void;
-  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'ai' | 'pan' | null;
+  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null;
   onCanvasClick?: (event: { x: number; y: number }) => void;
   isCreatingShape?: boolean;
 }
@@ -38,7 +38,7 @@ export interface CanvasProps {
 const Canvas: React.FC<CanvasProps> = ({
   width,
   height,
-  shapes,
+  content,
   cursors,
   updateShape,
   onMouseMove,
@@ -69,7 +69,7 @@ const Canvas: React.FC<CanvasProps> = ({
   });
 
   const { handleShapeSelect, handleShapeUpdate, handleShapeDragStart, handleShapeDragMove, handleShapeDragEnd } = useShapeHandling({
-    shapes,
+    content,
     currentUserId,
     updateShape,
     lockShape,
@@ -91,7 +91,7 @@ const Canvas: React.FC<CanvasProps> = ({
   });
 
   const visibleShapes = useViewportCulling({
-    shapes,
+    content,
     width,
     height,
     enableViewportCulling,

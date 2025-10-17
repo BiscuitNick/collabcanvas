@@ -1,12 +1,12 @@
 
 import { useCallback } from 'react';
 import { useCanvasStore } from '../../../store/canvasStore';
-import type { Shape } from '../../../types';
+import type { Content } from '../../../types';
 
 interface ShapeHandlingProps {
-  shapes: Shape[];
+  content: Content[];
   currentUserId?: string;
-  updateShape: (id: string, updates: Partial<Shape>) => Promise<void>;
+  updateShape: (id: string, updates: Partial<Content>) => Promise<void>;
   lockShape?: (id: string) => Promise<void>;
   unlockShape?: (id: string) => Promise<void>;
   startEditingShape?: (id: string) => void;
@@ -16,7 +16,7 @@ interface ShapeHandlingProps {
 }
 
 export const useShapeHandling = ({
-  shapes,
+  content,
   currentUserId,
   updateShape,
   lockShape,
@@ -30,7 +30,7 @@ export const useShapeHandling = ({
 
   const handleShapeSelect = useCallback(
     (shapeId: string) => {
-      const shape = shapes.find((s) => s.id === shapeId);
+      const shape = content.find((s) => s.id === shapeId);
       const isLockedByOther = shape?.lockedByUserId && shape.lockedByUserId !== currentUserId;
 
       if (selectedShapeId && selectedShapeId !== shapeId && unlockShape) {
@@ -43,11 +43,11 @@ export const useShapeHandling = ({
         lockShape(shapeId);
       }
     },
-    [selectShape, lockShape, unlockShape, selectedShapeId, shapes, currentUserId]
+    [selectShape, lockShape, unlockShape, selectedShapeId, content, currentUserId]
   );
 
   const handleShapeUpdate = useCallback(
-    (shapeId: string, updates: Partial<Shape>) => {
+    (shapeId: string, updates: Partial<Content>) => {
       updateShape(shapeId, updates);
     },
     [updateShape]

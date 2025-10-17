@@ -1,20 +1,20 @@
 import React from 'react'
 import { Button } from '../ui/button'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion'
-import ShapeProperties from './ShapeProperties'
-import type { Shape } from '../../types'
+import ContentProperties from './ContentProperties'
+import type { Content } from '../../types'
 
 interface DraggablePropertiesPaneProps {
-  shapes: Shape[]
-  selectedShape: Shape | null
-  onUpdateShape: (id: string, updates: Partial<Shape>) => void
+  content: Content[]
+  selectedShape: Content | null
+  onUpdateShape: (id: string, updates: Partial<Content>) => void
   onSelectShape: (id: string) => void
   isVisible: boolean
   onClose: () => void
 }
 
 const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
-  shapes,
+  content,
   selectedShape,
   onUpdateShape,
   onSelectShape,
@@ -25,8 +25,8 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
     return null
   }
 
-  // Sort shapes by creation date
-  const sortedShapes = [...shapes].sort((a, b) => {
+  // Sort content by creation date
+  const sortedContent = [...content].sort((a, b) => {
     const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt || 0);
     const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt || 0);
     return dateA - dateB;
@@ -50,21 +50,21 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
 
       {/* Shape List */}
       <div className="flex-1 overflow-y-auto">
-        {sortedShapes.length > 0 ? (
+        {sortedContent.length > 0 ? (
           <Accordion
             type="single"
             collapsible
             value={selectedShape?.id || ''}
             onValueChange={(value: string) => onSelectShape(value)}
           >
-            {sortedShapes.map((shape, index) => (
+            {sortedContent.map((shape, index) => (
               <AccordionItem value={shape.id} key={shape.id} className="border-b">
                 <AccordionTrigger className="px-3 py-2 text-xs hover:bg-gray-50">
                   {`Shape ${index + 1}: ${shape.type}`}
                 </AccordionTrigger>
                 <AccordionContent>
-                  <ShapeProperties
-                    shape={shape}
+                  <ContentProperties
+                    content={shape}
                     onUpdate={(updates) => onUpdateShape(shape.id, updates)}
                   />
                 </AccordionContent>
@@ -72,7 +72,7 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
             ))}
           </Accordion>
         ) : (
-          <p className="p-3 text-xs text-gray-500">No shapes on canvas.</p>
+          <p className="p-3 text-xs text-gray-500">No content on canvas.</p>
         )}
       </div>
     </div>

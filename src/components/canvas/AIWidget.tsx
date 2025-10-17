@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { callAITest, type AIResponse, type CanvasCommand, type AIProvider, type GPT5Model } from '../../lib/aiApi'
 import type { Rectangle } from '../../types'
-import { ShapeType, ShapeVersion } from '../../types'
+import { ContentType, ContentVersion } from '../../types'
 
 interface AIWidgetProps {
   stageScale: number
@@ -87,8 +87,8 @@ const AIWidget: React.FC<AIWidgetProps> = ({
             const canvasHeight = viewportHeight / stageScale
 
             await createShape({
-              type: ShapeType.RECTANGLE,
-              version: ShapeVersion.V2,
+              type: ContentType.RECTANGLE,
+              version: ContentVersion.V2,
               x: canvasX,
               y: canvasY,
               width: canvasWidth,

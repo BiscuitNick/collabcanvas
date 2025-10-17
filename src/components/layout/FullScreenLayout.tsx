@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { useCanvasStore } from '../../store/canvasStore'
-import type { Shape, Cursor as CursorType, PresenceUser } from '../../types'
+import type { Shape, Content, Cursor as CursorType, PresenceUser } from '../../types'
 import type { CanvasProps } from '../canvas/Canvas'
 import ZoomWidget from './ZoomWidget'
 import PositionWidget from './PositionWidget'
@@ -9,13 +9,13 @@ import BottomToolbar from './BottomToolbar'
 import ToolButton from './ToolButton'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
 import { useCursorContext } from '../../hooks/useCursorContext'
-import { useShapes } from '../../hooks/useShapes'
+import { useContent } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
 import DraggableDebugWidget from './DraggableDebugWidget'
 
 interface FullScreenLayoutProps {
   children: React.ReactNode
-  shapes: Shape[]
+  content: Content[]
   cursors: CursorType[]
   presence: PresenceUser[]
   updateShape: (id: string, updates: Partial<Shape>) => Promise<void>
@@ -34,7 +34,7 @@ interface UIState {
   propertiesPaneVisible: boolean
   gridlinesVisible: boolean
   selectedShapeId: string | null
-  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'ai' | 'pan' | null
+  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null
   aiAgentActive: boolean
   isDragging: boolean
   isPanning: boolean
@@ -45,7 +45,7 @@ interface UIState {
   enableViewportCulling: boolean
   fps: number
   shapeCreationOptions?: {
-    type: 'rectangle' | 'circle' | 'text'
+    type: 'rectangle' | 'circle' | 'text' | 'image'
     width?: number
     height?: number
     radius?: number
@@ -58,7 +58,7 @@ interface UIState {
 
 const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   children,
-  shapes,
+  content,
   cursors,
   presence,
   updateShape,
@@ -72,7 +72,11 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 }) => {
   useKeyboardShortcuts()
   const { selectShape, resetView } = useCanvasStore()
-  const { createShape, clearAllShapes } = useShapes()
+  const { createContent, clearAllContent } = useContent()
+  
+  // Legacy aliases for backward compatibility
+  const createShape = createContent
+  const clearAllShapes = clearAllContent
   const { user } = useAuth()
   const [uiState, setUIState] = useState<UIState>({
     propertiesPaneVisible: true,
@@ -150,13 +154,13 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 
   // Get selected shape
   const selectedShape = React.useMemo(() => {
-    return shapes.find(s => s.id === uiState.selectedShapeId) || null
-  }, [shapes, uiState.selectedShapeId])
+    return content.find(s => s.id === uiState.selectedShapeId) || null
+  }, [content, uiState.selectedShapeId])
 
 
   // Toolbar handlers
-  const handleToolSelect = useCallback((tool: 'select' | 'rectangle' | 'circle' | 'text' | 'ai' | 'pan' | null) => {
-    const isShapeTool = tool === 'rectangle' || tool === 'circle' || tool === 'text';
+  const handleToolSelect = useCallback((tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null) => {
+    const isShapeTool = tool === 'rectangle' || tool === 'circle' || tool === 'text' || tool === 'image';
     setUIState(prev => ({
       ...prev,
       selectedTool: tool,
@@ -171,7 +175,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   }, [])
 
   const handleCreateShapeWithOptions = useCallback((options: {
-    type: 'rectangle' | 'circle' | 'text'
+    type: 'rectangle' | 'circle' | 'text' | 'image'
     width?: number
     height?: number
     radius?: number
@@ -326,7 +330,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         {React.cloneElement(children as React.ReactElement<Partial<CanvasProps>>, {
           width: canvasSize.width,
           height: canvasSize.height,
-          shapes,
+          content,
           cursors,
           updateShape,
           onMouseMove,
@@ -380,7 +384,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
       <div className="absolute top-4 left-4 z-50 flex flex-col items-start space-y-2">
         <PositionWidget />
         <DraggablePropertiesPane
-          shapes={shapes}
+          content={content}
           selectedShape={selectedShape}
           onUpdateShape={updateShape}
           onSelectShape={handleShapeSelect}
@@ -397,7 +401,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 
       {/* Draggable Debug Widget */}
       <DraggableDebugWidget
-        shapes={shapes}
+        content={content}
         cursors={cursors}
         presence={presence}
         selectedShapeId={uiState.selectedShapeId}

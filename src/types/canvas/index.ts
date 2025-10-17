@@ -1,6 +1,6 @@
 
-// Base shape interface with common properties
-export interface BaseShape {
+// Base content interface with common properties
+export interface BaseContent {
   id: string;
   x: number;
   y: number;
@@ -16,31 +16,32 @@ export interface BaseShape {
   lockedByUserName?: string | null;
   lockedByUserColor?: string | null;
   lockedAt?: number | Date | null;
-  // Shape type and version for enhanced shapes
-  type: ShapeType;
-  version: ShapeVersion;
+  // Content type and version for enhanced content
+  type: ContentType;
+  version: ContentVersion;
 }
 
-// Shape type enum
-export const ShapeType = {
+// Content type enum
+export const ContentType = {
   RECTANGLE: 'rectangle',
   CIRCLE: 'circle',
   TEXT: 'text',
+  IMAGE: 'image',
 } as const;
 
-export type ShapeType = (typeof ShapeType)[keyof typeof ShapeType];
+export type ContentType = (typeof ContentType)[keyof typeof ContentType];
 
-// Shape version enum for backward compatibility
-export const ShapeVersion = {
+// Content version enum for backward compatibility
+export const ContentVersion = {
   V1: 'v1', // Original rectangles
-  V2: 'v2', // Enhanced shapes with new features
+  V2: 'v2', // Enhanced content with new features
 } as const;
 
-export type ShapeVersion = (typeof ShapeVersion)[keyof typeof ShapeVersion];
+export type ContentVersion = (typeof ContentVersion)[keyof typeof ContentVersion];
 
-// Rectangle type for canvas with Firestore integration (backward compatible)
-export interface Rectangle extends BaseShape {
-  type: typeof ShapeType.RECTANGLE;
+// Rectangle content type for canvas with Firestore integration (backward compatible)
+export interface RectangleContent extends BaseContent {
+  type: typeof ContentType.RECTANGLE;
   width: number;
   height: number;
   rotation: number;
@@ -51,18 +52,18 @@ export interface Rectangle extends BaseShape {
   cornerRadius?: number;
 }
 
-// Circle type for enhanced shapes
-export interface Circle extends BaseShape {
-  type: typeof ShapeType.CIRCLE;
+// Circle content type for enhanced content
+export interface CircleContent extends BaseContent {
+  type: typeof ContentType.CIRCLE;
   radius: number;
   fill: string;
   stroke?: string;
   strokeWidth?: number;
 }
 
-// Text type for enhanced shapes
-export interface Text extends BaseShape {
-  type: typeof ShapeType.TEXT;
+// Text content type for enhanced content
+export interface TextContent extends BaseContent {
+  type: typeof ContentType.TEXT;
   text: string;
   fontSize: number;
   fontFamily: FontFamily;
@@ -72,6 +73,19 @@ export interface Text extends BaseShape {
   height: number; // Text box height
   textAlign: TextAlign;
   verticalAlign: VerticalAlign;
+  // Text editing state
+  isEditing?: boolean;
+  editedBy?: string;
+}
+
+// Image content type for future implementation
+export interface ImageContent extends BaseContent {
+  type: typeof ContentType.IMAGE;
+  src: string;
+  width: number;
+  height: number;
+  alt?: string;
+  // Future: crop, filters, etc.
 }
 
 // Font family enum with 5 most popular fonts
@@ -114,24 +128,27 @@ export const VerticalAlign = {
 
 export type VerticalAlign = (typeof VerticalAlign)[keyof typeof VerticalAlign];
 
-// Union type for all shapes
-export type Shape = Rectangle | Circle | Text;
+// Union type for all content
+export type Content = RectangleContent | CircleContent | TextContent | ImageContent;
 
-// Type guards for shape type checking
-export const isRectangle = (shape: Shape): shape is Rectangle => shape.type === ShapeType.RECTANGLE;
+// Type guards for content type checking
+export const isRectangleContent = (content: Content): content is RectangleContent => content.type === ContentType.RECTANGLE;
 
-export const isCircle = (shape: Shape): shape is Circle => shape.type === ShapeType.CIRCLE;
+export const isCircleContent = (content: Content): content is CircleContent => content.type === ContentType.CIRCLE;
 
-export const isText = (shape: Shape): shape is Text => shape.type === ShapeType.TEXT;
+export const isTextContent = (content: Content): content is TextContent => content.type === ContentType.TEXT;
 
-// Enhanced shape properties for properties panel
-export interface ShapeProperties {
+export const isImageContent = (content: Content): content is ImageContent => content.type === ContentType.IMAGE;
+
+
+// Enhanced content properties for properties panel
+export interface ContentProperties {
   // Common properties
   id: string;
   x: number;
   y: number;
   fill: string;
-  // Shape-specific properties
+  // Content-specific properties
   width?: number;
   height?: number;
   radius?: number;
@@ -145,7 +162,11 @@ export interface ShapeProperties {
   fontStyle?: FontStyle;
   textAlign?: TextAlign;
   verticalAlign?: VerticalAlign;
+  // Image properties
+  src?: string;
+  alt?: string;
 }
+
 
 // Sync status enum
 export const SyncStatus = {
@@ -185,12 +206,12 @@ export interface StageConfig {
   scale: number;
 }
 
-// Shape creation options
-export interface ShapeCreationOptions {
-  type: ShapeType;
+// Content creation options
+export interface ContentCreationOptions {
+  type: ContentType;
   x: number;
   y: number;
-  // Default properties for each shape type
+  // Default properties for each content type
   rectangle?: {
     width: number;
     height: number;
@@ -214,10 +235,17 @@ export interface ShapeCreationOptions {
     textAlign: TextAlign;
     verticalAlign: VerticalAlign;
   };
+  image?: {
+    src: string;
+    width: number;
+    height: number;
+    alt?: string;
+  };
 }
 
-// Default values for shape creation
-export const DEFAULT_SHAPE_VALUES = {
+
+// Default values for content creation
+export const DEFAULT_CONTENT_VALUES = {
   rectangle: {
     width: 100,
     height: 60,
@@ -236,7 +264,7 @@ export const DEFAULT_SHAPE_VALUES = {
     rotation: 0,
   },
   text: {
-    text: 'Text',
+    text: 'hello world',
     fontSize: 16,
     fontFamily: 'Arial' as FontFamily,
     fontStyle: 'normal' as FontStyle,
@@ -248,4 +276,25 @@ export const DEFAULT_SHAPE_VALUES = {
     opacity: 1,
     rotation: 0,
   },
+  image: {
+    src: '',
+    width: 100,
+    height: 100,
+    alt: 'Image',
+  },
 } as const;
+
+// Legacy exports for backward compatibility during migration
+export type Shape = Content;
+export type Rectangle = RectangleContent;
+export type Circle = CircleContent;
+export type Text = TextContent;
+export const ShapeType = ContentType;
+export type ShapeType = ContentType;
+export const ShapeVersion = ContentVersion;
+export type ShapeVersion = ContentVersion;
+export const isRectangle = isRectangleContent;
+export const isCircle = isCircleContent;
+export const isText = isTextContent;
+export const DEFAULT_SHAPE_VALUES = DEFAULT_CONTENT_VALUES;
+

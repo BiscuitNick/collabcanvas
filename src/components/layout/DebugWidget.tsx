@@ -5,10 +5,10 @@ import { Switch } from '../ui/switch'
 import { Label } from '../ui/label'
 import { useCanvasStore } from '../../store/canvasStore'
 
-import type { Shape, Cursor, PresenceUser } from '../../types';
+import type { Content, Cursor, PresenceUser } from '../../types';
 
 interface DebugWidgetProps {
-  shapes: Shape[];
+  content: Content[];
   cursors: Cursor[];
   presence: PresenceUser[];
   selectedShapeId: string | null
@@ -23,7 +23,7 @@ interface DebugWidgetProps {
 }
 
 const DebugWidget: React.FC<DebugWidgetProps> = ({
-  shapes,
+  content,
   cursors,
   presence,
   selectedShapeId,
@@ -67,11 +67,11 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
 
         {/* Shapes Info */}
         <div>
-          <h4 className="font-medium text-gray-700 mb-1">Shapes ({shapes.length})</h4>
+          <h4 className="font-medium text-gray-700 mb-1">Content ({content.length})</h4>
           <div className="space-y-1 text-gray-600">
             <div>Selected: {selectedShapeId || 'None'}</div>
             <div className="text-xs">
-              {shapes.map(shape => (
+              {content.map(shape => (
                 <div key={shape.id} className="flex justify-between">
                   <span>{shape.type}</span>
                   <span className="text-gray-400">({Math.round(shape.x)}, {Math.round(shape.y)})</span>

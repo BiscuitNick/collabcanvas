@@ -3,41 +3,41 @@ import { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { firestore } from '../../lib/firebase';
 import { CANVAS_ID } from '../../lib/config';
-import type { Shape } from '../../types';
-import { ShapeVersion } from '../../types';
+import type { Content } from '../../types';
+import { ContentVersion } from '../../types';
 
 export const useFirestoreSync = (userUid: string | undefined) => {
-  const [shapes, setShapes] = useState<Shape[]>([]);
+  const [content, setContent] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const shapesStateRef = useRef<Shape[]>([]);
+  const contentStateRef = useRef<Content[]>([]);
   const activelyEditingRef = useRef<Set<string>>(new Set());
-  const isCreatingShape = useRef(false);
+  const isCreatingContent = useRef(false);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    shapesStateRef.current = shapes;
-  }, [shapes]);
+    contentStateRef.current = content;
+  }, [content]);
 
   useEffect(() => {
     if (!userUid) {
-      setShapes([]);
+      setContent([]);
       setLoading(false);
       return;
     }
 
-    const shapesRef = collection(firestore, 'canvases', CANVAS_ID, 'shapes');
-    const q = query(shapesRef, orderBy('createdAt', 'asc'));
+    const contentRef = collection(firestore, 'canvases', CANVAS_ID, 'content');
+    const q = query(contentRef, orderBy('createdAt', 'asc'));
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const shapesData: Shape[] = [];
+        const contentData: Content[] = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
-          const baseShape = {
+          const baseContent = {
             id: doc.id,
-            version: data.version || ShapeVersion.V1,
+            version: data.version || ContentVersion.V1,
             x: data.x,
             y: data.y,
             rotation: data.rotation || 0,
@@ -55,19 +55,43 @@ export const useFirestoreSync = (userUid: string | undefined) => {
           };
 
           if (data.type === 'rectangle') {
-            shapesData.push({ ...baseShape, type: 'rectangle', width: data.width, height: data.height });
+            contentData.push({ ...baseContent, type: 'rectangle', width: data.width, height: data.height, cornerRadius: data.cornerRadius });
           } else if (data.type === 'circle') {
-            shapesData.push({ ...baseShape, type: 'circle', radius: data.radius });
+            contentData.push({ ...baseContent, type: 'circle', radius: data.radius });
+          } else if (data.type === 'text') {
+            contentData.push({ 
+              ...baseContent, 
+              type: 'text', 
+              text: data.text,
+              fontSize: data.fontSize,
+              fontFamily: data.fontFamily,
+              fontStyle: data.fontStyle,
+              width: data.width,
+              height: data.height,
+              textAlign: data.textAlign,
+              verticalAlign: data.verticalAlign,
+              isEditing: data.isEditing || false,
+              editedBy: data.editedBy || null,
+            });
+          } else if (data.type === 'image') {
+            contentData.push({ 
+              ...baseContent, 
+              type: 'image', 
+              src: data.src,
+              width: data.width,
+              height: data.height,
+              alt: data.alt,
+            });
           }
         });
 
-        const mergedShapes = shapesData.map((remoteShape) => {
-          const local = shapesStateRef.current.find((s) => s.id === remoteShape.id);
-          const isActivelyEditing = activelyEditingRef.current.has(remoteShape.id);
+        const mergedContent = contentData.map((remoteContent) => {
+          const local = contentStateRef.current.find((c) => c.id === remoteContent.id);
+          const isActivelyEditing = activelyEditingRef.current.has(remoteContent.id);
           if (isActivelyEditing && local) {
             return local;
           }
-          return remoteShape;
+          return remoteContent;
         });
 
         if (updateTimeoutRef.current) {
@@ -75,14 +99,14 @@ export const useFirestoreSync = (userUid: string | undefined) => {
         }
 
         updateTimeoutRef.current = setTimeout(() => {
-          setShapes(mergedShapes);
+          setContent(mergedContent);
           setLoading(false);
           setError(null);
-        }, isCreatingShape.current ? 100 : 0);
+        }, isCreatingContent.current ? 100 : 0);
       },
       (err) => {
-        console.error('Error listening to shapes:', err);
-        setError('Failed to sync shapes');
+        console.error('Error listening to content:', err);
+        setError('Failed to sync content');
         setLoading(false);
       }
     );
@@ -95,5 +119,5 @@ export const useFirestoreSync = (userUid: string | undefined) => {
     };
   }, [userUid]);
 
-  return { shapes, setShapes, loading, error, activelyEditingRef, isCreatingShape };
+  return { content, setContent, loading, error, activelyEditingRef, isCreatingContent };
 };

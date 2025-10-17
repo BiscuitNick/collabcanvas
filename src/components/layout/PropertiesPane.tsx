@@ -209,7 +209,7 @@ const PropertiesPane: React.FC<PropertiesPaneProps> = ({
               <Input
                 id="fill-color"
                 type="color"
-                value={selectedShape.fill}
+                value={'fill' in selectedShape ? selectedShape.fill : '#000000'}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleColorChange(e.target.value)}
                 className="h-10"
               />

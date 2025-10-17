@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
-import { useShapes } from '../hooks/useShapes'
+import { useContent } from '../hooks/useContent'
 import { useCursors } from '../hooks/useCursors'
 import { usePresence } from '../hooks/usePresence'
 import { useCanvasStore } from '../store/canvasStore'
@@ -25,18 +25,26 @@ export const CanvasPage: React.FC = () => {
     const saved = localStorage.getItem('enableViewportCulling')
     return saved !== null ? JSON.parse(saved) : false
   })
-  const [, setVisibleShapesCount] = useState(0)
+  const [, setVisibleContentCount] = useState(0)
 
   // Initialize hooks
   const {
-    shapes,
-    updateShape,
-    loading: shapesLoading,
-    lockShape,
-    unlockShape,
-    startEditingShape,
-    stopEditingShape
-  } = useShapes()
+    content,
+    updateContent,
+    loading: contentLoading,
+    lockContent,
+    unlockContent,
+    startEditingContent,
+    stopEditingContent
+  } = useContent()
+  
+  // Legacy aliases for backward compatibility
+  const updateShape = updateContent
+  const lockShape = lockContent
+  const unlockShape = unlockContent
+  const startEditingShape = startEditingContent
+  const stopEditingShape = stopEditingContent
+  const setVisibleShapesCount = setVisibleContentCount
 
   const { stagePosition, stageScale, updatePosition } = useCanvasStore()
   
@@ -107,7 +115,7 @@ export const CanvasPage: React.FC = () => {
 
 
 
-  if (authLoading || shapesLoading) {
+  if (authLoading || contentLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -132,7 +140,7 @@ export const CanvasPage: React.FC = () => {
   return (
     <ErrorBoundary>
       <FullScreenLayout
-        shapes={shapes}
+        content={content}
         cursors={cursors}
         presence={presenceUsers}
         currentUserId={user?.uid || undefined}
@@ -149,7 +157,7 @@ export const CanvasPage: React.FC = () => {
         <Canvas
           width={canvasSize.width}
           height={canvasSize.height}
-          shapes={shapes}
+          content={content}
           cursors={cursors}
           updateShape={updateShape}
           onMouseMove={(x, y) => updateCursor(x, y)}

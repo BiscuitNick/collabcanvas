@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { Input } from '../ui/input'
 import { DEFAULT_SHAPE_VALUES } from '../../types'
-import type { ShapeType } from '../../types'
+import { ShapeType } from '../../types'
 
 interface ShapeCreationFormProps {
   selectedShape: ShapeType | null
   onShapeCreate: (options: {
-    type: ShapeType
+    type: 'rectangle' | 'circle' | 'text' | 'image'
     width?: number
     height?: number
     radius?: number

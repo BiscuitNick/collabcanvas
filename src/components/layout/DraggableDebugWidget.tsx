@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { Button } from '../ui/button'
 import DebugWidget from './DebugWidget'
-import type { Shape, Cursor as CursorType, PresenceUser } from '../../types'
+import type { Content, Cursor as CursorType, PresenceUser } from '../../types'
 
 interface DraggableDebugWidgetProps {
-  shapes: Shape[]
+  content: Content[]
   cursors: CursorType[]
   presence: PresenceUser[]
   selectedShapeId: string | null
@@ -20,7 +20,7 @@ interface DraggableDebugWidgetProps {
 }
 
 const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
-  shapes,
+  content,
   cursors,
   presence,
   selectedShapeId,
@@ -128,7 +128,7 @@ const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
         {/* Debug Widget Content */}
         <div className="p-3">
           <DebugWidget
-            shapes={shapes}
+            content={content}
             cursors={cursors}
             presence={presence}
             selectedShapeId={selectedShapeId}

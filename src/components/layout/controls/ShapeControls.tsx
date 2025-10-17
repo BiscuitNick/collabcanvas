@@ -3,7 +3,7 @@ import React from 'react';
 import { useCanvasStore } from '../../../store/canvasStore';
 import { useAuth } from '../../../hooks/useAuth';
 import { getRandomColor, getViewportCenter } from '../../../lib/utils';
-import { ShapeType, ShapeVersion } from '../../../types';
+import { ContentType, ContentVersion } from '../../../types';
 import type { Rectangle } from '../../../types';
 
 interface ShapeControlsProps {
@@ -34,8 +34,8 @@ const ShapeControls: React.FC<ShapeControlsProps> = ({
     try {
       const center = getViewportCenter(stagePosition, stageScale, viewportWidth, viewportHeight);
       const newRectangleData = {
-        type: ShapeType.RECTANGLE,
-        version: ShapeVersion.V2,
+        type: ContentType.RECTANGLE,
+        version: ContentVersion.V2,
         x: center.x - 50,
         y: center.y - 40,
         width: 100,

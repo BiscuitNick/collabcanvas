@@ -13,15 +13,15 @@ import {
 import { firestore } from '../lib/firebase'
 import { useCanvasStore } from '../store/canvasStore'
 import { SHAPE_RETRY_DELAY_MS, SHAPE_MAX_RETRIES, ENABLE_PERFORMANCE_LOGGING, CANVAS_ID } from '../lib/config'
-import type { Rectangle } from '../types'
-import { ShapeType, ShapeVersion } from '../types'
+import type { Shape } from '../types'
+import { ShapeVersion } from '../types'
 import { useAuth } from './useAuth'
 import { getUserColor } from '../lib/utils'
 
 interface UseShapesReturn {
-  shapes: Rectangle[]
-  createShape: (shape: Omit<Rectangle, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
-  updateShape: (id: string, updates: Partial<Rectangle>) => Promise<void>
+  shapes: Shape[]
+  createShape: (shape: Omit<Shape, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
+  updateShape: (id: string, updates: Partial<Shape>) => Promise<void>
   deleteShape: (id: string) => Promise<void>
   clearAllShapes: () => Promise<void>
   loading: boolean
@@ -35,7 +35,7 @@ interface UseShapesReturn {
 
 export const useShapes = (): UseShapesReturn => {
   const { user } = useAuth()
-  const [shapes, setShapes] = useState<Rectangle[]>([])
+  const [shapes, setShapes] = useState<Shape[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { updateShape: updateStoreShape, deleteShape: deleteStoreShape, setSyncStatus, clearAllShapes: clearAllShapesStore } = useCanvasStore()
@@ -44,7 +44,7 @@ export const useShapes = (): UseShapesReturn => {
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   const activelyEditingRef = useRef<Set<string>>(new Set())
-  const shapesStateRef = useRef<Rectangle[]>([])
+  const shapesStateRef = useRef<Shape[]>([])
   
   const LOCK_TTL_MS = 30000 // 30 seconds
   const lockCleanupIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -53,7 +53,7 @@ export const useShapes = (): UseShapesReturn => {
     shapesStateRef.current = shapes
   }, [shapes])
 
-  const throttledUpdate = useCallback(async (id: string, updates: Partial<Rectangle>) => {
+  const throttledUpdate = useCallback(async (id: string, updates: Partial<Shape>) => {
     try {
       const shapeRef = doc(firestore, 'canvases', CANVAS_ID, 'shapes', id)
       const updateData = {
@@ -94,19 +94,18 @@ export const useShapes = (): UseShapesReturn => {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const shapesData: Rectangle[] = []
+        const shapesData: Shape[] = []
         snapshot.forEach((doc) => {
           const data = doc.data()
-          shapesData.push({
+          const baseShape = {
             id: doc.id,
-            type: data.type || ShapeType.RECTANGLE,
             version: data.version || ShapeVersion.V1,
             x: data.x,
             y: data.y,
-            width: data.width,
-            height: data.height,
             rotation: data.rotation || 0,
             fill: data.fill,
+            stroke: data.stroke,
+            strokeWidth: data.strokeWidth,
             createdBy: data.createdBy,
             createdAt: data.createdAt,
             updatedAt: data.updatedAt,
@@ -114,8 +113,23 @@ export const useShapes = (): UseShapesReturn => {
             lockedByUserName: data.lockedByUserName || null,
             lockedByUserColor: data.lockedByUserColor || null,
             lockedAt: data.lockedAt || null,
-            syncStatus: 'synced'
-          })
+            syncStatus: 'synced' as const
+          };
+
+          if (data.type === 'rectangle') {
+            shapesData.push({
+              ...baseShape,
+              type: 'rectangle',
+              width: data.width,
+              height: data.height,
+            });
+          } else if (data.type === 'circle') {
+            shapesData.push({
+              ...baseShape,
+              type: 'circle',
+              radius: data.radius,
+            });
+          }
         })
         
         const mergedShapes = shapesData.map((remoteShape) => {
@@ -155,7 +169,7 @@ export const useShapes = (): UseShapesReturn => {
     }
   }, [user?.uid])
 
-  const createShape = useCallback(async (shapeData: Omit<Rectangle, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> => {
+  const createShape = useCallback(async (shapeData: Omit<Shape, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> => {
     try {
       isCreatingShape.current = true
       const shapesRef = collection(firestore, 'canvases', CANVAS_ID, 'shapes')
@@ -177,10 +191,10 @@ export const useShapes = (): UseShapesReturn => {
     }
   }, [setSyncStatus])
 
-  const updateShape = useCallback(async (id: string, updates: Partial<Rectangle>): Promise<void> => {
+  const updateShape = useCallback(async (id: string, updates: Partial<Shape>): Promise<void> => {
     try {
       activelyEditingRef.current.add(id)
-      updateStoreShape(id, { ...updates, syncStatus: 'pending' })
+      updateStoreShape(id, updates)
       setSyncStatus(id, 'pending')
       throttledUpdate(id, updates)
     } catch (err) {

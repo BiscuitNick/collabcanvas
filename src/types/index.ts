@@ -26,6 +26,9 @@ export interface BaseShape {
   createdAt: number | Date // Firestore Timestamp can be Date object too
   updatedAt: number | Date // Firestore Timestamp can be Date object too
   syncStatus?: SyncStatus // Local sync state
+  // Visual properties
+  opacity?: number // 0-1, default 1
+  rotation?: number // degrees, default 0
   // Collaborative locking (optional)
   lockedByUserId?: string | null
   lockedByUserName?: string | null
@@ -60,6 +63,8 @@ export interface Rectangle extends BaseShape {
   height: number
   rotation: number
   fill: string
+  stroke?: string
+  strokeWidth?: number
   // Corner radius for rounded rectangles
   cornerRadius?: number
 }
@@ -236,6 +241,7 @@ export const CursorContext = {
   GRAB: 'grab',
   GRABBING: 'grabbing',
   POINTER: 'pointer',
+  RESIZE: 'nw-resize', // Generic resize cursor
   RESIZE_NW: 'nw-resize',
   RESIZE_NE: 'ne-resize',
   RESIZE_SW: 'sw-resize',
@@ -244,7 +250,11 @@ export const CursorContext = {
   RESIZE_S: 's-resize',
   RESIZE_W: 'w-resize',
   RESIZE_E: 'e-resize',
+  ROTATE: 'grab', // Rotation cursor
+  ZOOM: 'zoom-in', // Zoom cursor
   TEXT: 'text',
+  NOT_ALLOWED: 'not-allowed',
+  WAIT: 'wait',
   CROSSHAIR: 'crosshair'
 } as const
 
@@ -304,3 +314,37 @@ export interface ShapeCreationOptions {
     verticalAlign: VerticalAlign
   }
 }
+
+// Default values for shape creation
+export const DEFAULT_SHAPE_VALUES = {
+  rectangle: {
+    width: 100,
+    height: 60,
+    fill: '#3b82f6',
+    stroke: '#1e40af',
+    strokeWidth: 2,
+    opacity: 1,
+    rotation: 0
+  },
+  circle: {
+    radius: 50,
+    fill: '#10b981',
+    stroke: '#047857',
+    strokeWidth: 2,
+    opacity: 1,
+    rotation: 0
+  },
+  text: {
+    text: 'Text',
+    fontSize: 16,
+    fontFamily: 'Arial' as FontFamily,
+    fontStyle: 'normal' as FontStyle,
+    textAlign: 'left' as TextAlign,
+    verticalAlign: 'top' as VerticalAlign,
+    fill: '#000000',
+    stroke: '#000000',
+    strokeWidth: 0,
+    opacity: 1,
+    rotation: 0
+  }
+} as const

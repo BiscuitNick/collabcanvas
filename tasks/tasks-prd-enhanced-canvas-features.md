@@ -14,13 +14,14 @@ Based on PRD: `prd-enhanced-canvas-features.md`
 - `src/components/canvas/ShapeFactory.test.tsx` - Unit tests for ShapeFactory
 - `src/components/canvas/Gridlines.tsx` - Gridlines overlay component
 - `src/components/canvas/Gridlines.test.tsx` - Unit tests for Gridlines component
-- `src/components/layout/PropertiesPane.tsx` - Collapsible properties panel component
+- `src/components/ui/` - shadcn/ui components (Button, Input, Select, etc.)
+- `src/components/layout/PropertiesPane.tsx` - Collapsible properties panel using shadcn/ui
 - `src/components/layout/PropertiesPane.test.tsx` - Unit tests for PropertiesPane
-- `src/components/layout/TopBar.tsx` - Top bar with user controls and zoom
+- `src/components/layout/TopBar.tsx` - Top bar with user controls and zoom using shadcn/ui
 - `src/components/layout/TopBar.test.tsx` - Unit tests for TopBar
-- `src/components/layout/BottomToolbar.tsx` - Bottom toolbar with shape creation tools
+- `src/components/layout/BottomToolbar.tsx` - Bottom toolbar with shape creation tools using shadcn/ui
 - `src/components/layout/BottomToolbar.test.tsx` - Unit tests for BottomToolbar
-- `src/components/layout/FullScreenLayout.tsx` - Full-screen layout wrapper
+- `src/components/layout/FullScreenLayout.tsx` - Full-screen layout wrapper using shadcn/ui
 - `src/components/layout/FullScreenLayout.test.tsx` - Unit tests for FullScreenLayout
 - `src/hooks/useShapesV2.ts` - Enhanced shapes hook with RTDB + Firestore dual sync
 - `src/hooks/useShapesV2.test.ts` - Unit tests for useShapesV2 hook
@@ -59,14 +60,16 @@ Based on PRD: `prd-enhanced-canvas-features.md`
   - [x] 1.6 Add comprehensive unit tests for all new shape components
   - [x] 1.7 Update existing Rectangle component to work with new shape system
 
-- [ ] 2.0 Implement Full-Screen UI with Floating Components
-  - [ ] 2.1 Create FullScreenLayout component with floating UI architecture
-  - [ ] 2.2 Build collapsible PropertiesPane component (left by default, movable to right)
-  - [ ] 2.3 Implement TopBar with user avatar, zoom dropdown, and share button
-  - [ ] 2.4 Create BottomToolbar with shape creation tools (rectangle, circle, text, AI)
-  - [ ] 2.5 Add contextual cursor management (grab hand for pan, pointer for shapes, resize cursors)
-  - [ ] 2.6 Implement pane positioning logic and state management
-  - [ ] 2.7 Add comprehensive unit tests for all layout components
+- [ ] 2.0 Implement Full-Screen UI with Floating Components (using shadcn/ui)
+  - [ ] 2.1 Setup shadcn/ui library and configure components
+  - [ ] 2.2 Create FullScreenLayout component with floating UI architecture
+  - [ ] 2.3 Build collapsible PropertiesPane component using shadcn/ui (Collapsible, ScrollArea, Separator)
+  - [ ] 2.4 Implement TopBar with user avatar, zoom dropdown, and share button using shadcn/ui (Avatar, DropdownMenu, Button)
+  - [ ] 2.5 Create BottomToolbar with shape creation tools using shadcn/ui (Button, Tooltip, Badge)
+  - [ ] 2.6 Add contextual cursor management (grab hand for pan, pointer for shapes, resize cursors)
+  - [ ] 2.7 Implement pane positioning logic and state management
+  - [ ] 2.8 Create shape properties controls using shadcn/ui (Input, Select, ColorPicker, Label, Switch)
+  - [ ] 2.9 Add comprehensive unit tests for all layout components
 
 - [ ] 3.0 Enhance Real-time Synchronization with RTDB
   - [ ] 3.1 Create useShapesV2 hook with dual RTDB + Firestore synchronization
@@ -78,21 +81,23 @@ Based on PRD: `prd-enhanced-canvas-features.md`
   - [ ] 3.7 Update Firestore security rules for shapes-v2 collection
   - [ ] 3.8 Add comprehensive integration tests for sync system
 
-- [ ] 4.0 Add Visual Enhancements and Professional Features
+- [ ] 4.0 Add Visual Enhancements and Professional Features (using shadcn/ui)
   - [ ] 4.1 Create Gridlines component with zoom-responsive scaling
   - [ ] 4.2 Implement smooth pan-to-element animations
-  - [ ] 4.3 Add visual feedback for all interactive elements (hover, selection, editing states)
-  - [ ] 4.4 Create enhanced properties panel with shape-specific controls
+  - [ ] 4.3 Add visual feedback for all interactive elements using shadcn/ui (hover, selection, editing states)
+  - [ ] 4.4 Create enhanced properties panel with shape-specific controls using shadcn/ui (Slider, Switch, ColorPicker)
   - [ ] 4.5 Implement contextual cursor changes based on interaction mode
   - [ ] 4.6 Add performance optimizations for 60 FPS target
-  - [ ] 4.7 Add comprehensive unit tests for visual enhancement components
+  - [ ] 4.7 Add loading states and skeletons using shadcn/ui (Skeleton, Spinner)
+  - [ ] 4.8 Add comprehensive unit tests for visual enhancement components
 
-- [ ] 5.0 Implement Advanced Features (Undo/Redo, AI Agent)
+- [ ] 5.0 Implement Advanced Features (Undo/Redo, AI Agent) using shadcn/ui
   - [ ] 5.1 Create useUndoRedo hook with action history management
   - [ ] 5.2 Implement undo/redo functionality for all shape operations
-  - [ ] 5.3 Create AI agent interface component for properties pane
-  - [ ] 5.4 Add AI agent integration to bottom toolbar
+  - [ ] 5.3 Create AI agent interface component using shadcn/ui (Dialog, Textarea, Card, Button)
+  - [ ] 5.4 Add AI agent integration to bottom toolbar with shadcn/ui components
   - [ ] 5.5 Implement action history persistence and cleanup
   - [ ] 5.6 Add keyboard shortcuts for undo/redo (Ctrl+Z, Ctrl+Y)
-  - [ ] 5.7 Add comprehensive unit tests for advanced features
-  - [ ] 5.8 Create migration utilities for existing canvases to access new features
+  - [ ] 5.7 Add toast notifications for user feedback using shadcn/ui (Toast)
+  - [ ] 5.8 Add comprehensive unit tests for advanced features
+  - [ ] 5.9 Create migration utilities for existing canvases to access new features

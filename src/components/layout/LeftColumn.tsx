@@ -5,7 +5,6 @@ import { getRandomColor, getViewportCenter } from '../../lib/utils'
 import { CANVAS_HALF } from '../../lib/constants'
 import type { Rectangle } from '../../types'
 import { ShapeType, ShapeVersion } from '../../types'
-import RectangleProperties from '../canvas/RectangleProperties'
 import AIWidget from '../canvas/AIWidget'
 import type { PresenceUser, Cursor as CursorType } from '../../types'
 
@@ -567,7 +566,7 @@ const LeftColumn: React.FC<LeftColumnProps> = ({
           {/* Rectangle Properties - Vertical Layout */}
           {selectedShapeId && (
             <div className="space-y-3">
-              <RectangleProperties selectedShapeId={selectedShapeId} />
+              {/* Properties panel moved to FullScreenLayout */}
             </div>
           )}
         </div>

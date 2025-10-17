@@ -4,8 +4,7 @@ import { useShapes } from '../hooks/useShapes'
 import { useCursors } from '../hooks/useCursors'
 import { usePresence } from '../hooks/usePresence'
 import { useCanvasStore } from '../store/canvasStore'
-import Layout from '../components/layout/Layout'
-import LeftColumn from '../components/layout/LeftColumn'
+import FullScreenLayout from '../components/layout/FullScreenLayout'
 import Canvas from '../components/canvas/Canvas'
 import FPSMonitor from '../components/canvas/FPSMonitor'
 import ErrorBoundary from '../components/ErrorBoundary'
@@ -15,46 +14,39 @@ export const CanvasPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth()
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const [pendingUserClick, setPendingUserClick] = useState<string | null>(null)
-  const [showSelfCursor, setShowSelfCursor] = useState(true)
-  const [showFPS, setShowFPS] = useState(() => {
+  const [showSelfCursor] = useState(true)
+  const [showFPS] = useState(() => {
     // Load from localStorage, default to true
     const saved = localStorage.getItem('showFPS')
     return saved !== null ? JSON.parse(saved) : true
   })
-  const [enableViewportCulling, setEnableViewportCulling] = useState(() => {
+  const [enableViewportCulling] = useState(() => {
     // Load from localStorage, default to false
     const saved = localStorage.getItem('enableViewportCulling')
     return saved !== null ? JSON.parse(saved) : false
   })
-  const [visibleShapesCount, setVisibleShapesCount] = useState(0)
+  const [, setVisibleShapesCount] = useState(0)
 
   // Initialize hooks
   const {
     shapes,
-    createShape,
     updateShape,
-    deleteShape,
-    clearAllShapes,
     loading: shapesLoading,
-    error: shapesError,
-    retry: retryShapes,
     lockShape,
     unlockShape,
     startEditingShape,
     stopEditingShape
   } = useShapes()
 
-  const { stagePosition, stageScale, updatePosition, selectShape } = useCanvasStore()
+  const { stagePosition, stageScale, updatePosition } = useCanvasStore()
   
   const {
     cursors,
-    updateCursor,
-    error: cursorsError
+    updateCursor
   } = useCursors(user?.uid || '', user?.displayName || 'Anonymous', stagePosition, canvasSize.width, canvasSize.height, stageScale)
 
   const {
-    presenceUsers,
-    error: presenceError
+    presenceUsers
   } = usePresence(user?.uid || '', user?.displayName || 'Anonymous')
 
   // Handle user click - auto pan to cursor (zoom-aware)
@@ -83,30 +75,6 @@ export const CanvasPage: React.FC = () => {
     }
   }, [cursors, canvasSize.width, canvasSize.height, stageScale, updatePosition])
 
-  // Handle shape click - auto pan to rectangle center (zoom-aware)
-  const handleShapeClick = useCallback((shapeId: string) => {
-    const shape = shapes.find(s => s.id === shapeId)
-    
-    if (shape) {
-      const centerX = shape.x + (shape.width / 2)
-      const centerY = shape.y + (shape.height / 2)
-
-      // Desired stage position to center the rectangle at current scale
-      const desiredX = (canvasSize.width / 2) - (centerX * stageScale)
-      const desiredY = (canvasSize.height / 2) - (centerY * stageScale)
-
-      // Clamp stage position to world bounds with scale
-      const minStageX = canvasSize.width - (CANVAS_HALF * stageScale)
-      const maxStageX = (CANVAS_HALF * stageScale)
-      const minStageY = canvasSize.height - (CANVAS_HALF * stageScale)
-      const maxStageY = (CANVAS_HALF * stageScale)
-
-      const clampedX = Math.max(minStageX, Math.min(maxStageX, desiredX))
-      const clampedY = Math.max(minStageY, Math.min(maxStageY, desiredY))
-      
-      updatePosition(clampedX, clampedY)
-    }
-  }, [shapes, canvasSize.width, canvasSize.height, stageScale, updatePosition])
 
   // Calculate canvas size based on viewport (left column is fixed at 320px)
   useEffect(() => {
@@ -137,19 +105,6 @@ export const CanvasPage: React.FC = () => {
     }
   }, [cursors, pendingUserClick, handleUserClick])
 
-  // Handle shape selection from the list
-  const handleShapeSelect = (shapeId: string) => {
-    selectShape(shapeId)
-    // Also pan to the selected shape
-    handleShapeClick(shapeId)
-  }
-
-  // Handle debug state changes from LeftColumn
-  const handleDebugStateChange = (selfCursor: boolean, showFPS: boolean, enableViewportCulling: boolean) => {
-    setShowSelfCursor(selfCursor)
-    setShowFPS(showFPS)
-    setEnableViewportCulling(enableViewportCulling)
-  }
 
 
   if (authLoading || shapesLoading) {
@@ -176,57 +131,41 @@ export const CanvasPage: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <Layout 
-        leftColumn={
-          <LeftColumn
-            viewportWidth={canvasSize.width}
-            viewportHeight={canvasSize.height}
-            createShape={createShape}
-            deleteShape={deleteShape}
-            clearAllShapes={clearAllShapes}
-            shapesError={shapesError || cursorsError || presenceError}
-            onRetry={retryShapes}
-            presenceUsers={presenceUsers}
-            cursors={cursors}
-            shapes={shapes}
-            onUserClick={handleUserClick}
-            onShapeSelect={handleShapeSelect}
-            onDebugStateChange={handleDebugStateChange}
-            visibleShapesCount={visibleShapesCount}
-          />
-        }
+      <FullScreenLayout
+        shapes={shapes}
+        cursors={cursors}
+        presence={presenceUsers}
+        currentUserId={user?.uid || undefined}
+        updateShape={updateShape}
+        onMouseMove={(x, y) => updateCursor(x, y)}
+        showSelfCursor={showSelfCursor}
+        enableViewportCulling={enableViewportCulling}
+        onVisibleShapesChange={setVisibleShapesCount}
+        lockShape={lockShape}
+        unlockShape={unlockShape}
+        startEditingShape={startEditingShape}
+        stopEditingShape={stopEditingShape}
       >
-        {/* Canvas Area - Takes remaining space */}
-        <div className="flex-1 flex items-center justify-center p-5 bg-gray-100 min-w-0">
-          <div 
-            className="bg-white overflow-hidden"
-            style={{
-              width: canvasSize.width,
-              height: canvasSize.height
-            }}
-          >
-            <Canvas
-              width={canvasSize.width}
-              height={canvasSize.height}
-              shapes={shapes}
-              cursors={cursors}
-              updateShape={updateShape}
-              onMouseMove={(x, y) => updateCursor(x, y)}
-              showSelfCursor={showSelfCursor}
-              currentUserId={user?.uid}
-              enableViewportCulling={enableViewportCulling}
-              onVisibleShapesChange={setVisibleShapesCount}
-              lockShape={lockShape}
-              unlockShape={unlockShape}
-              startEditingShape={startEditingShape}
-              stopEditingShape={stopEditingShape}
-            />
-          </div>
-        </div>
-        
-        {/* FPS Monitor Overlay */}
-        <FPSMonitor isEnabled={showFPS} />
-      </Layout>
+        <Canvas
+          width={canvasSize.width}
+          height={canvasSize.height}
+          shapes={shapes}
+          cursors={cursors}
+          updateShape={updateShape}
+          onMouseMove={(x, y) => updateCursor(x, y)}
+          showSelfCursor={showSelfCursor}
+          currentUserId={user?.uid}
+          enableViewportCulling={enableViewportCulling}
+          onVisibleShapesChange={setVisibleShapesCount}
+          lockShape={lockShape}
+          unlockShape={unlockShape}
+          startEditingShape={startEditingShape}
+          stopEditingShape={stopEditingShape}
+        />
+      </FullScreenLayout>
+      
+      {/* FPS Monitor Overlay */}
+      <FPSMonitor isEnabled={showFPS} />
     </ErrorBoundary>
   )
 }

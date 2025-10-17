@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react'
 
 interface FPSMonitorProps {
   isEnabled: boolean
+  onFPSUpdate?: (fps: number) => void
 }
 
-const FPSMonitor: React.FC<FPSMonitorProps> = ({ isEnabled }) => {
+const FPSMonitor: React.FC<FPSMonitorProps> = ({ isEnabled, onFPSUpdate }) => {
   const [fps, setFps] = useState(0)
   const frameCountRef = useRef(0)
   const animationFrameRef = useRef<number | undefined>(undefined)
@@ -36,7 +37,9 @@ const FPSMonitor: React.FC<FPSMonitorProps> = ({ isEnabled }) => {
         const averageFps = fpsHistoryRef.current.reduce((sum, fps) => sum + fps, 0) / fpsHistoryRef.current.length
         
         // Round to 0.1 precision
-        setFps(Math.round(averageFps * 10) / 10)
+        const roundedFps = Math.round(averageFps * 10) / 10
+        setFps(roundedFps)
+        onFPSUpdate?.(roundedFps)
         
         // Reset counters
         frameCountRef.current = 0

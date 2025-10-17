@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Rectangle, SyncStatus } from '../types'
+import type { Shape, SyncStatus } from '../types'
 
 interface CanvasState {
   // Stage position and scale
@@ -8,7 +8,7 @@ interface CanvasState {
   stageScale: number
   
   // Shapes array
-  shapes: Rectangle[]
+  shapes: Shape[]
   
   // Interaction states
   isPanning: boolean
@@ -22,7 +22,7 @@ interface CanvasState {
   shapeSyncStatus: Record<string, SyncStatus>
   
   // Pending updates queue for offline operations
-  pendingUpdates: Map<string, Partial<Rectangle>>
+  pendingUpdates: Map<string, Partial<Shape>>
   
   // Actions
   updatePosition: (x: number, y: number) => void
@@ -30,15 +30,15 @@ interface CanvasState {
   setPanning: (isPanning: boolean) => void
   setZooming: (isZooming: boolean) => void
   setDraggingShape: (isDraggingShape: boolean) => void
-  addShape: (shape: Rectangle) => void
-  updateShape: (id: string, updates: Partial<Rectangle>) => void
+  addShape: (shape: Shape) => void
+  updateShape: (id: string, updates: Partial<Shape>) => void
   deleteShape: (id: string) => void
   selectShape: (id: string | null) => void
   resetView: () => void
   setSyncStatus: (id: string, status: SyncStatus) => void
-  addPendingUpdate: (id: string, updates: Partial<Rectangle>) => void
+  addPendingUpdate: (id: string, updates: Partial<Shape>) => void
   clearPendingUpdates: () => void
-  setShapes: (shapes: Rectangle[]) => void
+  setShapes: (shapes: Shape[]) => void
   clearAllShapes: () => void
 }
 
@@ -62,8 +62,8 @@ export const useCanvasStore = create<CanvasState>()(
   },
   
   updateScale: (scale: number) => {
-    // Clamp scale between 0.1x and 3x
-    const clampedScale = Math.max(0.1, Math.min(3, scale))
+    // Clamp scale between 0.01x (1%) and 3x (300%)
+    const clampedScale = Math.max(0.01, Math.min(3, scale))
     set({ stageScale: clampedScale })
   },
   
@@ -79,16 +79,16 @@ export const useCanvasStore = create<CanvasState>()(
     set({ isDraggingShape })
   },
   
-  addShape: (shape: Rectangle) => {
+  addShape: (shape: Shape) => {
     set((state) => ({
       shapes: [...state.shapes, shape]
     }))
   },
   
-  updateShape: (id: string, updates: Partial<Rectangle>) => {
+  updateShape: (id: string, updates: Partial<Shape>) => {
     set((state) => ({
       shapes: state.shapes.map(shape =>
-        shape.id === id ? { ...shape, ...updates } : shape
+        shape.id === id ? { ...shape, ...updates } as Shape : shape
       )
     }))
   },
@@ -124,7 +124,7 @@ export const useCanvasStore = create<CanvasState>()(
     }))
   },
   
-  addPendingUpdate: (id: string, updates: Partial<Rectangle>) => {
+  addPendingUpdate: (id: string, updates: Partial<Shape>) => {
     set((state) => {
       const newPendingUpdates = new Map(state.pendingUpdates)
       newPendingUpdates.set(id, updates)
@@ -136,7 +136,7 @@ export const useCanvasStore = create<CanvasState>()(
     set({ pendingUpdates: new Map() })
   },
   
-  setShapes: (shapes: Rectangle[]) => {
+  setShapes: (shapes: Shape[]) => {
     set({ shapes })
   },
   

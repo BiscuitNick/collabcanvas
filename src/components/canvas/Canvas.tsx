@@ -3,17 +3,19 @@ import { Stage, Layer } from 'react-konva'
 import Konva from 'konva' // Import Konva for types
 import { useCanvasStore } from '../../store/canvasStore'
 import CanvasErrorBoundary from './CanvasErrorBoundary'
-import RectangleComponent from './Rectangle'
+import ShapeFactory from './ShapeFactory'
 import Cursor from '../multiplayer/Cursor'
-import type { Rectangle, Cursor as CursorType } from '../../types'
+import type { Shape, Cursor as CursorType } from '../../types'
 import { CANVAS_HALF } from '../../lib/constants'
+import { getZoomStep } from '../../lib/utils'
+import { useCursorContext } from '../../hooks/useCursorContext'
 
 interface CanvasProps {
   width: number
   height: number
-  shapes: Rectangle[]
+  shapes: Shape[]
   cursors: CursorType[]
-  updateShape: (id: string, updates: Partial<Rectangle>) => Promise<void>
+  updateShape: (id: string, updates: Partial<Shape>) => Promise<void>
   onMouseMove: (x: number, y: number, canvasWidth: number, canvasHeight: number) => void
   showSelfCursor?: boolean
   currentUserId?: string
@@ -23,6 +25,16 @@ interface CanvasProps {
   unlockShape?: (id: string) => Promise<void>
   startEditingShape?: (id: string) => void
   stopEditingShape?: (id: string) => void
+  onShapeSelect?: (shapeId: string) => void
+  onDragStart?: () => void
+  onDragEnd?: () => void
+  onPanStart?: () => void
+  onPanEnd?: () => void
+  onResizeStart?: () => void
+  onResizeEnd?: () => void
+  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'ai' | 'pan' | null
+  onCanvasClick?: (event: { x: number; y: number }) => void
+  isCreatingShape?: boolean
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -39,7 +51,14 @@ const Canvas: React.FC<CanvasProps> = ({
   lockShape,
   unlockShape,
   startEditingShape,
-  stopEditingShape
+  stopEditingShape,
+  onDragStart,
+  onDragEnd,
+  onPanStart,
+  onPanEnd,
+  selectedTool,
+  onCanvasClick,
+  isCreatingShape = false
 }) => {
   const stageRef = useRef<Konva.Stage>(null)
   const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null)
@@ -59,6 +78,14 @@ const Canvas: React.FC<CanvasProps> = ({
     setDraggingShape,
     selectShape
   } = useCanvasStore()
+
+  // Apply cursor context based on selected tool and interaction state
+  useCursorContext({
+    selectedTool: selectedTool || null,
+    isDragging: isDraggingShape,
+    isPanning: isPanning,
+    isResizing: false // TODO: Add resize state when implementing shape resizing
+  })
 
   // Canvas bounds - 64000x64000 with center at (0,0) for infinite feel
   // Moved to src/lib/constants.ts
@@ -84,6 +111,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
       setPanning(true)
       setZooming(false)
+      onPanStart?.()
     } catch (error) {
       console.error('Error in handleDragStart:', error)
     }
@@ -95,6 +123,7 @@ const Canvas: React.FC<CanvasProps> = ({
       if (isDraggingShape) return
 
       setPanning(false)
+      onPanEnd?.()
       const clampedPos = clampPosition(e.target.x(), e.target.y())
       updatePosition(clampedPos.x, clampedPos.y)
 
@@ -127,7 +156,6 @@ const Canvas: React.FC<CanvasProps> = ({
 
       setZooming(true)
 
-      const scaleBy = 1.1
       const stage = e.target.getStage()
       const oldScale = stage?.scaleX()
       const pointer = stage?.getPointerPosition()
@@ -137,23 +165,28 @@ const Canvas: React.FC<CanvasProps> = ({
         return
       }
 
-      // Get the point in canvas space before zoom
-      const mousePointTo = {
-        x: (pointer.x - stage.x()) / oldScale,
-        y: (pointer.y - stage.y()) / oldScale,
-      }
-
-      const newScale = e.evt.deltaY > 0 ? oldScale * scaleBy : oldScale / scaleBy
-      const clampedScale = Math.max(0.1, Math.min(3, newScale))
+      // Determine the zoom step based on the current scale
+      const currentPercentage = Math.round(oldScale * 100)
+      const step = getZoomStep(currentPercentage)
+      
+      // Determine new scale by adding/subtracting the step percentage
+      const newPercentage = e.evt.deltaY > 0
+        ? Math.max(1, currentPercentage - step)
+        : Math.min(300, currentPercentage + step)
+      
+      const newScale = newPercentage / 100
+      
+      // The store's updateScale function already clamps the value,
+      // but we call it here to keep the state in sync.
+      updateScale(newScale)
 
       // Calculate new stage position to keep the mouse point fixed
       const newPos = {
-        x: pointer.x - mousePointTo.x * clampedScale,
-        y: pointer.y - mousePointTo.y * clampedScale,
+        x: pointer.x - (pointer.x - stage.x()) / oldScale * newScale,
+        y: pointer.y - (pointer.y - stage.y()) / oldScale * newScale,
       }
 
       setZooming(false)
-      updateScale(clampedScale)
       
       const clampedPos = clampPosition(newPos.x, newPos.y)
       updatePosition(clampedPos.x, clampedPos.y)
@@ -164,10 +197,23 @@ const Canvas: React.FC<CanvasProps> = ({
   }
 
 
-  // Handle stage click to deselect
+  // Handle stage click to deselect or create shape
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     if (e.target === e.target.getStage()) {
-      // Unlock current shape before deselecting
+      // If we're creating a shape, handle that first
+      if (isCreatingShape && onCanvasClick) {
+        const stage = e.target.getStage()
+        const pointerPosition = stage.getPointerPosition()
+        if (pointerPosition) {
+          // Convert to canvas coordinates (accounting for scale and position)
+          const x = (pointerPosition.x - stagePosition.x) / stageScale
+          const y = (pointerPosition.y - stagePosition.y) / stageScale
+          onCanvasClick({ x, y })
+          return
+        }
+      }
+      
+      // Otherwise, deselect current shape
       if (selectedShapeId && unlockShape) {
         console.log('🔓 Attempting to unlock shape:', selectedShapeId)
         unlockShape(selectedShapeId)
@@ -199,8 +245,8 @@ const Canvas: React.FC<CanvasProps> = ({
     // For now, we'll let the cursor remain visible
   }
 
-  // Handle rectangle selection
-  const handleRectangleSelect = useCallback((shapeId: string) => {
+  // Handle shape selection
+  const handleShapeSelect = useCallback((shapeId: string) => {
     console.log('🎯 Selecting shape:', shapeId)
     
     // Find the shape to check if it's locked
@@ -224,27 +270,29 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   }, [selectShape, lockShape, unlockShape, selectedShapeId, shapes, currentUserId])
 
-  // Handle rectangle updates
-  const handleRectangleUpdate = useCallback((shapeId: string, updates: Partial<Rectangle>) => {
+  // Handle shape updates
+  const handleShapeUpdate = useCallback((shapeId: string, updates: Partial<Shape>) => {
     updateShape(shapeId, updates)
   }, [updateShape])
 
-  // Handle rectangle drag start
-  const handleRectangleDragStart = useCallback((shapeId: string) => {
+  // Handle shape drag start
+  const handleShapeDragStart = useCallback((shapeId: string) => {
     setDraggingShape(true)
     startEditingShape?.(shapeId)
-  }, [startEditingShape])
+    onDragStart?.()
+  }, [startEditingShape, onDragStart])
 
-  // Handle rectangle drag move (real-time updates while dragging)
-  const handleRectangleDragMove = useCallback((shapeId: string, x: number, y: number) => {
+  // Handle shape drag move (real-time updates while dragging)
+  const handleShapeDragMove = useCallback((shapeId: string, x: number, y: number) => {
     updateShape(shapeId, { x, y })
   }, [updateShape])
 
-  // Handle rectangle drag end
-  const handleRectangleDragEnd = useCallback((shapeId: string, x: number, y: number) => {
+  // Handle shape drag end
+  const handleShapeDragEnd = useCallback((shapeId: string, x: number, y: number) => {
     updateShape(shapeId, { x, y })
     stopEditingShape?.(shapeId)
-  }, [updateShape, stopEditingShape])
+    onDragEnd?.()
+  }, [updateShape, stopEditingShape, onDragEnd])
 
   // Mobile touch handlers
   const getTouchDistance = (touches: TouchList) => {
@@ -375,7 +423,7 @@ const Canvas: React.FC<CanvasProps> = ({
   }, [stageScale, updateScale, selectShape])
 
   // Viewport culling: Only render shapes visible in the viewport
-  const getVisibleShapes = useCallback((shapesToFilter: Rectangle[]) => {
+  const getVisibleShapes = useCallback((shapesToFilter: Shape[]) => {
     if (!enableViewportCulling) return shapesToFilter
 
     // Calculate viewport bounds in canvas coordinates
@@ -390,11 +438,28 @@ const Canvas: React.FC<CanvasProps> = ({
     const padding = 500 / stageScale
 
     return shapesToFilter.filter(shape => {
+      // Get shape bounds based on type
+      let shapeWidth, shapeHeight
+      
+      if ('width' in shape && 'height' in shape) {
+        // Rectangle or Text
+        shapeWidth = shape.width
+        shapeHeight = shape.height
+      } else if ('radius' in shape) {
+        // Circle
+        shapeWidth = shape.radius * 2
+        shapeHeight = shape.radius * 2
+      } else {
+        // Fallback for unknown shapes
+        shapeWidth = 100
+        shapeHeight = 100
+      }
+
       // Check if shape is within visible bounds (with padding)
       return !(
-        shape.x + shape.width < viewportBounds.left - padding ||
+        shape.x + shapeWidth < viewportBounds.left - padding ||
         shape.x > viewportBounds.right + padding ||
-        shape.y + shape.height < viewportBounds.top - padding ||
+        shape.y + shapeHeight < viewportBounds.top - padding ||
         shape.y > viewportBounds.bottom + padding
       )
     })
@@ -422,20 +487,20 @@ const Canvas: React.FC<CanvasProps> = ({
   // Memoize shapes rendering to prevent unnecessary re-renders
   const renderedShapes = useMemo(() => {
     return visibleShapes.map((shape) => (
-      <RectangleComponent
+      <ShapeFactory
         key={shape.id}
         shape={shape}
         isSelected={selectedShapeId === shape.id}
-        onSelect={() => handleRectangleSelect(shape.id)}
-        onUpdate={(updates) => handleRectangleUpdate(shape.id, updates)}
-        onDragMove={(x, y) => handleRectangleDragMove(shape.id, x, y)}
-        onDragEnd={(x, y) => handleRectangleDragEnd(shape.id, x, y)}
-        onDragStart={() => handleRectangleDragStart(shape.id)}
+        onSelect={() => handleShapeSelect(shape.id)}
+        onUpdate={(updates) => handleShapeUpdate(shape.id, updates)}
+        onDragMove={(x, y) => handleShapeDragMove(shape.id, x, y)}
+        onDragEnd={(x, y) => handleShapeDragEnd(shape.id, x, y)}
+        onDragStart={() => handleShapeDragStart(shape.id)}
         onDragEndCallback={() => setDraggingShape(false)}
         currentUserId={currentUserId}
       />
     ))
-  }, [visibleShapes, selectedShapeId, handleRectangleSelect, handleRectangleUpdate, handleRectangleDragMove, handleRectangleDragEnd, handleRectangleDragStart, setDraggingShape, currentUserId])
+  }, [visibleShapes, selectedShapeId, handleShapeSelect, handleShapeUpdate, handleShapeDragMove, handleShapeDragEnd, handleShapeDragStart, setDraggingShape, currentUserId])
 
   return (
     <CanvasErrorBoundary>

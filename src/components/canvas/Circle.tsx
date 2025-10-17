@@ -38,16 +38,8 @@ const CircleComponent: React.FC<CircleProps> = memo(({
   // Check if shape is locked by another user
   const isLockedByOther = shape.lockedByUserId && shape.lockedByUserId !== currentUserId
   
-  // Debug: Log lock color info
-  if (isLockedByOther) {
-    console.log('🎨 Locked circle color:', {
-      shapeId: shape.id,
-      lockedByUserId: shape.lockedByUserId,
-      lockedByUserName: shape.lockedByUserName,
-      lockedByUserColor: shape.lockedByUserColor,
-      currentUserId
-    })
-  }
+  // Implement radius fallback
+  const effectiveRadius = shape.radius || 50 // Fallback to 50 if radius is undefined/null
 
   // Throttled drag move function
   const throttledDragMove = useCallback((x: number, y: number) => {
@@ -73,7 +65,7 @@ const CircleComponent: React.FC<CircleProps> = memo(({
         const startTime = ENABLE_PERFORMANCE_LOGGING ? performance.now() : 0
         
         // Clamp position within canvas bounds (using diameter for bounds checking)
-        const diameter = shape.radius * 2
+        const diameter = effectiveRadius * 2
         const clampedX = clamp(pendingUpdate.x, -CANVAS_HALF, CANVAS_HALF - diameter)
         const clampedY = clamp(pendingUpdate.y, -CANVAS_HALF, CANVAS_HALF - diameter)
         
@@ -87,7 +79,7 @@ const CircleComponent: React.FC<CircleProps> = memo(({
         }
       }
     }, RECTANGLE_DRAG_DEBOUNCE_MS)
-  }, [onDragMove, shape.radius])
+  }, [onDragMove, effectiveRadius])
 
   // Update transformer when selection changes
   useEffect(() => {
@@ -115,9 +107,6 @@ const CircleComponent: React.FC<CircleProps> = memo(({
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true
     // Allow viewing details but not editing if locked by another user
-    if (isLockedByOther) {
-      console.log('👁️ Viewing locked circle details:', shape.lockedByUserName)
-    }
     // Always call onSelect to show details in panel
     onSelect()
   }
@@ -125,7 +114,6 @@ const CircleComponent: React.FC<CircleProps> = memo(({
   const handleDragStart = () => {
     // Only allow drag if shape is selected
     if (!isSelected) {
-      console.log('❌ Cannot drag - circle must be selected first')
       return
     }
     // Notify parent that dragging has started
@@ -147,7 +135,7 @@ const CircleComponent: React.FC<CircleProps> = memo(({
     const circleY = e.target.y()
     
     // Clamp position within canvas bounds (using diameter for bounds checking)
-    const diameter = shape.radius * 2
+    const diameter = effectiveRadius * 2
     const clampedX = clamp(circleX, -CANVAS_HALF, CANVAS_HALF - diameter)
     const clampedY = clamp(circleY, -CANVAS_HALF, CANVAS_HALF - diameter)
     
@@ -204,7 +192,7 @@ const CircleComponent: React.FC<CircleProps> = memo(({
         ref={circleRef}
         x={shape.x}
         y={shape.y}
-        radius={shape.radius}
+        radius={effectiveRadius}
         fill={shape.fill}
         stroke={shape.stroke || 'transparent'}
         strokeWidth={shape.strokeWidth || 0}

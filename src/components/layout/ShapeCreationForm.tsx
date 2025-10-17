@@ -6,7 +6,7 @@ import { ShapeType } from '../../types'
 interface ShapeCreationFormProps {
   selectedShape: ShapeType | null
   onShapeCreate: (options: {
-    type: 'rectangle' | 'circle' | 'text' | 'image'
+    type: 'rectangle' | 'circle' | 'image'
     width?: number
     height?: number
     radius?: number

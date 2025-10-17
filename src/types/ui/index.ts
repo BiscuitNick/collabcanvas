@@ -1,5 +1,4 @@
 
-import { FontFamily, FontStyle } from '../canvas';
 
 // Interaction state type
 export interface InteractionState {
@@ -70,10 +69,3 @@ export interface GridlinesConfig {
   strokeWidth: number;
 }
 
-// Font configuration for text shapes
-export interface FontConfig {
-  family: FontFamily;
-  size: number;
-  style: FontStyle;
-  color: string;
-}

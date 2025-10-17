@@ -34,7 +34,7 @@ interface UIState {
   propertiesPaneVisible: boolean
   gridlinesVisible: boolean
   selectedShapeId: string | null
-  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null
+  selectedTool: 'select' | 'rectangle' | 'circle' | 'image' | 'ai' | 'pan' | null
   aiAgentActive: boolean
   isDragging: boolean
   isPanning: boolean
@@ -45,7 +45,7 @@ interface UIState {
   enableViewportCulling: boolean
   fps: number
   shapeCreationOptions?: {
-    type: 'rectangle' | 'circle' | 'text' | 'image'
+    type: 'rectangle' | 'circle' | 'image'
     width?: number
     height?: number
     radius?: number
@@ -159,8 +159,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 
 
   // Toolbar handlers
-  const handleToolSelect = useCallback((tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null) => {
-    const isShapeTool = tool === 'rectangle' || tool === 'circle' || tool === 'text' || tool === 'image';
+  const handleToolSelect = useCallback((tool: 'select' | 'rectangle' | 'circle' | 'image' | 'ai' | 'pan' | null) => {
+    const isShapeTool = tool === 'rectangle' || tool === 'circle' || tool === 'image';
     setUIState(prev => ({
       ...prev,
       selectedTool: tool,
@@ -175,7 +175,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   }, [])
 
   const handleCreateShapeWithOptions = useCallback((options: {
-    type: 'rectangle' | 'circle' | 'text' | 'image'
+    type: 'rectangle' | 'circle' | 'image'
     width?: number
     height?: number
     radius?: number
@@ -380,9 +380,24 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         </div>
       )}
 
-      {/* Floating Widgets - Top Left */}
-      <div className="absolute top-4 left-4 z-50 flex flex-col items-start space-y-2">
+      {/* Floating Position Widget - Top Left */}
+      <div className="absolute top-4 left-4 z-50">
         <PositionWidget />
+      </div>
+
+      {/* Floating Zoom Widget - Top Right */}
+      <div className="absolute top-4 right-4 z-50">
+        <ZoomWidget />
+      </div>
+
+      {/* Floating Layers Panel - Left with dynamic height */}
+      <div 
+        className="absolute left-4 z-50"
+        style={{
+          top: 'calc(1rem + 40px + 1rem)', // top-4 + PositionWidget height + gap
+          bottom: '1rem' // bottom-4
+        }}
+      >
         <DraggablePropertiesPane
           content={content}
           selectedShape={selectedShape}
@@ -391,11 +406,6 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           isVisible={uiState.propertiesPaneVisible}
           onClose={closePropertiesPane}
         />
-      </div>
-
-      {/* Floating Zoom Widget - Top Right */}
-      <div className="absolute top-4 right-4 z-50">
-        <ZoomWidget />
       </div>
 
 

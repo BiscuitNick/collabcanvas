@@ -23,7 +23,7 @@ export interface AIResponse {
 
 export interface CanvasCommand {
   action: 'create' | 'move' | 'resize' | 'rotate';
-  type?: 'rectangle' | 'circle' | 'text';
+  type?: 'rectangle' | 'circle';
   x?: number;
   y?: number;
   width?: number;

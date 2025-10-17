@@ -101,10 +101,6 @@ const AIWidget: React.FC<AIWidgetProps> = ({
             console.warn('Invalid rectangle command, skipping:', command)
             continue
           }
-        } else if (command.action === 'create' && command.type === 'text') {
-          // Skip text shapes (these are usually fallback responses with JSON content)
-          console.warn('Skipping text shape command (likely fallback response):', command.text?.substring(0, 50))
-          continue
         } else {
           console.warn('Unsupported command, skipping:', command.action, command.type)
           continue

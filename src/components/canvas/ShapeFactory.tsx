@@ -1,9 +1,8 @@
 import React from 'react'
 import Rectangle from './Rectangle'
 import Circle from './Circle'
-import Text from './Text'
-import type { Shape, Rectangle as RectangleType, Circle as CircleType, Text as TextType } from '../../types'
-import { isRectangle, isCircle, isText } from '../../types'
+import type { Shape, Rectangle as RectangleType, Circle as CircleType } from '../../types'
+import { isRectangle, isCircle } from '../../types'
 
 interface ShapeFactoryProps {
   shape: Shape
@@ -73,22 +72,6 @@ const ShapeFactory: React.FC<ShapeFactoryProps> = ({
     )
   }
 
-  // Render Text component
-  if (isText(shape)) {
-    return (
-      <Text
-        shape={shape as TextType}
-        isSelected={isSelected}
-        onSelect={onSelect}
-        onUpdate={onUpdate as (updates: Partial<TextType>) => void}
-        onDragMove={onDragMove}
-        onDragEnd={onDragEnd}
-        onDragStart={onDragStart}
-        onDragEndCallback={onDragEndCallback}
-        currentUserId={currentUserId}
-      />
-    )
-  }
 
   // Fallback for unknown shape types
   console.warn('Unknown shape type:', shape)

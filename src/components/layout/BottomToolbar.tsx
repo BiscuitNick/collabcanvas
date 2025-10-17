@@ -9,7 +9,6 @@ import {
 import { 
   Square, 
   Circle, 
-  Type, 
   Hand, 
   MousePointer2, 
   ImagePlus,
@@ -23,9 +22,9 @@ import ShapeCreationForm from './ShapeCreationForm'
 import { ShapeType } from '../../types'
 
 interface BottomToolbarProps {
-  onCreateShape: (type: 'rectangle' | 'circle' | 'text' | 'image') => void
+  onCreateShape: (type: 'rectangle' | 'circle' | 'image') => void
   onCreateShapeWithOptions: (options: {
-    type: 'rectangle' | 'circle' | 'text' | 'image'
+    type: 'rectangle' | 'circle' | 'image'
     width?: number
     height?: number
     radius?: number
@@ -34,14 +33,14 @@ interface BottomToolbarProps {
     strokeWidth: number
   }) => void
   onOpenAIAgent: () => void
-  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null
-  onToolSelect: (tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null) => void
+  selectedTool: 'select' | 'rectangle' | 'circle' | 'image' | 'ai' | 'pan' | null
+  onToolSelect: (tool: 'select' | 'rectangle' | 'circle' | 'image' | 'ai' | 'pan' | null) => void
   debugMode: boolean
   onToggleDebug: () => void
   onResetCanvas: () => void
 }
 
-type ToolType = 'pan' | 'select' | 'text' | 'shapes' | 'ai'
+type ToolType = 'pan' | 'select' | 'shapes' | 'ai'
 
 const BottomToolbar: React.FC<BottomToolbarProps> = ({
   onCreateShapeWithOptions,
@@ -76,15 +75,13 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   const tools = [
     { id: 'pan' as ToolType, label: 'Hand Tool', icon: Hand, description: 'Pan around the canvas' },
     { id: 'select' as ToolType, label: 'Selection Tool', icon: MousePointer2, description: 'Select and move objects' },
-    { id: 'text' as ToolType, label: 'Text Tool', icon: Type, description: 'Add text elements' },
     { id: 'shapes' as ToolType, label: 'Shapes Tool', icon: Shapes, description: 'Create shapes' },
     { id: 'ai' as ToolType, label: 'AI Tool', icon: ImagePlus, description: 'Open AI assistant' }
   ]
 
   const shapes = [
     { type: 'rectangle' as ShapeType, label: 'Rectangle', icon: Square },
-    { type: 'circle' as ShapeType, label: 'Circle', icon: Circle },
-    { type: 'text' as ShapeType, label: 'Text', icon: Type }
+    { type: 'circle' as ShapeType, label: 'Circle', icon: Circle }
   ]
 
   const handleToolSelect = (tool: ToolType) => {

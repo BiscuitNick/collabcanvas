@@ -33,9 +33,9 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
   });
 
   return (
-    <div className="w-64 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg flex flex-col">
+    <div className="w-64 h-full bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-2 border-b border-gray-200">
+      <div className="flex items-center justify-between p-3 border-b border-gray-200 flex-shrink-0">
         <h3 className="text-sm font-medium text-gray-700">Layers</h3>
         <Button
           variant="ghost"
@@ -48,8 +48,8 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
         </Button>
       </div>
 
-      {/* Shape List */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Shape List - Scrollable Content */}
+      <div className="flex-1 overflow-y-auto min-h-0">
         {sortedContent.length > 0 ? (
           <Accordion
             type="single"
@@ -72,7 +72,9 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
             ))}
           </Accordion>
         ) : (
-          <p className="p-3 text-xs text-gray-500">No content on canvas.</p>
+          <div className="p-3">
+            <p className="text-xs text-gray-500">No content on canvas.</p>
+          </div>
         )}
       </div>
     </div>

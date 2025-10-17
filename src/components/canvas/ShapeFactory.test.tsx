@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import ShapeFactory from './ShapeFactory'
-import type { Rectangle, Circle, Text } from '../../types'
-import { ShapeType, ShapeVersion, FontFamily, FontStyle, TextAlign, VerticalAlign } from '../../types'
+import type { Rectangle, Circle } from '../../types'
+import { ShapeType, ShapeVersion } from '../../types'
 
 // Mock the individual shape components
 vi.mock('./Rectangle', () => ({
@@ -21,13 +21,6 @@ vi.mock('./Circle', () => ({
   )
 }))
 
-vi.mock('./Text', () => ({
-  default: ({ shape, isSelected, onSelect }: { shape: Text; isSelected: boolean; onSelect: () => void }) => (
-    <div data-testid="text-component" data-shape-id={shape.id} data-selected={isSelected} onClick={onSelect}>
-      Text: {shape.id}
-    </div>
-  )
-}))
 
 describe('ShapeFactory Component', () => {
   const mockRectangle: Rectangle = {
@@ -58,25 +51,6 @@ describe('ShapeFactory Component', () => {
     updatedAt: Date.now()
   }
 
-  const mockText: Text = {
-    id: 'text-1',
-    type: ShapeType.TEXT,
-    version: ShapeVersion.V2,
-    x: 300,
-    y: 300,
-    text: 'Hello World',
-    fontSize: 16,
-    fontFamily: FontFamily.ARIAL,
-    fontStyle: FontStyle.NORMAL,
-    fill: '#000000',
-    width: 200,
-    height: 50,
-    textAlign: TextAlign.LEFT,
-    verticalAlign: VerticalAlign.TOP,
-    createdBy: 'user-1',
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  }
 
   const defaultProps = {
     isSelected: false,
@@ -130,24 +104,6 @@ describe('ShapeFactory Component', () => {
     })
   })
 
-  describe('Text Rendering', () => {
-    it('should render Text component for text shapes', () => {
-      render(<ShapeFactory {...defaultProps} shape={mockText} />)
-      
-      const text = screen.getByTestId('text-component')
-      expect(text).toBeInTheDocument()
-      expect(text).toHaveAttribute('data-shape-id', 'text-1')
-      expect(text).toHaveAttribute('data-selected', 'false')
-      expect(text).toHaveTextContent('Text: text-1')
-    })
-
-    it('should pass correct props to Text component', () => {
-      render(<ShapeFactory {...defaultProps} shape={mockText} isSelected={true} />)
-      
-      const text = screen.getByTestId('text-component')
-      expect(text).toHaveAttribute('data-selected', 'true')
-    })
-  })
 
   describe('Event Handling', () => {
     it('should handle onSelect events for rectangles', () => {
@@ -168,14 +124,6 @@ describe('ShapeFactory Component', () => {
       expect(defaultProps.onSelect).toHaveBeenCalledTimes(1)
     })
 
-    it('should handle onSelect events for text', () => {
-      render(<ShapeFactory {...defaultProps} shape={mockText} />)
-      
-      const text = screen.getByTestId('text-component')
-      text.click()
-      
-      expect(defaultProps.onSelect).toHaveBeenCalledTimes(1)
-    })
   })
 
   describe('Type Safety', () => {
@@ -183,7 +131,6 @@ describe('ShapeFactory Component', () => {
       // Test that the factory correctly identifies shape types
       expect(mockRectangle.type).toBe(ShapeType.RECTANGLE)
       expect(mockCircle.type).toBe(ShapeType.CIRCLE)
-      expect(mockText.type).toBe(ShapeType.TEXT)
     })
 
     it('should pass all required props to shape components', () => {
@@ -195,7 +142,6 @@ describe('ShapeFactory Component', () => {
       expect(() => {
         render(<ShapeFactory {...propsWithDragMove} shape={mockRectangle} />)
         render(<ShapeFactory {...propsWithDragMove} shape={mockCircle} />)
-        render(<ShapeFactory {...propsWithDragMove} shape={mockText} />)
       }).not.toThrow()
     })
   })
@@ -253,10 +199,6 @@ describe('ShapeFactory Component', () => {
       // Change to circle
       rerender(<ShapeFactory {...defaultProps} shape={mockCircle} />)
       expect(screen.getByTestId('circle-component')).toBeInTheDocument()
-      
-      // Change to text
-      rerender(<ShapeFactory {...defaultProps} shape={mockText} />)
-      expect(screen.getByTestId('text-component')).toBeInTheDocument()
       
       // Change back to rectangle
       rerender(<ShapeFactory {...defaultProps} shape={mockRectangle} />)

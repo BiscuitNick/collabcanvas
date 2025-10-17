@@ -39,8 +39,9 @@ const MockCanvas = ({ width, height, onShapeSelect }: { width: number; height: n
 )
 
 const defaultProps = {
-  shapes: [] as Rectangle[],
+  content: [] as Rectangle[],
   cursors: [] as CursorType[],
+  presence: [],
   updateShape: vi.fn(),
   onMouseMove: vi.fn(),
   showSelfCursor: true,
@@ -50,8 +51,7 @@ const defaultProps = {
   lockShape: vi.fn(),
   unlockShape: vi.fn(),
   startEditingShape: vi.fn(),
-  stopEditingShape: vi.fn(),
-  presence: [],
+  stopEditingShape: vi.fn()
 }
 
 describe('FullScreenLayout', () => {

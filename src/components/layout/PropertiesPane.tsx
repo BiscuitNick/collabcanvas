@@ -6,10 +6,9 @@ import { Separator } from '../ui/separator'
 import { ScrollArea } from '../ui/scroll-area'
 // import { Switch } from '../ui/switch'
 import { Slider } from '../ui/slider'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { cn } from '../../lib/utils'
 import type { Shape } from '../../types'
-import { isRectangle, isCircle, isText } from '../../types'
+import { isRectangle, isCircle } from '../../types'
 
 interface PropertiesPaneProps {
   selectedShape: Shape | null
@@ -105,7 +104,6 @@ const PropertiesPane: React.FC<PropertiesPaneProps> = ({
         <p className="text-sm text-gray-600">
           {selectedShape.type === 'rectangle' && 'Rectangle'}
           {selectedShape.type === 'circle' && 'Circle'}
-          {selectedShape.type === 'text' && 'Text'}
         </p>
       </div>
 
@@ -175,28 +173,6 @@ const PropertiesPane: React.FC<PropertiesPaneProps> = ({
                 />
               </div>
             )}
-            {isText(selectedShape) && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="text-width">Width</Label>
-                  <Input
-                    id="text-width"
-                    type="number"
-                    value={Math.round(selectedShape.width)}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSizeChange('width', Number(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="text-height">Height</Label>
-                  <Input
-                    id="text-height"
-                    type="number"
-                    value={Math.round(selectedShape.height)}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSizeChange('height', Number(e.target.value))}
-                  />
-                </div>
-              </div>
-            )}
           </div>
 
           <Separator />
@@ -216,50 +192,6 @@ const PropertiesPane: React.FC<PropertiesPaneProps> = ({
             </div>
           </div>
 
-          {/* Text-specific properties */}
-          {isText(selectedShape) && (
-            <>
-              <Separator />
-              <div className="space-y-3">
-                <h3 className="text-sm font-medium">Text</h3>
-                <div className="space-y-1">
-                  <Label htmlFor="text-content">Content</Label>
-                  <Input
-                    id="text-content"
-                    value={selectedShape.text}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdateShape({ text: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="font-size">Font Size</Label>
-                  <Input
-                    id="font-size"
-                    type="number"
-                    value={selectedShape.fontSize}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdateShape({ fontSize: Number(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="font-family">Font Family</Label>
-                  <Select
-                    value={selectedShape.fontFamily}
-                    onValueChange={(value: string) => onUpdateShape({ fontFamily: value as 'Arial' | 'Helvetica' | 'Times New Roman' | 'Georgia' | 'Verdana' })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Arial">Arial</SelectItem>
-                      <SelectItem value="Helvetica">Helvetica</SelectItem>
-                      <SelectItem value="Times New Roman">Times New Roman</SelectItem>
-                      <SelectItem value="Georgia">Georgia</SelectItem>
-                      <SelectItem value="Verdana">Verdana</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </>
-          )}
 
           {/* Rotation */}
           <Separator />

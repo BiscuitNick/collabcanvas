@@ -100,15 +100,15 @@ const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
         left: position.x || 'auto',
         top: position.y || 'auto',
         right: position.x ? 'auto' : '16px',
-        bottom: position.y ? 'auto' : '80px',
+        bottom: position.y ? 'auto' : '16px',
         cursor: isDragging ? 'grabbing' : 'grab'
       }}
     >
-      <div className="bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg">
+      <div className="bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg flex flex-col max-h-[calc(100vh-8rem)]">
         {/* Header with drag handle and close button */}
         <div 
           data-drag-handle
-          className="flex items-center justify-between p-3 border-b border-gray-200 cursor-grab"
+          className="flex items-center justify-between p-3 border-b border-gray-200 cursor-grab flex-shrink-0"
         >
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -125,8 +125,8 @@ const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
           </Button>
         </div>
 
-        {/* Debug Widget Content */}
-        <div className="p-3">
+        {/* Debug Widget Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto min-h-0 p-3">
           <DebugWidget
             content={content}
             cursors={cursors}

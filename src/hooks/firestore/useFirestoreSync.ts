@@ -58,21 +58,6 @@ export const useFirestoreSync = (userUid: string | undefined) => {
             contentData.push({ ...baseContent, type: 'rectangle', width: data.width, height: data.height, cornerRadius: data.cornerRadius });
           } else if (data.type === 'circle') {
             contentData.push({ ...baseContent, type: 'circle', radius: data.radius });
-          } else if (data.type === 'text') {
-            contentData.push({ 
-              ...baseContent, 
-              type: 'text', 
-              text: data.text,
-              fontSize: data.fontSize,
-              fontFamily: data.fontFamily,
-              fontStyle: data.fontStyle,
-              width: data.width,
-              height: data.height,
-              textAlign: data.textAlign,
-              verticalAlign: data.verticalAlign,
-              isEditing: data.isEditing || false,
-              editedBy: data.editedBy || null,
-            });
           } else if (data.type === 'image') {
             contentData.push({ 
               ...baseContent, 

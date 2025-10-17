@@ -3,6 +3,8 @@ import { Button } from '../ui/button'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion'
 import ContentProperties from './ContentProperties'
 import type { Content } from '../../types'
+import { isTextContent } from '../../types'
+import { getTextExcerpt } from '../../lib/utils'
 
 interface DraggablePropertiesPaneProps {
   content: Content[]
@@ -57,19 +59,27 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
             value={selectedShape?.id || ''}
             onValueChange={(value: string) => onSelectShape(value)}
           >
-            {sortedContent.map((shape, index) => (
-              <AccordionItem value={shape.id} key={shape.id} className="border-b">
-                <AccordionTrigger className="px-3 py-2 text-xs hover:bg-gray-50">
-                  {`Shape ${index + 1}: ${shape.type}`}
-                </AccordionTrigger>
-                <AccordionContent>
-                  <ContentProperties
-                    content={shape}
-                    onUpdate={(updates) => onUpdateShape(shape.id, updates)}
-                  />
-                </AccordionContent>
-              </AccordionItem>
-            ))}
+            {sortedContent.map((shape, index) => {
+              // Get a better label for text content
+              const label = isTextContent(shape)
+                ? getTextExcerpt(shape.text, 20)
+                : `${shape.type} ${index + 1}`;
+
+              return (
+                <AccordionItem value={shape.id} key={shape.id} className="border-b">
+                  <AccordionTrigger className="px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2">
+                    <span className="font-mono text-gray-500">{shape.type === 'text' ? 'T' : shape.type === 'rectangle' ? '▭' : '○'}</span>
+                    <span>{label}</span>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <ContentProperties
+                      content={shape}
+                      onUpdate={(updates) => onUpdateShape(shape.id, updates)}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
           </Accordion>
         ) : (
           <div className="p-3">

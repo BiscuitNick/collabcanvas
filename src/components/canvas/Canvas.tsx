@@ -4,12 +4,14 @@ import Konva from 'konva';
 import { useCanvasStore } from '../../store/canvasStore';
 import CanvasErrorBoundary from './CanvasErrorBoundary';
 import ShapeFactory from './ShapeFactory';
+import TextContent from './TextContent';
 import Cursor from '../multiplayer/Cursor';
 import type { Content, Cursor as CursorType } from '../../types';
 import { useCursorContext } from '../../hooks/useCursorContext';
 import { useInteractionHandling } from './hooks/useInteractionHandling';
 import { useShapeHandling } from './hooks/useShapeHandling';
 import { useViewportCulling } from './hooks/useViewportCulling';
+import { ContentType, ContentVersion, FontFamily, FontStyle } from '../../types';
 
 export interface CanvasProps {
   width: number;
@@ -115,6 +117,24 @@ const Canvas: React.FC<CanvasProps> = ({
     ));
   }, [visibleShapes, selectedShapeId, handleShapeSelect, handleShapeUpdate, handleShapeDragMove, handleShapeDragEnd, handleShapeDragStart, setDraggingShape, currentUserId]);
 
+  // HARDCODED TEST TEXT - Remove after testing
+  const testTextContent = {
+    id: 'test-text-123',
+    type: ContentType.TEXT,
+    version: ContentVersion.V2,
+    x: 0, // Center of canvas
+    y: 0, // Center of canvas
+    text: 'HELLO WORLD - TEST TEXT',
+    fontSize: 48,
+    fontFamily: FontFamily.ARIAL,
+    fontStyle: FontStyle.BOLD,
+    fill: '#FF0000', // Red for visibility
+    rotation: 0,
+    createdBy: 'test',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
   return (
     <CanvasErrorBoundary>
       <div className="canvas-container">
@@ -129,7 +149,20 @@ const Canvas: React.FC<CanvasProps> = ({
           draggable={!isZooming && !isDraggingShape}
           {...interactionHandlers}
         >
-          <Layer>{renderedShapes}</Layer>
+          <Layer>
+            {renderedShapes}
+            {/* HARDCODED TEST TEXT - Remove after testing */}
+            <TextContent
+              content={testTextContent as any}
+              isSelected={false}
+              onSelect={() => console.log('Test text clicked')}
+              onUpdate={() => {}}
+              onDragEnd={() => {}}
+              onDragStart={() => {}}
+              onDragEndCallback={() => {}}
+              currentUserId={currentUserId}
+            />
+          </Layer>
           <Layer>
             {cursors
               .filter((cursor) => {

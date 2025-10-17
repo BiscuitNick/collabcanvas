@@ -25,6 +25,7 @@ export interface BaseContent {
 export const ContentType = {
   RECTANGLE: 'rectangle',
   CIRCLE: 'circle',
+  TEXT: 'text',
   IMAGE: 'image',
 } as const;
 
@@ -60,6 +61,62 @@ export interface CircleContent extends BaseContent {
   strokeWidth?: number;
 }
 
+// Font family type
+export const FontFamily = {
+  ARIAL: 'Arial',
+  HELVETICA: 'Helvetica',
+  TIMES_NEW_ROMAN: 'Times New Roman',
+  COURIER: 'Courier',
+  GEORGIA: 'Georgia',
+} as const;
+
+export type FontFamily = (typeof FontFamily)[keyof typeof FontFamily];
+
+// Font style type
+export const FontStyle = {
+  NORMAL: 'normal',
+  BOLD: 'bold',
+  ITALIC: 'italic',
+  BOLD_ITALIC: 'bold italic',
+} as const;
+
+export type FontStyle = (typeof FontStyle)[keyof typeof FontStyle];
+
+// Text alignment type
+export const TextAlign = {
+  LEFT: 'left',
+  CENTER: 'center',
+  RIGHT: 'right',
+  JUSTIFY: 'justify',
+} as const;
+
+export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign];
+
+// Vertical alignment type
+export const VerticalAlign = {
+  TOP: 'top',
+  MIDDLE: 'middle',
+  BOTTOM: 'bottom',
+} as const;
+
+export type VerticalAlign = (typeof VerticalAlign)[keyof typeof VerticalAlign];
+
+// Text content type (separate tool, not part of shapes)
+export interface TextContent extends BaseContent {
+  type: typeof ContentType.TEXT;
+  text: string;
+  fontSize: number;
+  fontFamily: FontFamily;
+  fontStyle: FontStyle;
+  fill: string;
+  width?: number;
+  height?: number;
+  textAlign?: TextAlign;
+  verticalAlign?: VerticalAlign;
+  // Editing state
+  isEditing?: boolean;
+  editedBy?: string;
+}
 
 // Image content type for future implementation
 export interface ImageContent extends BaseContent {
@@ -73,13 +130,14 @@ export interface ImageContent extends BaseContent {
 
 
 // Union type for all content
-export type Content = RectangleContent | CircleContent | ImageContent;
+export type Content = RectangleContent | CircleContent | TextContent | ImageContent;
 
 // Type guards for content type checking
 export const isRectangleContent = (content: Content): content is RectangleContent => content.type === ContentType.RECTANGLE;
 
 export const isCircleContent = (content: Content): content is CircleContent => content.type === ContentType.CIRCLE;
 
+export const isTextContent = (content: Content): content is TextContent => content.type === ContentType.TEXT;
 
 export const isImageContent = (content: Content): content is ImageContent => content.type === ContentType.IMAGE;
 
@@ -99,6 +157,13 @@ export interface ContentProperties {
   cornerRadius?: number;
   stroke?: string;
   strokeWidth?: number;
+  // Text properties
+  text?: string;
+  fontSize?: number;
+  fontFamily?: FontFamily;
+  fontStyle?: FontStyle;
+  textAlign?: TextAlign;
+  verticalAlign?: VerticalAlign;
   // Image properties
   src?: string;
   alt?: string;
@@ -161,6 +226,13 @@ export interface ContentCreationOptions {
     stroke?: string;
     strokeWidth?: number;
   };
+  text?: {
+    text: string;
+    fontSize: number;
+    fontFamily: FontFamily;
+    fontStyle: FontStyle;
+    fill: string;
+  };
   image?: {
     src: string;
     width: number;
@@ -186,6 +258,17 @@ export const DEFAULT_CONTENT_VALUES = {
     fill: '#10b981',
     stroke: '#047857',
     strokeWidth: 2,
+    opacity: 1,
+    rotation: 0,
+  },
+  text: {
+    text: 'hello world',
+    fontSize: 24,
+    fontFamily: FontFamily.ARIAL,
+    fontStyle: FontStyle.NORMAL,
+    fill: '#000000',
+    textAlign: TextAlign.LEFT,
+    verticalAlign: VerticalAlign.TOP,
     opacity: 1,
     rotation: 0,
   },

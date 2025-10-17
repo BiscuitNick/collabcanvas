@@ -1,64 +1,68 @@
 # Task List: Text Implementation
 
-## Task 1: Create Text Shape Data Structure
-**Goal:** Define and implement TextShape interface
+## Task 1: Create Text Content Data Structure ✅ COMPLETED
+**Goal:** Define and implement TextContent interface (Text is its own tool, separate from Shapes)
 
 **Subtasks:**
-- [ ] 1.1: Add `TextShape` interface to types file
-- [ ] 1.2: Add text validation (min 0 chars, max 5000 chars)
-- [ ] 1.3: Create factory function `createTextShape(x, y)` with defaults
-- [ ] 1.4: Update Firestore security rules to allow TextShape type
-- [ ] 1.5: Test Firestore write/read with TextShape structure
+- [x] 1.1: Add `TextContent` interface to types file
+- [x] 1.2: Add text validation (min 0 chars, max 5000 chars)
+- [x] 1.3: Create factory function `createTextContent(x, y)` with defaults
+- [x] 1.4: Update Firestore security rules to allow TextContent type
+- [x] 1.5: Test Firestore write/read with TextContent structure
 
 ---
 
-## Task 2: Build Text Toolbar Button
-**Goal:** Add text creation trigger
+## Task 2: Build Text Toolbar Button ✅ COMPLETED
+**Goal:** Add text creation trigger (Text is a separate tool, not part of Shapes tool)
 
 **Subtasks:**
-- [ ] 2.1: Add "Text" button to Toolbar component
-  - Icon: Letter "T" or text icon
-  - Position: after Circle button
+- [x] 2.1: Add "Text" button to Toolbar component
+  - Icon: Letter "T" (Type icon from lucide-react)
+  - Position: as separate tool, not grouped with shapes
   - Active state when text tool selected
-- [ ] 2.2: Add text tool to tool selection state
-  - Tool types: 'hand' | 'selection' | 'rectangle' | 'circle' | 'text'
-- [ ] 2.3: Implement text creation handler
-  - Calculate viewport center position
-  - Create TextShape with default properties
-  - Add to local shapes state
-  - Write to Firestore
-  - Broadcast to RTDB
-  - Immediately enter edit mode with caret visible
-- [ ] 2.4: Test text creation flow
-  - Click button → text appears at center
-  - Text is immediately editable
-  - Other users see new text appear
+- [x] 2.2: Add text tool to tool selection state
+  - Tool types: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan'
+  - Text tool is independent, not a sub-tool of shapes
+- [x] 2.3: Implement text creation handler
+  - Click on canvas creates text at clicked position
+  - Create TextContent with default properties using factory function
+  - Add to Firestore via createContent
+  - TODO: Immediately enter edit mode with caret visible (deferred to Task 4)
+- [x] 2.4: Test text creation flow
+  - Text tool can be selected from toolbar
+  - Instruction message displays: "Click on canvas to add text"
+  - Clicking canvas creates text at cursor position
+  - Text persists to Firestore with proper structure
 
 ---
 
-## Task 3: Create TextShape Canvas Component
+## Task 3: Create TextContent Canvas Component ✅ COMPLETED
 **Goal:** Render text on Konva canvas
 
 **Subtasks:**
-- [ ] 3.1: Create `TextShape.tsx` component
-  - Render Konva.Text with shape properties
+- [x] 3.1: Create `TextContent.tsx` component
+  - Render Konva.Text with content properties
   - Apply fontSize, fontFamily, fontStyle, fill
   - Handle x, y, rotation transforms
-- [ ] 3.2: Add click handler for selection
-  - Only active when Selection tool enabled
-  - Set selectedShapeId on click
-  - Show transform handles
-- [ ] 3.3: Add double-click handler for edit mode
-  - Call `enterEditMode(shape.id, shape.text)`
-  - Prevent when Hand tool active
-- [ ] 3.4: Make text draggable when selected
-  - Enable draggable when selected AND not editing
-  - Broadcast position to RTDB during drag
-  - Write final position to Firestore on dragEnd
-- [ ] 3.5: Integrate with Shapes layer
-  - Add TextShape components to Content layer
-  - Render after rectangles/circles (z-index)
-  - Filter shapes by type === 'text'
+  - Canvas coordinate system: 0,0 is at center
+- [x] 3.2: Add click handler for selection
+  - Click to select text content
+  - Set selectedContentId on click
+  - Show transform handles when selected
+  - Locked content shows lock indicator
+- [x] 3.3: Add double-click handler for edit mode
+  - Double-click handler added (placeholder for Task 4)
+  - TODO: Full implementation in Task 4 (inline text editor)
+- [x] 3.4: Make text draggable when selected
+  - Draggable when selected AND not locked by another user
+  - Throttled drag updates for performance
+  - Position clamped to canvas bounds (-CANVAS_HALF to +CANVAS_HALF)
+  - Final position persists to Firestore on dragEnd
+- [x] 3.5: Integrate with Content layer
+  - Added TextContent to ShapeFactory
+  - Uses isTextContent() type guard
+  - Renders alongside rectangles/circles
+  - Same interaction pattern as other content types
 
 ---
 
@@ -90,7 +94,7 @@
   - Clear RTDB liveUpdate
   - Remove from activeEdits
 - [ ] 4.6: Broadcast active editing state
-  - Write to RTDB `/activeEdits/{shapeId}` on edit start
+  - Write to RTDB `/activeEdits/{contentId}` on edit start
   - Include userId, userName, type: 'editing-text'
   - Remove on edit end
 - [ ] 4.7: Handle edge cases
@@ -102,7 +106,7 @@
 ---
 
 ## Task 5: Add Text Transform Handles
-**Goal:** Allow resize and rotation of text shapes
+**Goal:** Allow resize and rotation of text content
 
 **Subtasks:**
 - [ ] 5.1: Extend TransformControls to support text
@@ -123,8 +127,8 @@
   - **Recommendation:** Resizing changes bounding box only for MVP (fontSize stays constant)
   - Future: Scale fontSize proportionally
 - [ ] 5.5: Test transform operations
-  - Resize text → shape updates
-  - Rotate text → shape rotates
+  - Resize text → content updates
+  - Rotate text → content rotates
   - Live updates visible to other users
   - Final state persists to Firestore
 
@@ -134,22 +138,22 @@
 **Goal:** Edit text properties via sidebar
 
 **Subtasks:**
-- [ ] 6.1: Detect when selected shape is text
-  - Check `selectedShape?.type === 'text'`
+- [ ] 6.1: Detect when selected content is text
+  - Check `selectedContent?.type === 'text'`
   - Render text-specific property controls
 - [ ] 6.2: Add text content input
   - Textarea for multi-line display (even though text is single-line)
-  - Value bound to selectedShape.text
+  - Value bound to selectedContent.text
   - onChange updates local state + queues Firestore write
   - Debounce Firestore write (300ms)
 - [ ] 6.3: Add font family dropdown
   - Options: Arial, Helvetica, Times New Roman, Courier, Georgia
-  - Value bound to selectedShape.fontFamily
+  - Value bound to selectedContent.fontFamily
   - onChange updates immediately
 - [ ] 6.4: Add font size input with +/- buttons
   - Number input: range 8-72
   - Increment/decrement buttons (+1, -1)
-  - Value bound to selectedShape.fontSize
+  - Value bound to selectedContent.fontSize
   - Validate range on input
 - [ ] 6.5: Add font style toggle buttons
   - Bold button (B) - toggles bold in fontStyle
@@ -158,7 +162,7 @@
   - Logic: handle all combinations (normal, bold, italic, bold italic)
 - [ ] 6.6: Add fill color picker
   - Color input (HTML5 color picker)
-  - Value bound to selectedShape.fill
+  - Value bound to selectedContent.fill
   - onChange updates immediately
 - [ ] 6.7: Add common transform properties
   - Position X, Y (number inputs)
@@ -176,7 +180,7 @@
 ---
 
 ## Task 7: Integrate Text with Layers Panel
-**Goal:** Show text shapes in layers list
+**Goal:** Show text content in layers list
 
 **Subtasks:**
 - [ ] 7.1: Add text icon to LayerItem
@@ -188,7 +192,7 @@
   - Example: "Hello World..." (truncated with ellipsis)
 - [ ] 7.3: Layer click selects text
   - Same behavior as rectangles/circles
-  - Updates selectedShapeId
+  - Updates selectedContentId
   - Shows transform handles on canvas
 - [ ] 7.4: Selected text highlights in layers list
   - Visual indicator when layer is selected
@@ -200,7 +204,7 @@
 
 ---
 
-## Task 8: Test Text Shape with Real-Time Sync
+## Task 8: Test Text Content with Real-Time Sync
 **Goal:** Verify text works in multi-user scenarios
 
 **Subtasks:**
@@ -243,7 +247,7 @@
 - [ ] 9.1: Empty text handling
   - Allow empty text (0 characters)
   - Show placeholder or tiny bounding box
-  - Don't crash or hide shape
+  - Don't crash or hide content
 - [ ] 9.2: Very long text handling
   - Limit to 5000 characters
   - Show character count in properties panel
@@ -261,7 +265,7 @@
   - Canvas zooms/pans during edit → overlay repositions correctly
   - Text selected while in edit mode → exit edit mode first
 - [ ] 9.6: Performance
-  - 100+ text shapes → maintain 60 FPS
+  - 100+ text content items → maintain 60 FPS
   - Rapid text editing → no lag or stuttering
   - Large font sizes (72px) → renders correctly
 
@@ -297,7 +301,7 @@
 ## Success Criteria
 
 **Text implementation is complete when:**
-- ✅ Users can create text shapes via Toolbar button
+- ✅ Users can create text content via Toolbar button (Text is separate tool, not part of Shapes)
 - ✅ Text spawns at viewport center with default properties
 - ✅ Text immediately enters edit mode with visible caret
 - ✅ Double-click text for inline editing
@@ -308,7 +312,7 @@
 - ✅ Text appears in layers panel with correct icon and name
 - ✅ Multi-user editing works without conflicts
 - ✅ Text persists to Firestore correctly
-- ✅ Performance: 100+ text shapes at 60 FPS
+- ✅ Performance: 100+ text content items at 60 FPS
 
 ---
 

@@ -17,6 +17,12 @@ interface DraggableDebugWidgetProps {
   onToggleViewportCulling: (enable: boolean) => void
   fps: number
   onClose: () => void
+  enableFirestore?: boolean
+  onToggleFirestore?: (enable: boolean) => void
+  canvasWidth: number
+  canvasHeight: number
+  onCanvasWidthChange?: (width: number) => void
+  onCanvasHeightChange?: (height: number) => void
 }
 
 const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
@@ -32,7 +38,13 @@ const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
   enableViewportCulling,
   onToggleViewportCulling,
   fps,
-  onClose
+  onClose,
+  enableFirestore,
+  onToggleFirestore,
+  canvasWidth,
+  canvasHeight,
+  onCanvasWidthChange,
+  onCanvasHeightChange
 }) => {
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
@@ -140,6 +152,12 @@ const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
             enableViewportCulling={enableViewportCulling}
             onToggleViewportCulling={onToggleViewportCulling}
             fps={fps}
+            enableFirestore={enableFirestore}
+            onToggleFirestore={onToggleFirestore}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onCanvasWidthChange={onCanvasWidthChange}
+            onCanvasHeightChange={onCanvasHeightChange}
           />
         </div>
       </div>

@@ -12,13 +12,15 @@ This PRD outlines the implementation of enhanced canvas content types, specifica
 
 ## Content Hierarchy
 
+**Note:** Text is a separate, independent tool - NOT a subtool of Shapes.
+
 ```
 Content
-├── Shapes
+├── Shapes (tool)
 │   ├── Rectangle
 │   └── Circle
-├── Text
-└── Image (Future)
+├── Text (separate tool)
+└── Image (Future, separate tool)
 ```
 
 ## User Stories
@@ -85,12 +87,14 @@ Content
 
 ### 2. Text Content Implementation
 
+**IMPORTANT:** Text is a separate, independent tool - NOT part of the Shapes tool.
+
 #### 2.1 Text Tool Integration
-**Implementation:** Text tool in toolbar with properties panel
+**Implementation:** Independent text tool in toolbar with properties panel
 
 **Must Have:**
-- Text tool button in main toolbar
-- Text tool selection state management
+- Text tool button in main toolbar (separate from shapes, not grouped)
+- Text tool selection state management (independent tool state)
 - Properties panel for text formatting
 - Font family, style, size, and color controls
 
@@ -295,6 +299,7 @@ interface BaseContent {
   // ... other common properties
 }
 
+// Text is a separate content type, not a shape subtype
 interface TextContent extends BaseContent {
   type: 'text';
   text: string;

@@ -77,7 +77,8 @@ const ShapeCreationForm: React.FC<ShapeCreationFormProps> = ({
 
   // Automatically enter creation mode when form values change or shape type is selected
   useEffect(() => {
-    if (selectedShape) {
+    // Only handle rectangle and circle shapes, not text
+    if (selectedShape && (selectedShape === 'rectangle' || selectedShape === 'circle')) {
       onShapeCreate({
         type: selectedShape,
         width: selectedShape === 'rectangle' ? formData.width : undefined,

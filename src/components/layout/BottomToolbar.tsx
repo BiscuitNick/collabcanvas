@@ -1,25 +1,28 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '../ui/button'
-import { 
+import { Input } from '../ui/input'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu'
-import { 
-  Square, 
-  Circle, 
-  Hand, 
-  MousePointer2, 
+import {
+  Square,
+  Circle,
+  Hand,
+  MousePointer2,
   ImagePlus,
   Lightbulb,
   ChevronDown,
   Bug,
   Shapes,
-  Trash2
+  Trash2,
+  Type
 } from 'lucide-react'
 import ShapeCreationForm from './ShapeCreationForm'
-import { ShapeType } from '../../types'
+import TextToolbar from './TextToolbar'
+import { ShapeType, FontFamily, FontStyle } from '../../types'
 
 interface BottomToolbarProps {
   onCreateShape: (type: 'rectangle' | 'circle' | 'image') => void
@@ -32,18 +35,27 @@ interface BottomToolbarProps {
     stroke: string
     strokeWidth: number
   }) => void
+  onTextOptionsChange?: (options: {
+    text: string
+    fontSize: number
+    fontFamily: FontFamily
+    fontStyle: FontStyle
+  }) => void
+  onCreateText?: () => void
   onOpenAIAgent: () => void
-  selectedTool: 'select' | 'rectangle' | 'circle' | 'image' | 'ai' | 'pan' | null
-  onToolSelect: (tool: 'select' | 'rectangle' | 'circle' | 'image' | 'ai' | 'pan' | null) => void
+  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null
+  onToolSelect: (tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null) => void
   debugMode: boolean
   onToggleDebug: () => void
   onResetCanvas: () => void
 }
 
-type ToolType = 'pan' | 'select' | 'shapes' | 'ai'
+type ToolType = 'pan' | 'select' | 'shapes' | 'text' | 'ai'
 
 const BottomToolbar: React.FC<BottomToolbarProps> = ({
   onCreateShapeWithOptions,
+  onTextOptionsChange,
+  // onCreateText is not used yet but reserved for future use
   onOpenAIAgent,
   onToolSelect,
   debugMode,
@@ -54,6 +66,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   // Local state for toolbar
   const [activeTool, setActiveTool] = useState<ToolType>('select')
   const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle')
+  const [textInput, setTextInput] = useState('hello world')
 
   // Persist tool selection in localStorage
   useEffect(() => {
@@ -76,6 +89,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     { id: 'pan' as ToolType, label: 'Hand Tool', icon: Hand, description: 'Pan around the canvas' },
     { id: 'select' as ToolType, label: 'Selection Tool', icon: MousePointer2, description: 'Select and move objects' },
     { id: 'shapes' as ToolType, label: 'Shapes Tool', icon: Shapes, description: 'Create shapes' },
+    { id: 'text' as ToolType, label: 'Text Tool', icon: Type, description: 'Create text' },
     { id: 'ai' as ToolType, label: 'AI Tool', icon: ImagePlus, description: 'Open AI assistant' }
   ]
 
@@ -87,10 +101,13 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   const handleToolSelect = (tool: ToolType) => {
     setActiveTool(tool)
     localStorage.setItem('collabcanvas-active-tool', tool)
-    
+
     // Map internal tool types to external tool types
     if (tool === 'shapes') {
       onToolSelect(selectedShape)
+    } else if (tool === 'text') {
+      onToolSelect('text')
+      // Text creation will be triggered by clicking on canvas
     } else if (tool === 'ai') {
       onToolSelect('ai')
       onOpenAIAgent()
@@ -151,7 +168,14 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
           </div>
         )
       }
-      
+
+      case 'text':
+        return (
+          <div className="flex items-center space-x-2">
+            {onTextOptionsChange && <TextToolbar onTextOptionsChange={onTextOptionsChange} />}
+          </div>
+        )
+
       case 'ai':
         return (
           <div className="flex items-center space-x-2">
@@ -197,41 +221,73 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     }
   }
 
-  return (
-    <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-4 py-2 flex items-center space-x-4">
-      {/* Left Tool Selection Dropdown */}
-      <div className="flex items-center">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8">
-              {getCurrentTool() && (() => {
-                const Icon = getCurrentTool()!.icon
-                return <Icon className="h-4 w-4" />
-              })()}
-              <ChevronDown className="h-4 w-4 ml-2" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="bg-white">
-            {tools.map((tool) => {
-              const Icon = tool.icon
-              return (
-                <DropdownMenuItem
-                  key={tool.id}
-                  onClick={() => handleToolSelect(tool.id)}
-                  className="flex items-center"
-                >
-                  <Icon className="h-4 w-4 mr-2" />
-                  {tool.label}
-                </DropdownMenuItem>
-              )
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+  const handleTextInputChange = (value: string) => {
+    setTextInput(value)
+    localStorage.setItem('collabcanvas-text-input', value)
+    // Notify parent of text change
+    if (onTextOptionsChange) {
+      const savedOptions = localStorage.getItem('collabcanvas-text-creation')
+      const options = savedOptions ? JSON.parse(savedOptions) : {}
+      onTextOptionsChange({
+        text: value,
+        fontSize: options.fontSize || 24,
+        fontFamily: options.fontFamily || 'Arial',
+        fontStyle: options.fontStyle || 'normal',
+      })
+    }
+  }
 
-      {/* Right Dynamic Content */}
-      <div className="flex items-center">
-        {renderDynamicContent()}
+  return (
+    <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center">
+      {/* Text Input Field - Appears above toolbar when text tool is active */}
+      {activeTool === 'text' && (
+        <div className="mb-2 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-4 py-2">
+          <Input
+            type="text"
+            value={textInput}
+            onChange={(e) => handleTextInputChange(e.target.value)}
+            placeholder="Enter text..."
+            className="h-8 w-64 text-sm"
+          />
+        </div>
+      )}
+
+      {/* Main Toolbar */}
+      <div className="bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-4 py-2 flex items-center space-x-4">
+        {/* Left Tool Selection Dropdown */}
+        <div className="flex items-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8">
+                {getCurrentTool() && (() => {
+                  const Icon = getCurrentTool()!.icon
+                  return <Icon className="h-4 w-4" />
+                })()}
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-white">
+              {tools.map((tool) => {
+                const Icon = tool.icon
+                return (
+                  <DropdownMenuItem
+                    key={tool.id}
+                    onClick={() => handleToolSelect(tool.id)}
+                    className="flex items-center"
+                  >
+                    <Icon className="h-4 w-4 mr-2" />
+                    {tool.label}
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Right Dynamic Content */}
+        <div className="flex items-center">
+          {renderDynamicContent()}
+        </div>
       </div>
     </div>
   )

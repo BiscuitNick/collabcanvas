@@ -115,10 +115,11 @@ export const useInteractionHandling = ({
       if (isCreatingShape && onCanvasClick) {
         const stage = e.target.getStage();
         const pointerPosition = stage.getPointerPosition();
-        if (pointerPosition) {
-          const x = (pointerPosition.x - stagePosition.x) / stageScale;
-          const y = (pointerPosition.y - stagePosition.y) / stageScale;
-          onCanvasClick({ x, y });
+        if (pointerPosition && stage) {
+          // Use the proper transform to convert screen coordinates to canvas coordinates
+          const transform = stage.getAbsoluteTransform().copy().invert();
+          const canvasPoint = transform.point({ x: pointerPosition.x, y: pointerPosition.y });
+          onCanvasClick({ x: canvasPoint.x, y: canvasPoint.y });
           return;
         }
       }

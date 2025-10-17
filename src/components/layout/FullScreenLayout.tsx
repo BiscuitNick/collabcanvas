@@ -34,7 +34,7 @@ interface UIState {
   propertiesPaneVisible: boolean
   gridlinesVisible: boolean
   selectedShapeId: string | null
-  selectedTool: 'select' | 'rectangle' | 'circle' | 'image' | 'ai' | 'pan' | null
+  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null
   aiAgentActive: boolean
   isDragging: boolean
   isPanning: boolean
@@ -96,7 +96,13 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     isCreatingShape: false
   })
 
+  const [enableFirestore, setEnableFirestore] = useState(() => {
+    const stored = localStorage.getItem('enableFirestore');
+    return stored ? JSON.parse(stored) : true;
+  })
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
+  const [manualCanvasSize, setManualCanvasSize] = useState<{ width: number; height: number } | null>(null)
+  const [textOptions, setTextOptions] = useState({ text: 'hello world', fontSize: 24, fontFamily: 'Arial' as const, fontStyle: 'normal' as const })
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Apply cursor context based on selected tool and interaction state
@@ -107,19 +113,25 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     isResizing: uiState.isResizing
   })
 
-  // Calculate canvas size - full screen
+  // Calculate canvas size - full screen or manual
   const calculateCanvasSize = useCallback(() => {
     if (!containerRef.current) return
 
+    // If manual size is set, use that instead
+    if (manualCanvasSize) {
+      setCanvasSize(manualCanvasSize)
+      return
+    }
+
     const container = containerRef.current
     const containerRect = container.getBoundingClientRect()
-    
+
     // Full screen canvas - no reserved space for UI elements
     setCanvasSize({
       width: containerRect.width,
       height: containerRect.height
     })
-  }, [])
+  }, [manualCanvasSize])
 
   useEffect(() => {
     calculateCanvasSize()
@@ -159,12 +171,13 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 
 
   // Toolbar handlers
-  const handleToolSelect = useCallback((tool: 'select' | 'rectangle' | 'circle' | 'image' | 'ai' | 'pan' | null) => {
+  const handleToolSelect = useCallback((tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null) => {
     const isShapeTool = tool === 'rectangle' || tool === 'circle' || tool === 'image';
+    const isTextTool = tool === 'text';
     setUIState(prev => ({
       ...prev,
       selectedTool: tool,
-      isCreatingShape: isShapeTool,
+      isCreatingShape: isShapeTool || isTextTool,
       // Reset shape options if switching away from a shape tool
       shapeCreationOptions: isShapeTool ? prev.shapeCreationOptions : undefined
     }))
@@ -237,6 +250,25 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     localStorage.setItem('enableViewportCulling', JSON.stringify(enable))
   }, [])
 
+  const handleToggleFirestore = useCallback((enable: boolean) => {
+    console.log('🔄 Firestore toggle changed:', enable)
+    setEnableFirestore(enable)
+    localStorage.setItem('enableFirestore', JSON.stringify(enable))
+    console.log('🔍 localStorage after toggle:', localStorage.getItem('enableFirestore'))
+  }, [])
+
+  const handleCanvasWidthChange = useCallback((width: number) => {
+    setManualCanvasSize(prev => ({ width, height: prev?.height || canvasSize.height }))
+  }, [canvasSize.height])
+
+  const handleCanvasHeightChange = useCallback((height: number) => {
+    setManualCanvasSize(prev => ({ width: prev?.width || canvasSize.width, height }))
+  }, [canvasSize.width])
+
+  const handleTextOptionsChange = useCallback((options: { text: string; fontSize: number; fontFamily: any; fontStyle: any }) => {
+    setTextOptions(options)
+  }, [])
+
   // Reset canvas - clear all shapes and recenter zoom/pan
   const handleResetCanvas = useCallback(async () => {
     try {
@@ -255,10 +287,49 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 
   // Handle canvas click for shape creation
   const handleCanvasClick = useCallback(async (event: { x: number; y: number }) => {
+    console.log('🖱️ Canvas clicked at:', event.x, event.y, 'Selected tool:', uiState.selectedTool)
+    console.log('🔍 FullScreenLayout enableFirestore:', enableFirestore)
+
+    // Handle text creation
+    if (uiState.selectedTool === 'text') {
+      try {
+        const { createTextContent } = await import('../../lib/utils')
+
+        const textContent = createTextContent(
+          event.x,
+          event.y,
+          user?.uid || 'anonymous',
+          {
+            text: textOptions.text,
+            fontSize: textOptions.fontSize,
+            fontFamily: textOptions.fontFamily,
+            fontStyle: textOptions.fontStyle,
+          }
+        )
+
+        console.log('📝 Creating text content:', textContent)
+        console.log('🔍 Calling createContent with skipFirestore:', !enableFirestore)
+
+        // Create content - skipFirestore parameter controls whether to save to Firestore
+        await createContent(textContent, !enableFirestore)
+
+        if (enableFirestore) {
+          console.log('✅ Text content should be in Firestore')
+        } else {
+          console.log('⚠️ Firestore disabled - text added to local state only')
+        }
+        // TODO: Task 2.3 - Immediately enter edit mode with caret visible
+      } catch (error) {
+        console.error('❌ Error creating text:', error)
+      }
+      return
+    }
+
     if (uiState.isCreatingShape && uiState.shapeCreationOptions) {
       const { shapeCreationOptions } = uiState
-      
+
       try {
+        console.log('🔍 Creating shape with skipFirestore:', !enableFirestore)
         // Create shape at clicked position
         if (shapeCreationOptions.type === 'rectangle') {
           const rectangle = {
@@ -273,10 +344,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
             strokeWidth: shapeCreationOptions.strokeWidth,
             rotation: 0,
             createdBy: user?.uid || 'anonymous',
-            createdAt: new Date(),
-            updatedAt: new Date()
           }
-          await createShape(rectangle)
+          await createShape(rectangle, !enableFirestore)
         } else if (shapeCreationOptions.type === 'circle') {
           let radius = shapeCreationOptions.radius
           if (radius === undefined) {
@@ -300,17 +369,15 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
             strokeWidth: shapeCreationOptions.strokeWidth,
             rotation: 0,
             createdBy: user?.uid || 'anonymous',
-            createdAt: new Date(),
-            updatedAt: new Date()
           }
-          await createShape(circle)
+          await createShape(circle, !enableFirestore)
         }
-        
+
       } catch {
         // ignore
       }
     }
-  }, [createShape, user?.uid, uiState])
+  }, [createShape, user?.uid, uiState, createContent, enableFirestore, textOptions])
 
 
 
@@ -356,6 +423,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         <BottomToolbar
           onCreateShape={handleCreateShape}
           onCreateShapeWithOptions={handleCreateShapeWithOptions}
+          onTextOptionsChange={handleTextOptionsChange}
           onOpenAIAgent={handleOpenAIAgent}
           selectedTool={uiState.selectedTool}
           onToolSelect={handleToolSelect}
@@ -423,6 +491,12 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         enableViewportCulling={uiState.enableViewportCulling}
         onToggleViewportCulling={handleToggleViewportCulling}
         fps={uiState.fps}
+        enableFirestore={enableFirestore}
+        onToggleFirestore={handleToggleFirestore}
+        canvasWidth={canvasSize.width}
+        canvasHeight={canvasSize.height}
+        onCanvasWidthChange={handleCanvasWidthChange}
+        onCanvasHeightChange={handleCanvasHeightChange}
         onClose={() => setUIState(prev => ({ ...prev, debugMode: false }))}
       />
     </div>

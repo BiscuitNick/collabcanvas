@@ -20,6 +20,12 @@ interface DebugWidgetProps {
   enableViewportCulling: boolean
   onToggleViewportCulling: (enable: boolean) => void
   fps: number
+  enableFirestore?: boolean
+  onToggleFirestore?: (enable: boolean) => void
+  canvasWidth: number
+  canvasHeight: number
+  onCanvasWidthChange?: (width: number) => void
+  onCanvasHeightChange?: (height: number) => void
 }
 
 const DebugWidget: React.FC<DebugWidgetProps> = ({
@@ -34,7 +40,13 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
   onToggleFPS,
   enableViewportCulling,
   onToggleViewportCulling,
-  fps
+  fps,
+  enableFirestore = true,
+  onToggleFirestore,
+  canvasWidth,
+  canvasHeight,
+  onCanvasWidthChange,
+  onCanvasHeightChange
 }) => {
   const { stagePosition, stageScale, isPanning, isDraggingShape, isZooming } = useCanvasStore()
 
@@ -146,6 +158,66 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
                   onCheckedChange={onToggleViewportCulling}
                   className="scale-75"
                 />
+              </div>
+
+              {onToggleFirestore && (
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="firestore-updates" className="text-xs">
+                    Firestore Updates
+                  </Label>
+                  <Switch
+                    id="firestore-updates"
+                    checked={enableFirestore}
+                    onCheckedChange={onToggleFirestore}
+                    className="scale-75"
+                  />
+                </div>
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Canvas Dimensions */}
+        <AccordionItem value="canvas-dimensions" className="border-b">
+          <AccordionTrigger className="py-2 text-xs font-medium text-gray-700 hover:no-underline">
+            Canvas Dimensions
+          </AccordionTrigger>
+          <AccordionContent className="pb-2">
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="canvas-width" className="text-xs">
+                  Width: {canvasWidth}px
+                </Label>
+                {onCanvasWidthChange && (
+                  <input
+                    id="canvas-width"
+                    type="range"
+                    min="400"
+                    max="3840"
+                    step="100"
+                    value={canvasWidth}
+                    onChange={(e) => onCanvasWidthChange(parseInt(e.target.value))}
+                    className="w-full mt-1"
+                  />
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="canvas-height" className="text-xs">
+                  Height: {canvasHeight}px
+                </Label>
+                {onCanvasHeightChange && (
+                  <input
+                    id="canvas-height"
+                    type="range"
+                    min="300"
+                    max="2160"
+                    step="100"
+                    value={canvasHeight}
+                    onChange={(e) => onCanvasHeightChange(parseInt(e.target.value))}
+                    className="w-full mt-1"
+                  />
+                )}
               </div>
             </div>
           </AccordionContent>

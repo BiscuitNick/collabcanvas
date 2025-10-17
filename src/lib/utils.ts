@@ -53,3 +53,80 @@ export const getZoomStep = (currentPercentage: number) => {
   if (currentPercentage < 100) return 5
   return 10
 }
+
+// Text validation constants
+export const TEXT_VALIDATION = {
+  MIN_CHARS: 0,
+  MAX_CHARS: 5000,
+} as const
+
+// Validate text content length
+export function validateTextLength(text: string): { valid: boolean; error?: string } {
+  if (text.length < TEXT_VALIDATION.MIN_CHARS) {
+    return { valid: false, error: `Text must be at least ${TEXT_VALIDATION.MIN_CHARS} characters` }
+  }
+  if (text.length > TEXT_VALIDATION.MAX_CHARS) {
+    return { valid: false, error: `Text must not exceed ${TEXT_VALIDATION.MAX_CHARS} characters` }
+  }
+  return { valid: true }
+}
+
+// Truncate text to max length
+export function truncateText(text: string, maxLength: number = TEXT_VALIDATION.MAX_CHARS): string {
+  if (text.length <= maxLength) return text
+  return text.substring(0, maxLength)
+}
+
+// Get text excerpt for display (e.g., in layers panel)
+export function getTextExcerpt(text: string, maxLength: number = 20): string {
+  if (!text) return 'Text'
+  if (text.length <= maxLength) return text
+  return text.substring(0, maxLength) + '...'
+}
+
+// Import types for factory function
+import type { TextContent } from '../types'
+import { ContentType, ContentVersion, DEFAULT_CONTENT_VALUES } from '../types'
+
+// Factory function to create TextContent
+export function createTextContent(
+  x: number,
+  y: number,
+  userId: string,
+  options?: {
+    text?: string
+    fontSize?: number
+    fontFamily?: typeof DEFAULT_CONTENT_VALUES.text.fontFamily
+    fontStyle?: typeof DEFAULT_CONTENT_VALUES.text.fontStyle
+    fill?: string
+    textAlign?: typeof DEFAULT_CONTENT_VALUES.text.textAlign
+    verticalAlign?: typeof DEFAULT_CONTENT_VALUES.text.verticalAlign
+    opacity?: number
+    rotation?: number
+  }
+): Omit<TextContent, 'id' | 'createdAt' | 'updatedAt'> {
+  const defaults = DEFAULT_CONTENT_VALUES.text
+
+  // Validate and truncate text if needed
+  const text = options?.text !== undefined
+    ? truncateText(options.text)
+    : defaults.text
+
+  return {
+    type: ContentType.TEXT,
+    version: ContentVersion.V2,
+    x,
+    y,
+    text,
+    fontSize: options?.fontSize ?? defaults.fontSize,
+    fontFamily: options?.fontFamily ?? defaults.fontFamily,
+    fontStyle: options?.fontStyle ?? defaults.fontStyle,
+    fill: options?.fill ?? defaults.fill,
+    textAlign: options?.textAlign ?? defaults.textAlign,
+    verticalAlign: options?.verticalAlign ?? defaults.verticalAlign,
+    opacity: options?.opacity ?? defaults.opacity,
+    rotation: options?.rotation ?? defaults.rotation,
+    createdBy: userId,
+    // createdAt and updatedAt will be added by Firestore with serverTimestamp()
+  }
+}

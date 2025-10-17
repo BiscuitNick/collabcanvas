@@ -34,12 +34,13 @@ export const useViewportCulling = ({
       const padding = 500 / stageScale;
 
       return shapesToFilter.filter((shape) => {
-        let shapeWidth, shapeHeight;
+        let shapeWidth: number;
+        let shapeHeight: number;
 
-        if ('width' in shape && 'height' in shape) {
+        if ('width' in shape && 'height' in shape && shape.width !== undefined && shape.height !== undefined) {
           shapeWidth = shape.width;
           shapeHeight = shape.height;
-        } else if ('radius' in shape) {
+        } else if ('radius' in shape && shape.radius !== undefined) {
           shapeWidth = shape.radius * 2;
           shapeHeight = shape.radius * 2;
         } else {

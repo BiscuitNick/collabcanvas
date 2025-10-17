@@ -5,9 +5,10 @@ import { useContentLocking } from './firestore/useContentLocking';
 
 export const useContent = () => {
   const { user } = useAuth();
-  const { content, loading, error, activelyEditingRef, isCreatingContent } = useFirestoreSync(user?.uid);
+  const { content, setContent, loading, error, activelyEditingRef, isCreatingContent } = useFirestoreSync(user?.uid);
   const { createContent, updateContent, deleteContent, clearAllContent, startEditingContent, stopEditingContent } = useContentOperations(
     content,
+    setContent,
     activelyEditingRef,
     isCreatingContent
   );

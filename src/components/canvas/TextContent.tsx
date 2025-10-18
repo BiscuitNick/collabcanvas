@@ -107,15 +107,18 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
       return
     }
 
-    // Prevent event from bubbling to stage for selection
-    e.cancelBubble = true
-    e.evt.stopPropagation()
-
     // Prevent selection if locked by another user
     if (isLockedByOther) {
       console.log('⚠️ Cannot select - locked by another user')
+      // IMPORTANT: Must stop propagation to prevent canvas panning!
+      e.cancelBubble = true
+      e.evt.stopPropagation()
       return
     }
+
+    // Prevent event from bubbling to stage for selection
+    e.cancelBubble = true
+    e.evt.stopPropagation()
 
     // Call onSelect to show details in panel
     onSelect()
@@ -129,10 +132,20 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
     // Prevent editing if locked by another user
     if (isLockedByOther) {
       console.log('⚠️ Cannot edit - locked by another user')
+      // Already stopped propagation above, so just return
       return
     }
 
     // TODO: Task 4 - Enter edit mode
+  }
+
+  const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Stop propagation on mousedown for locked shapes to prevent stage drag initiation
+    if (isLockedByOther) {
+      e.cancelBubble = true
+      e.evt.stopPropagation()
+      e.evt.stopImmediatePropagation?.()
+    }
   }
 
   const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -232,6 +245,7 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
         draggable={isSelected && !isLockedByOther}
         onClick={handleClick}
         onTap={handleClick}
+        onMouseDown={handleMouseDown}
         onDblClick={handleDblClick}
         onDblTap={handleDblClick}
         onDragStart={isSelected && !isLockedByOther ? handleDragStart : undefined}

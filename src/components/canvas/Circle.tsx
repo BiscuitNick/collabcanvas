@@ -111,18 +111,30 @@ const CircleComponent: React.FC<CircleProps> = memo(({
       return
     }
 
+    // Prevent selection if locked by another user
+    if (isLockedByOther) {
+      console.log('⚠️ Cannot select - locked by another user')
+      // IMPORTANT: Must stop propagation to prevent canvas panning!
+      e.cancelBubble = true
+      e.evt.stopPropagation()
+      return
+    }
+
     // Prevent event from bubbling to stage for selection
     e.cancelBubble = true
     e.evt.stopPropagation()
 
-    // Prevent selection if locked by another user
-    if (isLockedByOther) {
-      console.log('⚠️ Cannot select - locked by another user')
-      return
-    }
-
     // Call onSelect to show details in panel
     onSelect()
+  }
+
+  const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Stop propagation on mousedown for locked shapes to prevent stage drag initiation
+    if (isLockedByOther) {
+      e.cancelBubble = true
+      e.evt.stopPropagation()
+      e.evt.stopImmediatePropagation?.()
+    }
   }
 
   const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -222,6 +234,7 @@ const CircleComponent: React.FC<CircleProps> = memo(({
         draggable={isSelected && !isLockedByOther}
         onClick={handleClick}
         onTap={handleClick}
+        onMouseDown={handleMouseDown}
         onDragStart={isSelected && !isLockedByOther ? handleDragStart : undefined}
         onDragMove={isSelected && !isLockedByOther ? handleDragMove : undefined}
         onDragEnd={isSelected && !isLockedByOther ? handleDragEnd : undefined}

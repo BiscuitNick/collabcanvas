@@ -154,7 +154,7 @@ const Canvas: React.FC<CanvasProps> = ({
                 return true;
               })
               .map((cursor) => (
-                <Cursor key={cursor.userId} cursor={cursor} />
+                <Cursor key={cursor.userId} cursor={cursor} scale={stageScale} />
               ))}
           </Layer>
         </Stage>

@@ -2,7 +2,7 @@
 import { useRef, useCallback } from 'react';
 import { clamp } from '../../../lib/utils';
 import { CANVAS_HALF, MIN_SHAPE_SIZE, MAX_SHAPE_SIZE } from '../../../lib/constants';
-import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS, ENABLE_PERFORMANCE_LOGGING } from '../../../lib/config';
+import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS } from '../../../lib/config';
 import Konva from 'konva';
 
 interface ShapeInteractionProps {
@@ -42,16 +42,11 @@ export const useShapeInteraction = ({
         if (!pendingUpdate) return;
 
         if (now - lastUpdateRef.current >= RECTANGLE_DRAG_THROTTLE_MS) {
-          const startTime = ENABLE_PERFORMANCE_LOGGING ? performance.now() : 0;
           const clampedX = clamp(pendingUpdate.x, -CANVAS_HALF, CANVAS_HALF - shape.width);
           const clampedY = clamp(pendingUpdate.y, -CANVAS_HALF, CANVAS_HALF - shape.height);
           onDragMove(clampedX, clampedY);
           lastUpdateRef.current = now;
           pendingUpdateRef.current = null;
-          if (ENABLE_PERFORMANCE_LOGGING) {
-            const duration = performance.now() - startTime;
-            console.log(`📝 Shape drag update took ${duration.toFixed(2)}ms`);
-          }
         }
       }, RECTANGLE_DRAG_DEBOUNCE_MS);
     },

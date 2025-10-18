@@ -15,6 +15,7 @@ interface TextContentProps {
   onDragStart: () => void
   onDragEndCallback: () => void
   currentUserId?: string
+  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null
 }
 
 const TextContentComponent: React.FC<TextContentProps> = memo(({
@@ -27,6 +28,7 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
   onDragStart,
   onDragEndCallback,
   currentUserId,
+  selectedTool,
 }) => {
   const textRef = useRef<Konva.Text>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
@@ -75,8 +77,8 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
       try {
         transformerRef.current.nodes([textRef.current])
         transformerRef.current.getLayer()?.batchDraw()
-      } catch (error) {
-        console.warn('Transformer setup failed:', error)
+      } catch {
+        // Silently fail transformer setup
       }
     }
   }, [isSelected])
@@ -92,24 +94,53 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
   }, [])
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    e.cancelBubble = true
-    // Allow viewing details but not editing if locked by another user
-    if (isLockedByOther) {
-      console.log('👁️ Viewing locked text details:', content.lockedByUserName)
+    // Log text content click
+    console.log('🖱️ Canvas clicked - Shape:', { type: 'text', id: content.id, x: content.x.toFixed(2), y: content.y.toFixed(2), text: content.text })
+
+    // Only allow selection with select, pan, or ai tools
+    const allowSelection = selectedTool === 'select' || selectedTool === 'pan' || selectedTool === 'ai' || selectedTool === null
+
+    if (!allowSelection) {
+      // Don't stop propagation - let the tool action happen
+      console.log('🔧 Tool active - passing click through to canvas')
+      return
     }
-    // Always call onSelect to show details in panel
+
+    // Prevent event from bubbling to stage for selection
+    e.cancelBubble = true
+    e.evt.stopPropagation()
+
+    // Prevent selection if locked by another user
+    if (isLockedByOther) {
+      console.log('⚠️ Cannot select - locked by another user')
+      return
+    }
+
+    // Call onSelect to show details in panel
     onSelect()
   }
 
   const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Prevent event from bubbling to stage
     e.cancelBubble = true
+    e.evt.stopPropagation()
+
+    // Prevent editing if locked by another user
+    if (isLockedByOther) {
+      console.log('⚠️ Cannot edit - locked by another user')
+      return
+    }
+
     // TODO: Task 4 - Enter edit mode
-    console.log('TODO: Enter edit mode for text:', content.id)
   }
 
-  const handleDragStart = () => {
+  const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
+    // Prevent event from bubbling
+    e.cancelBubble = true
+
     if (!isSelected) {
-      console.log('❌ Cannot drag - text must be selected first')
+      // Prevent the drag
+      e.target.stopDrag()
       return
     }
     onDragStart()

@@ -14,6 +14,7 @@ interface InteractionHandlingProps {
   selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'ai' | 'pan' | null;
   onCanvasClick?: (event: { x: number; y: number }) => void;
   isCreatingShape?: boolean;
+  unlockShape?: (id: string) => Promise<void>;
 }
 
 export const useInteractionHandling = ({
@@ -24,6 +25,7 @@ export const useInteractionHandling = ({
   onPanEnd,
   onCanvasClick,
   isCreatingShape,
+  unlockShape,
 }: Omit<InteractionHandlingProps, 'selectedTool'>) => {
   const {
     stagePosition,
@@ -31,6 +33,7 @@ export const useInteractionHandling = ({
     isPanning,
     isZooming,
     isDraggingShape,
+    selectedContentId,
     updatePosition,
     updateScale,
     setPanning,
@@ -53,29 +56,46 @@ export const useInteractionHandling = ({
     };
   };
 
-  const handleDragStart = () => {
-    if (isDraggingShape) return;
+  const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
+    const stage = e.target.getStage();
+    if (!stage) return;
+
+    // Don't start panning if we clicked on a shape (anything other than the stage itself)
+    const clickedOnShape = e.target !== stage;
+
+    if (isDraggingShape || clickedOnShape) {
+      // Prevent stage from dragging when interacting with shapes
+      e.target.stopDrag?.();
+      return;
+    }
+
     setPanning(true);
     setZooming(false);
     onPanStart?.();
   };
 
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
-    if (isDraggingShape) return;
+    const stage = e.target.getStage();
+    if (!stage) return;
+
+    // If we're dragging a shape or if the drag target is not the stage itself, don't update canvas position
+    const draggedShape = e.target !== stage;
+
+    if (isDraggingShape || draggedShape) {
+      return;
+    }
+
     setPanning(false);
     onPanEnd?.();
     const clampedPos = clampPosition(e.target.x(), e.target.y());
     updatePosition(clampedPos.x, clampedPos.y);
 
     if (onMouseMove) {
-      const stage = e.target.getStage();
-      if (stage) {
-        const pointer = stage.getPointerPosition();
-        if (pointer) {
-          const transform = stage.getAbsoluteTransform().copy().invert();
-          const canvasPoint = transform.point({ x: pointer.x, y: pointer.y });
-          onMouseMove(canvasPoint.x, canvasPoint.y, width, height);
-        }
+      const pointer = stage.getPointerPosition();
+      if (pointer) {
+        const transform = stage.getAbsoluteTransform().copy().invert();
+        const canvasPoint = transform.point({ x: pointer.x, y: pointer.y });
+        onMouseMove(canvasPoint.x, canvasPoint.y, width, height);
       }
     }
   };
@@ -111,20 +131,51 @@ export const useInteractionHandling = ({
   };
 
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (e.target === e.target.getStage()) {
-      if (isCreatingShape && onCanvasClick) {
-        const stage = e.target.getStage();
-        const pointerPosition = stage.getPointerPosition();
-        if (pointerPosition && stage) {
-          // Use the proper transform to convert screen coordinates to canvas coordinates
-          const transform = stage.getAbsoluteTransform().copy().invert();
-          const canvasPoint = transform.point({ x: pointerPosition.x, y: pointerPosition.y });
-          onCanvasClick({ x: canvasPoint.x, y: canvasPoint.y });
-          return;
-        }
+    // Prevent event bubbling
+    e.cancelBubble = true;
+
+    const stage = e.target.getStage();
+    if (!stage) return;
+
+    // Check if we clicked on the stage background (not on a shape)
+    const clickedOnEmpty = e.target === stage;
+
+    // Get pointer position and canvas coordinates
+    const pointerPosition = stage.getPointerPosition();
+    if (!pointerPosition) return;
+
+    const transform = stage.getAbsoluteTransform().copy().invert();
+    const canvasPoint = transform.point({ x: pointerPosition.x, y: pointerPosition.y });
+
+    if (clickedOnEmpty) {
+      // Clicked on empty canvas area
+      console.log('🖱️ Canvas clicked - Empty area at:', { x: canvasPoint.x.toFixed(2), y: canvasPoint.y.toFixed(2) });
+
+      // Unlock the currently selected shape before deselecting
+      if (selectedContentId && unlockShape) {
+        unlockShape(selectedContentId);
       }
 
+      // Always deselect current shape when clicking empty canvas or placing new shape
       selectShape(null);
+
+      // If creating a shape, trigger the shape creation
+      if (isCreatingShape && onCanvasClick) {
+        onCanvasClick({ x: canvasPoint.x, y: canvasPoint.y });
+        return;
+      }
+    } else {
+      // Clicked on a shape - the shape's onSelect handler will be called via ShapeFactory
+      // The shape's onClick handler will call onSelect which handles switching selection
+      // Just log the click for debugging
+      const shapeId = e.target.id() || 'unknown';
+      const shapeName = e.target.name() || e.target.className;
+      console.log('🖱️ Canvas clicked - Shape:', {
+        type: shapeName,
+        id: shapeId,
+        x: canvasPoint.x.toFixed(2),
+        y: canvasPoint.y.toFixed(2)
+      });
     }
   };
 
@@ -225,6 +276,7 @@ export const useInteractionHandling = ({
     onDragEnd: handleDragEnd,
     onWheel: handleWheel,
     onClick: handleStageClick,
+    onTap: handleStageClick, // Use same handler for tap events on mobile
     onMouseMove: handleMouseMove,
     onMouseLeave: handleMouseLeave,
     onTouchStart: handleTouchStart,

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { Button } from '../ui/button'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion'
 import ContentProperties from './ContentProperties'
@@ -13,6 +13,8 @@ interface DraggablePropertiesPaneProps {
   onSelectShape: (id: string) => void
   isVisible: boolean
   onClose: () => void
+  currentUserId?: string
+  users?: Map<string, { displayName?: string; email?: string }>
 }
 
 const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
@@ -22,7 +24,24 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
   onSelectShape,
   isVisible,
   onClose,
+  currentUserId,
+  users,
 }) => {
+  const selectedItemRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // Scroll to selected item when selection changes
+  useEffect(() => {
+    if (selectedShape && selectedItemRef.current && scrollContainerRef.current) {
+      // Use scrollIntoView with smooth behavior
+      selectedItemRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'nearest'
+      })
+    }
+  }, [selectedShape?.id])
+
   if (!isVisible) {
     return null
   }
@@ -51,7 +70,7 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
       </div>
 
       {/* Shape List - Scrollable Content */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0">
         {sortedContent.length > 0 ? (
           <Accordion
             type="single"
@@ -65,17 +84,49 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
                 ? getTextExcerpt(shape.text, 20)
                 : `${shape.type} ${index + 1}`;
 
+              const isSelected = selectedShape?.id === shape.id;
+
+              // Check if locked by another user
+              const isLockedByOther = shape.lockedByUserId && shape.lockedByUserId !== currentUserId;
+              const isLockedBySelf = shape.lockedByUserId && shape.lockedByUserId === currentUserId;
+
+              // Get the user who locked this shape
+              let lockedByUserName = '';
+              if (shape.lockedByUserId && users) {
+                const user = users.get(shape.lockedByUserId);
+                lockedByUserName = user?.displayName || user?.email || 'Unknown User';
+              }
+
               return (
-                <AccordionItem value={shape.id} key={shape.id} className="border-b">
+                <AccordionItem
+                  value={shape.id}
+                  key={shape.id}
+                  className={`border-b ${isLockedByOther ? 'opacity-60' : ''}`}
+                  ref={isSelected ? selectedItemRef : null}
+                >
                   <AccordionTrigger className="px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2">
-                    <span className="font-mono text-gray-500">{shape.type === 'text' ? 'T' : shape.type === 'rectangle' ? '▭' : '○'}</span>
-                    <span>{label}</span>
+                    <span className="font-mono text-lg text-gray-500">{shape.type === 'text' ? 'T' : shape.type === 'rectangle' ? '▭' : '○'}</span>
+                    <div className="flex-1 flex items-center gap-2 min-w-0">
+                      <span className="truncate">{label}</span>
+                      {(isLockedBySelf || isLockedByOther) && (
+                        <span className="text-xs flex items-center gap-1 shrink-0" title={`Locked by ${lockedByUserName}`}>
+                          <span className={isLockedByOther ? 'text-red-500' : 'text-blue-500'}>🔒</span>
+                          {isLockedByOther && <span className="text-gray-500 text-xs truncate max-w-[80px]">{lockedByUserName}</span>}
+                        </span>
+                      )}
+                    </div>
                   </AccordionTrigger>
                   <AccordionContent>
-                    <ContentProperties
-                      content={shape}
-                      onUpdate={(updates) => onUpdateShape(shape.id, updates)}
-                    />
+                    {isLockedByOther ? (
+                      <div className="p-3 text-xs text-gray-500 italic">
+                        Locked by {lockedByUserName}. Cannot edit.
+                      </div>
+                    ) : (
+                      <ContentProperties
+                        content={shape}
+                        onUpdate={(updates) => onUpdateShape(shape.id, updates)}
+                      />
+                    )}
                   </AccordionContent>
                 </AccordionItem>
               );

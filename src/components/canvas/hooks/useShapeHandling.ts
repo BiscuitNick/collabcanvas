@@ -26,7 +26,9 @@ export const useShapeHandling = ({
   onDragStart,
   onDragEnd,
 }: ShapeHandlingProps) => {
-  const { selectedShapeId, selectShape, setDraggingShape } = useCanvasStore();
+  const { selectedContentId, selectShape, setDraggingShape } = useCanvasStore();
+  // Use selectedContentId directly instead of the getter selectedShapeId for proper reactivity
+  const selectedShapeId = selectedContentId;
 
   const handleShapeSelect = useCallback(
     (shapeId: string) => {

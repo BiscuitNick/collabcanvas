@@ -4,7 +4,7 @@ import Konva from 'konva' // Import Konva for types
 import type { Circle } from '../../types'
 import { clamp } from '../../lib/utils'
 import { CANVAS_HALF, MIN_SHAPE_SIZE, MAX_SHAPE_SIZE } from '../../lib/constants'
-import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS, ENABLE_PERFORMANCE_LOGGING } from '../../lib/config'
+import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS } from '../../lib/config'
 
 interface CircleProps {
   shape: Circle
@@ -16,6 +16,7 @@ interface CircleProps {
   onDragStart: () => void
   onDragEndCallback: () => void
   currentUserId?: string
+  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null
 }
 
 const CircleComponent: React.FC<CircleProps> = memo(({
@@ -28,6 +29,7 @@ const CircleComponent: React.FC<CircleProps> = memo(({
   onDragStart,
   onDragEndCallback,
   currentUserId,
+  selectedTool,
 }) => {
   const circleRef = useRef<Konva.Circle>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
@@ -62,21 +64,14 @@ const CircleComponent: React.FC<CircleProps> = memo(({
 
       // Throttle: only update if enough time has passed since last update
       if (now - lastUpdateRef.current >= RECTANGLE_DRAG_THROTTLE_MS) {
-        const startTime = ENABLE_PERFORMANCE_LOGGING ? performance.now() : 0
-        
         // Clamp position within canvas bounds (using diameter for bounds checking)
         const diameter = effectiveRadius * 2
         const clampedX = clamp(pendingUpdate.x, -CANVAS_HALF, CANVAS_HALF - diameter)
         const clampedY = clamp(pendingUpdate.y, -CANVAS_HALF, CANVAS_HALF - diameter)
-        
+
         onDragMove(clampedX, clampedY)
         lastUpdateRef.current = now
         pendingUpdateRef.current = null
-        
-        if (ENABLE_PERFORMANCE_LOGGING) {
-          const duration = performance.now() - startTime
-          console.log(`⭕ Circle drag update took ${duration.toFixed(2)}ms`)
-        }
       }
     }, RECTANGLE_DRAG_DEBOUNCE_MS)
   }, [onDragMove, effectiveRadius])
@@ -87,9 +82,8 @@ const CircleComponent: React.FC<CircleProps> = memo(({
       try {
         transformerRef.current.nodes([circleRef.current])
         transformerRef.current.getLayer()?.batchDraw()
-      } catch (error: unknown) {
-        // Ignore errors in test environment
-        console.warn('Transformer setup failed:', error)
+      } catch {
+        // Silently fail transformer setup
       }
     }
   }, [isSelected])
@@ -105,15 +99,40 @@ const CircleComponent: React.FC<CircleProps> = memo(({
   }, [])
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Log shape click
+    console.log('🖱️ Canvas clicked - Shape:', { type: 'circle', id: shape.id, x: shape.x.toFixed(2), y: shape.y.toFixed(2) })
+
+    // Only allow selection with select, pan, or ai tools
+    const allowSelection = selectedTool === 'select' || selectedTool === 'pan' || selectedTool === 'ai' || selectedTool === null
+
+    if (!allowSelection) {
+      // Don't stop propagation - let the tool action happen
+      console.log('🔧 Tool active - passing click through to canvas')
+      return
+    }
+
+    // Prevent event from bubbling to stage for selection
     e.cancelBubble = true
-    // Allow viewing details but not editing if locked by another user
-    // Always call onSelect to show details in panel
+    e.evt.stopPropagation()
+
+    // Prevent selection if locked by another user
+    if (isLockedByOther) {
+      console.log('⚠️ Cannot select - locked by another user')
+      return
+    }
+
+    // Call onSelect to show details in panel
     onSelect()
   }
 
-  const handleDragStart = () => {
+  const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
+    // Prevent event from bubbling
+    e.cancelBubble = true
+
     // Only allow drag if shape is selected
     if (!isSelected) {
+      // Prevent the drag
+      e.target.stopDrag()
       return
     }
     // Notify parent that dragging has started

@@ -71,7 +71,18 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   stopEditingShape
 }) => {
   useKeyboardShortcuts()
-  const { selectShape, resetView } = useCanvasStore()
+  const { selectShape, resetView, selectedContentId } = useCanvasStore()
+
+  // Convert presence array to a Map for efficient user lookup
+  const usersMap = React.useMemo(() => {
+    const map = new Map<string, { displayName?: string; email?: string }>();
+    presence.forEach(user => {
+      map.set(user.userId, { displayName: user.userName, email: user.userName });
+    });
+    return map;
+  }, [presence]);
+  // Use selectedContentId directly instead of the getter selectedShapeId for proper reactivity
+  const canvasSelectedShapeId = selectedContentId
   const { createContent, clearAllContent } = useContent()
   
   // Legacy aliases for backward compatibility
@@ -95,6 +106,14 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     shapeCreationOptions: undefined,
     isCreatingShape: false
   })
+
+  // Sync canvas store selection with UI state
+  useEffect(() => {
+    setUIState(prev => ({
+      ...prev,
+      selectedShapeId: canvasSelectedShapeId
+    }))
+  }, [canvasSelectedShapeId])
 
   const [enableFirestore, setEnableFirestore] = useState(() => {
     const stored = localStorage.getItem('enableFirestore');
@@ -251,10 +270,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   }, [])
 
   const handleToggleFirestore = useCallback((enable: boolean) => {
-    console.log('🔄 Firestore toggle changed:', enable)
     setEnableFirestore(enable)
     localStorage.setItem('enableFirestore', JSON.stringify(enable))
-    console.log('🔍 localStorage after toggle:', localStorage.getItem('enableFirestore'))
   }, [])
 
   const handleCanvasWidthChange = useCallback((width: number) => {
@@ -287,9 +304,6 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 
   // Handle canvas click for shape creation
   const handleCanvasClick = useCallback(async (event: { x: number; y: number }) => {
-    console.log('🖱️ Canvas clicked at:', event.x, event.y, 'Selected tool:', uiState.selectedTool)
-    console.log('🔍 FullScreenLayout enableFirestore:', enableFirestore)
-
     // Handle text creation
     if (uiState.selectedTool === 'text') {
       try {
@@ -307,20 +321,12 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           }
         )
 
-        console.log('📝 Creating text content:', textContent)
-        console.log('🔍 Calling createContent with skipFirestore:', !enableFirestore)
-
         // Create content - skipFirestore parameter controls whether to save to Firestore
         await createContent(textContent, !enableFirestore)
 
-        if (enableFirestore) {
-          console.log('✅ Text content should be in Firestore')
-        } else {
-          console.log('⚠️ Firestore disabled - text added to local state only')
-        }
         // TODO: Task 2.3 - Immediately enter edit mode with caret visible
-      } catch (error) {
-        console.error('❌ Error creating text:', error)
+      } catch {
+        // Silently fail
       }
       return
     }
@@ -329,7 +335,6 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
       const { shapeCreationOptions } = uiState
 
       try {
-        console.log('🔍 Creating shape with skipFirestore:', !enableFirestore)
         // Create shape at clicked position
         if (shapeCreationOptions.type === 'rectangle') {
           const rectangle = {
@@ -473,6 +478,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           onSelectShape={handleShapeSelect}
           isVisible={uiState.propertiesPaneVisible}
           onClose={closePropertiesPane}
+          currentUserId={currentUserId}
+          users={usersMap}
         />
       </div>
 

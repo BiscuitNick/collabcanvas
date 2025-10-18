@@ -186,79 +186,28 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
       )}
 
       {/* Colors */}
-      {isTextContent(content) ? (
-        <div>
-          <Label htmlFor={`${content.id}-fill`} className="text-xs">Color</Label>
-          <Input
-            id={`${content.id}-fill`}
-            type="color"
-            value={content.fill}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleColorChange('fill', e.target.value)}
-            className="h-7 w-full p-1"
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <Label htmlFor={`${content.id}-fill`} className="text-xs">Fill</Label>
-            <Input
-              id={`${content.id}-fill`}
-              type="color"
-              value={'fill' in content ? content.fill : '#000000'}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleColorChange('fill', e.target.value)}
-              className="h-7 w-full p-1"
-            />
-          </div>
-          <div>
-            <Label htmlFor={`${content.id}-stroke`} className="text-xs">Stroke</Label>
-            <Input
-              id={`${content.id}-stroke`}
-              type="color"
-              value={'stroke' in content ? content.stroke || '#000000' : '#000000'}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleColorChange('stroke', e.target.value)}
-              className="h-7 w-full p-1"
-            />
-          </div>
-        </div>
-      )}
-      
-      {/* Stroke Width & Rotation */}
-      {isTextContent(content) ? (
-        <div>
-          <Label htmlFor={`${content.id}-rotation`} className="text-xs">Rotation</Label>
-          <Input
-            id={`${content.id}-rotation`}
-            type="number"
-            value={Math.round(content.rotation || 0)}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('rotation', parseInt(e.target.value) || 0)}
-            className="h-7 text-xs"
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <Label htmlFor={`${content.id}-strokeWidth`} className="text-xs">Stroke Width</Label>
-            <Input
-              id={`${content.id}-strokeWidth`}
-              type="number"
-              value={'strokeWidth' in content ? content.strokeWidth || 0 : 0}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('strokeWidth', parseInt(e.target.value) || 0)}
-              className="h-7 text-xs"
-              min="0"
-            />
-          </div>
-          <div>
-            <Label htmlFor={`${content.id}-rotation`} className="text-xs">Rotation</Label>
-            <Input
-              id={`${content.id}-rotation`}
-              type="number"
-              value={Math.round(content.rotation || 0)}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('rotation', parseInt(e.target.value) || 0)}
-              className="h-7 text-xs"
-            />
-          </div>
-        </div>
-      )}
+      <div>
+        <Label htmlFor={`${content.id}-fill`} className="text-xs">{isTextContent(content) ? 'Color' : 'Fill'}</Label>
+        <Input
+          id={`${content.id}-fill`}
+          type="color"
+          value={'fill' in content ? content.fill : '#000000'}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleColorChange('fill', e.target.value)}
+          className="h-10 w-full p-0 border-0 rounded cursor-pointer"
+        />
+      </div>
+
+      {/* Rotation */}
+      <div>
+        <Label htmlFor={`${content.id}-rotation`} className="text-xs">Rotation</Label>
+        <Input
+          id={`${content.id}-rotation`}
+          type="number"
+          value={Math.round(content.rotation || 0)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('rotation', parseInt(e.target.value) || 0)}
+          className="h-7 text-xs"
+        />
+      </div>
     </div>
   )
 }

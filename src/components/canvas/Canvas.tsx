@@ -61,7 +61,9 @@ const Canvas: React.FC<CanvasProps> = ({
   isCreatingShape = false,
 }) => {
   const stageRef = useRef<Konva.Stage>(null);
-  const { stagePosition, stageScale, isZooming, isDraggingShape, isPanning, selectedShapeId, setDraggingShape } = useCanvasStore();
+  const { stagePosition, stageScale, isZooming, isDraggingShape, isPanning, selectedContentId, setDraggingShape } = useCanvasStore();
+  // Use selectedContentId directly instead of the getter selectedShapeId for proper reactivity
+  const selectedShapeId = selectedContentId;
 
   useCursorContext({
     selectedTool: selectedTool || null,
@@ -90,6 +92,7 @@ const Canvas: React.FC<CanvasProps> = ({
     onPanEnd,
     onCanvasClick,
     isCreatingShape,
+    unlockShape,
   });
 
   const visibleShapes = useViewportCulling({
@@ -113,9 +116,10 @@ const Canvas: React.FC<CanvasProps> = ({
         onDragStart={() => handleShapeDragStart(shape.id)}
         onDragEndCallback={() => setDraggingShape(false)}
         currentUserId={currentUserId}
+        selectedTool={selectedTool}
       />
     ));
-  }, [visibleShapes, selectedShapeId, handleShapeSelect, handleShapeUpdate, handleShapeDragMove, handleShapeDragEnd, handleShapeDragStart, setDraggingShape, currentUserId]);
+  }, [visibleShapes, selectedShapeId, handleShapeSelect, handleShapeUpdate, handleShapeDragMove, handleShapeDragEnd, handleShapeDragStart, setDraggingShape, currentUserId, selectedTool]);
 
   // HARDCODED TEST TEXT - Remove after testing
   const testTextContent = {
@@ -146,7 +150,7 @@ const Canvas: React.FC<CanvasProps> = ({
           y={stagePosition.y}
           scaleX={stageScale}
           scaleY={stageScale}
-          draggable={!isZooming && !isDraggingShape}
+          draggable={!isZooming && !isDraggingShape && !selectedShapeId}
           {...interactionHandlers}
         >
           <Layer>
@@ -155,12 +159,13 @@ const Canvas: React.FC<CanvasProps> = ({
             <TextContent
               content={testTextContent as any}
               isSelected={false}
-              onSelect={() => console.log('Test text clicked')}
+              onSelect={() => {}}
               onUpdate={() => {}}
               onDragEnd={() => {}}
               onDragStart={() => {}}
               onDragEndCallback={() => {}}
               currentUserId={currentUserId}
+              selectedTool={selectedTool}
             />
           </Layer>
           <Layer>

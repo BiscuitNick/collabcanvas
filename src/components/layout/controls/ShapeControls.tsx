@@ -26,7 +26,9 @@ const ShapeControls: React.FC<ShapeControlsProps> = ({
   onShapeSelect,
 }) => {
   const { user } = useAuth();
-  const { stageScale, stagePosition, selectedShapeId, resetView } = useCanvasStore();
+  const { stageScale, stagePosition, selectedContentId, resetView } = useCanvasStore();
+  // Use selectedContentId directly instead of the getter selectedShapeId for proper reactivity
+  const selectedShapeId = selectedContentId;
 
   const handleCreateRectangle = async () => {
     if (!user) return;

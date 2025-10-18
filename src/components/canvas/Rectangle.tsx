@@ -4,7 +4,7 @@ import Konva from 'konva' // Import Konva for types
 import type { Rectangle } from '../../types'
 import { clamp } from '../../lib/utils'
 import { CANVAS_HALF, MIN_SHAPE_SIZE, MAX_SHAPE_SIZE } from '../../lib/constants'
-import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS, ENABLE_PERFORMANCE_LOGGING } from '../../lib/config'
+import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS } from '../../lib/config'
 
 interface RectangleProps {
   shape: Rectangle
@@ -16,6 +16,7 @@ interface RectangleProps {
   onDragStart: () => void
   onDragEndCallback: () => void
   currentUserId?: string
+  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null
 }
 
 const RectangleComponent: React.FC<RectangleProps> = memo(({
@@ -28,6 +29,7 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   onDragStart,
   onDragEndCallback,
   currentUserId,
+  selectedTool,
 }) => {
   const rectRef = useRef<Konva.Rect>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
@@ -37,18 +39,6 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
 
   // Check if shape is locked by another user
   const isLockedByOther = shape.lockedByUserId && shape.lockedByUserId !== currentUserId
-  // const isLockedByCurrent = shape.lockedByUserId === currentUserId
-  
-  // Debug: Log lock color info
-  if (isLockedByOther) {
-    console.log('🎨 Locked shape color:', {
-      shapeId: shape.id,
-      lockedByUserId: shape.lockedByUserId,
-      lockedByUserName: shape.lockedByUserName,
-      lockedByUserColor: shape.lockedByUserColor,
-      currentUserId
-    })
-  }
 
   // Canvas bounds - 64000x64000 with center at (0,0) for infinite feel
   // Moved to src/lib/constants.ts
@@ -74,20 +64,13 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
 
       // Throttle: only update if enough time has passed since last update
       if (now - lastUpdateRef.current >= RECTANGLE_DRAG_THROTTLE_MS) {
-        const startTime = ENABLE_PERFORMANCE_LOGGING ? performance.now() : 0
-        
         // Clamp position within canvas bounds
         const clampedX = clamp(pendingUpdate.x, -CANVAS_HALF, CANVAS_HALF - shape.width)
         const clampedY = clamp(pendingUpdate.y, -CANVAS_HALF, CANVAS_HALF - shape.height)
-        
+
         onDragMove(clampedX, clampedY)
         lastUpdateRef.current = now
         pendingUpdateRef.current = null
-        
-        if (ENABLE_PERFORMANCE_LOGGING) {
-          const duration = performance.now() - startTime
-          console.log(`📦 Rectangle drag update took ${duration.toFixed(2)}ms`)
-        }
       }
     }, RECTANGLE_DRAG_DEBOUNCE_MS)
   }, [onDragMove, shape.width, shape.height])
@@ -98,9 +81,8 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
       try {
         transformerRef.current.nodes([rectRef.current])
         transformerRef.current.getLayer()?.batchDraw()
-      } catch (error: unknown) {
-        // Ignore errors in test environment
-        console.warn('Transformer setup failed:', error)
+      } catch {
+        // Silently fail transformer setup
       }
     }
   }, [isSelected])
@@ -116,19 +98,40 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   }, [])
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    e.cancelBubble = true
-    // Allow viewing details but not editing if locked by another user
-    if (isLockedByOther) {
-      console.log('👁️ Viewing locked shape details:', shape.lockedByUserName)
+    // Log shape click
+    console.log('🖱️ Canvas clicked - Shape:', { type: 'rectangle', id: shape.id, x: shape.x.toFixed(2), y: shape.y.toFixed(2) })
+
+    // Only allow selection with select, pan, or ai tools
+    const allowSelection = selectedTool === 'select' || selectedTool === 'pan' || selectedTool === 'ai' || selectedTool === null
+
+    if (!allowSelection) {
+      // Don't stop propagation - let the tool action happen
+      console.log('🔧 Tool active - passing click through to canvas')
+      return
     }
-    // Always call onSelect to show details in panel
+
+    // Prevent event from bubbling to stage for selection
+    e.cancelBubble = true
+    e.evt.stopPropagation()
+
+    // Prevent selection if locked by another user
+    if (isLockedByOther) {
+      console.log('⚠️ Cannot select - locked by another user')
+      return
+    }
+
+    // Call onSelect to show details in panel
     onSelect()
   }
 
-  const handleDragStart = () => {
+  const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
+    // Prevent event from bubbling
+    e.cancelBubble = true
+
     // Only allow drag if shape is selected
     if (!isSelected) {
-      console.log('❌ Cannot drag - shape must be selected first')
+      // Prevent the drag
+      e.target.stopDrag()
       return
     }
     // Notify parent that dragging has started
@@ -272,7 +275,7 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
             return newBox
           }}
           keepRatio={false}
-          enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top-center', 'bottom-center', 'left-center', 'right-center']}
+          enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top-center', 'bottom-center', 'middle-left', 'middle-right']}
           anchorSize={8}
           anchorStroke="#007AFF"
           anchorFill="#FFFFFF"

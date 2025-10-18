@@ -10,6 +10,7 @@ import { useCursorContext } from '../../hooks/useCursorContext';
 import { useInteractionHandling } from './hooks/useInteractionHandling';
 import { useShapeHandling } from './hooks/useShapeHandling';
 import { useViewportCulling } from './hooks/useViewportCulling';
+import { useSmoothPanning } from './hooks/useSmoothPanning';
 
 export interface CanvasProps {
   width: number;
@@ -101,6 +102,16 @@ const Canvas: React.FC<CanvasProps> = ({
     onVisibleShapesChange,
   });
 
+  // Enable smooth panning animation
+  useSmoothPanning({
+    stageRef,
+    targetX: stagePosition.x,
+    targetY: stagePosition.y,
+    duration: 300,
+    isUserDragging: isPanning, // Disable animation during user dragging
+    isZooming: isZooming, // Disable animation during user zooming
+  });
+
   const renderedShapes = useMemo(() => {
     return visibleShapes.map((shape) => (
       <ShapeFactory
@@ -127,8 +138,6 @@ const Canvas: React.FC<CanvasProps> = ({
           ref={stageRef}
           width={width}
           height={height}
-          x={stagePosition.x}
-          y={stagePosition.y}
           scaleX={stageScale}
           scaleY={stageScale}
           draggable={!isZooming && !isDraggingShape && !selectedShapeId}

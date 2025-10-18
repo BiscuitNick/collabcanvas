@@ -15,7 +15,7 @@ interface ShapeFactoryProps {
   onDragStart: () => void
   onDragEndCallback: () => void
   currentUserId?: string
-  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null
+  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
 }
 
 /**

@@ -6,25 +6,37 @@ import replicate
 import re
 from prompts import get_canvas_system_prompt
 
-def text_to_canvas_commands_replicate(prompt: str, model: str) -> dict:
+def text_to_canvas_commands_replicate(prompt: str, model: str, selected_content=None) -> dict:
     """Converts a natural language prompt to canvas commands using Replicate."""
     start_time = time.time()
     try:
         api_token = os.environ.get('REPLICATE_API_TOKEN')
         if not api_token:
+            print("[Replicate Service] API token not configured")
             return {"success": False, "error": "Replicate API token not configured"}
+
+        is_editing = selected_content is not None
+        print(f"[Replicate Service] Calling with model: {model}, editing: {is_editing}")
+
+        # Get system prompt with optional selected content context
+        system_prompt = get_canvas_system_prompt(selected_content)
 
         input_payload = {
             "prompt": prompt,
             "messages": [],
             "verbosity": "low",
             "image_input": [],
-            "system_prompt": get_canvas_system_prompt(),
+            "system_prompt": system_prompt,
             "reasoning_effort": "minimal",
         }
 
+        # Use model string as-is if it contains a "/", otherwise prepend "openai/"
+        model_path = model if "/" in model else f"openai/{model}"
+
+        print(f"[Replicate Service] Calling with model: {model_path}")
+
         raw_output = replicate.run(
-            f"openai/{model}",
+            model_path,
             input=input_payload,
             api_token=api_token,
         )
@@ -36,11 +48,14 @@ def text_to_canvas_commands_replicate(prompt: str, model: str) -> dict:
         else:
             response_text = str(raw_output)
 
+        print(f"[Replicate Service] Completed in {api_duration:.0f}ms, response length: {len(response_text)}")
+
         try:
             cleaned_response = response_text.strip()
             canvas_commands = json.loads(cleaned_response)
             if not isinstance(canvas_commands, list):
                 canvas_commands = [canvas_commands]
+            print(f"[Replicate Service] Parsed {len(canvas_commands)} commands")
         except json.JSONDecodeError:
             json_match = re.search(r'\[[\s\S]*?\]', response_text, re.DOTALL)
             if json_match:
@@ -103,9 +118,11 @@ def text_to_canvas_commands_replicate(prompt: str, model: str) -> dict:
                 }
             ]
 
+        print(f"[Replicate Service] Returning {len(canvas_commands)} commands")
+
         debug_info = {
             "provider": "replicate",
-            "model": f"openai/{model}",
+            "model": model_path,
             "response_time_ms": api_duration,
             "raw_response_length": len(response_text),
             "raw_output": raw_output,

@@ -20,7 +20,7 @@ def hello_world(req: https_fn.Request) -> https_fn.Response:
     return https_fn.Response(
         json.dumps(response_data),
         status=200,
-        headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': ''}
+        headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}
     )
 
 @https_fn.on_request(secrets=["OPENAI_API_KEY"])
@@ -35,20 +35,27 @@ def ai_text_to_canvas(req: https_fn.Request) -> https_fn.Response:
 
     prompt = request_data['prompt']
     model = request_data.get('model', 'gpt-5-mini')
+    selected_content = request_data.get('selectedContent')
 
-    result = text_to_canvas_commands(prompt, model)
+    print(f"[OpenAI Endpoint] Request - Model: {model}, Has selected content: {selected_content is not None}")
+
+    result = text_to_canvas_commands(prompt, model, selected_content)
+
+    print(f"[OpenAI Endpoint] Response - Success: {result['success']}, Commands: {len(result.get('data', {}).get('commands', []))}")
+    if not result['success']:
+        print(f"[OpenAI Endpoint] Error: {result.get('error')}")
 
     if result['success']:
         return https_fn.Response(
             json.dumps(result),
             status=200,
-            headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': ''}
+            headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}
         )
     else:
         return https_fn.Response(
             json.dumps({'success': False, 'error': result['error']}),
             status=500,
-            headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': ''}
+            headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}
         )
 
 @https_fn.on_request(secrets=["REPLICATE_API_TOKEN"])
@@ -63,18 +70,25 @@ def ai_text_to_canvas_replicate(req: https_fn.Request) -> https_fn.Response:
 
     prompt = request_data['prompt']
     model = request_data.get('model', 'gpt-5-mini')
+    selected_content = request_data.get('selectedContent')
 
-    result = text_to_canvas_commands_replicate(prompt, model)
+    print(f"[Replicate Endpoint] Request - Model: {model}, Has selected content: {selected_content is not None}")
+
+    result = text_to_canvas_commands_replicate(prompt, model, selected_content)
+
+    print(f"[Replicate Endpoint] Response - Success: {result['success']}, Commands: {len(result.get('data', {}).get('commands', []))}")
+    if not result['success']:
+        print(f"[Replicate Endpoint] Error: {result.get('error')}")
 
     if result['success']:
         return https_fn.Response(
             json.dumps(result),
             status=200,
-            headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': ''}
+            headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}
         )
     else:
         return https_fn.Response(
             json.dumps({'success': False, 'error': result['error']}),
             status=500,
-            headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': ''}
+            headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}
         )

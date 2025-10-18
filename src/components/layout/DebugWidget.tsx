@@ -5,12 +5,11 @@ import { Label } from '../ui/label'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion'
 import { useCanvasStore } from '../../store/canvasStore'
 
-import type { Content, Cursor, PresenceUser } from '../../types';
+import type { Content, Cursor } from '../../types';
 
 interface DebugWidgetProps {
   content: Content[];
   cursors: Cursor[];
-  presence: PresenceUser[];
   selectedShapeId: string | null
   debugMode: boolean
   showSelfCursor: boolean
@@ -31,22 +30,15 @@ interface DebugWidgetProps {
 const DebugWidget: React.FC<DebugWidgetProps> = ({
   content,
   cursors,
-  presence,
   selectedShapeId,
   debugMode,
   showSelfCursor,
   onToggleSelfCursor,
-  showFPS,
-  onToggleFPS,
   enableViewportCulling,
   onToggleViewportCulling,
   fps,
   enableFirestore = true,
-  onToggleFirestore,
-  canvasWidth,
-  canvasHeight,
-  onCanvasWidthChange,
-  onCanvasHeightChange
+  onToggleFirestore
 }) => {
   const { stagePosition, stageScale, isPanning, isDraggingShape, isZooming } = useCanvasStore()
 
@@ -137,18 +129,6 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
               </div>
               
               <div className="flex items-center justify-between">
-                <Label htmlFor="show-fps" className="text-xs">
-                  Show FPS Monitor
-                </Label>
-                <Switch
-                  id="show-fps"
-                  checked={showFPS}
-                  onCheckedChange={onToggleFPS}
-                  className="scale-75"
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
                 <Label htmlFor="viewport-culling" className="text-xs">
                   Enable Viewport Culling
                 </Label>
@@ -177,68 +157,6 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
           </AccordionContent>
         </AccordionItem>
 
-        {/* Canvas Dimensions */}
-        <AccordionItem value="canvas-dimensions" className="border-b">
-          <AccordionTrigger className="py-2 text-xs font-medium text-gray-700 hover:no-underline">
-            Canvas Dimensions
-          </AccordionTrigger>
-          <AccordionContent className="pb-2">
-            <div className="space-y-3">
-              <div>
-                <Label htmlFor="canvas-width" className="text-xs">
-                  Width: {canvasWidth}px
-                </Label>
-                {onCanvasWidthChange && (
-                  <input
-                    id="canvas-width"
-                    type="range"
-                    min="400"
-                    max="3840"
-                    step="100"
-                    value={canvasWidth}
-                    onChange={(e) => onCanvasWidthChange(parseInt(e.target.value))}
-                    className="w-full mt-1"
-                  />
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="canvas-height" className="text-xs">
-                  Height: {canvasHeight}px
-                </Label>
-                {onCanvasHeightChange && (
-                  <input
-                    id="canvas-height"
-                    type="range"
-                    min="300"
-                    max="2160"
-                    step="100"
-                    value={canvasHeight}
-                    onChange={(e) => onCanvasHeightChange(parseInt(e.target.value))}
-                    className="w-full mt-1"
-                  />
-                )}
-              </div>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-
-        {/* Presence Info */}
-        <AccordionItem value="presence-info" className="border-b">
-          <AccordionTrigger className="py-2 text-xs font-medium text-gray-700 hover:no-underline">
-            Presence ({presence.length})
-          </AccordionTrigger>
-          <AccordionContent className="pb-2">
-            <div className="space-y-1 text-gray-600 max-h-32 overflow-y-auto">
-              {presence.map(user => (
-                <div key={user.userId} className="flex justify-between py-0.5">
-                  <span>{user.userName}</span>
-                  <span className="text-gray-400">Active</span>
-                </div>
-              ))}
-            </div>
-          </AccordionContent>
-        </AccordionItem>
       </Accordion>
     </div>
   )

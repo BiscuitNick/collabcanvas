@@ -6,7 +6,6 @@ import { usePresence } from '../hooks/usePresence'
 import { useCanvasStore } from '../store/canvasStore'
 import FullScreenLayout from '../components/layout/FullScreenLayout'
 import Canvas from '../components/canvas/Canvas'
-import FPSMonitor from '../components/canvas/FPSMonitor'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { CANVAS_HALF } from '../lib/constants'
 
@@ -15,11 +14,6 @@ export const CanvasPage: React.FC = () => {
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const [pendingUserClick, setPendingUserClick] = useState<string | null>(null)
   const [showSelfCursor] = useState(true)
-  const [showFPS] = useState(() => {
-    // Load from localStorage, default to true
-    const saved = localStorage.getItem('showFPS')
-    return saved !== null ? JSON.parse(saved) : true
-  })
   const [enableViewportCulling] = useState(() => {
     // Load from localStorage, default to false
     const saved = localStorage.getItem('enableViewportCulling')
@@ -171,9 +165,6 @@ export const CanvasPage: React.FC = () => {
           stopEditingShape={stopEditingShape}
         />
       </FullScreenLayout>
-      
-      {/* FPS Monitor Overlay */}
-      <FPSMonitor isEnabled={showFPS} />
     </ErrorBoundary>
   )
 }

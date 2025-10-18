@@ -1,12 +1,11 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { Button } from '../ui/button'
 import DebugWidget from './DebugWidget'
-import type { Content, Cursor as CursorType, PresenceUser } from '../../types'
+import type { Content, Cursor as CursorType } from '../../types'
 
 interface DraggableDebugWidgetProps {
   content: Content[]
   cursors: CursorType[]
-  presence: PresenceUser[]
   selectedShapeId: string | null
   debugMode: boolean
   showSelfCursor: boolean
@@ -28,7 +27,6 @@ interface DraggableDebugWidgetProps {
 const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
   content,
   cursors,
-  presence,
   selectedShapeId,
   debugMode,
   showSelfCursor,
@@ -118,7 +116,7 @@ const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
     >
       <div className="bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg flex flex-col max-h-[calc(100vh-8rem)]">
         {/* Header with drag handle and close button */}
-        <div 
+        <div
           data-drag-handle
           className="flex items-center justify-between p-3 border-b border-gray-200 cursor-grab flex-shrink-0"
         >
@@ -142,7 +140,6 @@ const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
           <DebugWidget
             content={content}
             cursors={cursors}
-            presence={presence}
             selectedShapeId={selectedShapeId}
             debugMode={debugMode}
             showSelfCursor={showSelfCursor}

@@ -11,7 +11,7 @@ import {
 import { firestore } from '../lib/firebase'
 import { getUserColor } from '../lib/utils'
 import { STALE_PRESENCE_THRESHOLD, OFFLINE_PRESENCE_THRESHOLD } from '../lib/constants'
-import { PRESENCE_UPDATE_INTERVAL_MS, PRESENCE_CLEANUP_INTERVAL_MS, ENABLE_PERFORMANCE_LOGGING, CANVAS_ID } from '../lib/config'
+import { PRESENCE_UPDATE_INTERVAL_MS, PRESENCE_CLEANUP_INTERVAL_MS, CANVAS_ID } from '../lib/config'
 import type { PresenceUser } from '../types'
 
 interface UsePresenceReturn {
@@ -33,9 +33,8 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
     try {
       const presenceRef = doc(firestore, 'canvases', CANVAS_ID, 'presence', userId)
       await deleteDoc(presenceRef)
-      console.log('🧹 Cleaned up presence for user:', userId)
     } catch (err) {
-      console.error('❌ Error cleaning up presence:', err)
+      // Error cleaning up presence
     }
   }, [userId])
 
@@ -61,26 +60,22 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
       for (const userId of staleUsers) {
         try {
           await deleteDoc(doc(firestore, 'canvases', CANVAS_ID, 'presence', userId))
-          console.log('🧹 Removed stale presence for user:', userId)
         } catch (err) {
-          console.error('❌ Error removing stale presence:', err)
+          // Error removing stale presence
         }
       }
     } catch (err) {
-      console.error('❌ Error cleaning up stale presence:', err)
+      // Error cleaning up stale presence
     }
   }, [])
 
   // Write user presence on mount and set up heartbeat
   useEffect(() => {
     if (!userId || !userName) {
-      console.log('⚠️ No userId or userName provided, skipping presence setup')
       return
     }
 
     const writePresence = async () => {
-      const startTime = ENABLE_PERFORMANCE_LOGGING ? performance.now() : 0
-      
       try {
         const presenceRef = doc(firestore, 'canvases', CANVAS_ID, 'presence', userId)
         const presenceData = {
@@ -90,21 +85,10 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
           joinedAt: serverTimestamp(),
           lastSeen: serverTimestamp()
         }
-        
-        if (ENABLE_PERFORMANCE_LOGGING) {
-          console.log('👤 Writing presence to Firestore:', presenceData)
-        }
+
         await setDoc(presenceRef, presenceData, { merge: true })
         setError(null)
-        
-        if (ENABLE_PERFORMANCE_LOGGING) {
-          const duration = performance.now() - startTime
-          console.log(`💓 Presence update took ${duration.toFixed(2)}ms for user: ${userId}`)
-        } else {
-          console.log('✅ Presence written successfully')
-        }
       } catch (err) {
-        console.error('❌ Error writing presence:', err)
         setError('Failed to write presence data')
       }
     }
@@ -114,13 +98,12 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
     // Set up heartbeat to update lastSeen every 30 seconds
     heartbeatIntervalRef.current = setInterval(async () => {
       if (isCleaningUpRef.current) return
-      
+
       try {
         const presenceRef = doc(firestore, 'presence', userId)
         await setDoc(presenceRef, { lastSeen: serverTimestamp() }, { merge: true })
-        console.log('💓 Heartbeat updated for user:', userId)
       } catch (err) {
-        console.error('❌ Error updating heartbeat:', err)
+        // Error updating heartbeat
       }
     }, PRESENCE_UPDATE_INTERVAL_MS)
 
@@ -159,15 +142,11 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
   // Listen to presence changes
   useEffect(() => {
     if (!userId) {
-      console.log('⚠️ No userId provided, skipping presence listener setup')
       return
     }
 
     const presenceRef = collection(firestore, 'presence')
-    
-    console.log('🔍 Setting up presence listener for userId:', userId)
-    console.log('🔗 Using Firestore collection: presence')
-    
+
     const unsubscribe = onSnapshot(
       presenceRef,
       (snapshot) => {
@@ -187,28 +166,18 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
                 color: data.color,
                 joinedAt: data.joinedAt?.toMillis() || Date.now()
               }
-              
+
               presenceData.push(presenceUser)
-            } else {
-              console.log('👻 User considered offline (no recent heartbeat):', data.userName)
             }
           })
-          
-          console.log('👥 Processed presence users (online only):', presenceData)
+
           setPresenceUsers(presenceData)
           setError(null)
         } catch (err) {
-          console.error('❌ Error listening to presence:', err)
           setError('Failed to sync presence data')
         }
       },
       (err) => {
-        console.error('❌ Error in presence listener:', err)
-        console.error('❌ Error details:', {
-          code: err.code,
-          message: err.message,
-          stack: err.stack
-        })
         setError(`Failed to connect to presence sync: ${err.message}`)
       }
     )

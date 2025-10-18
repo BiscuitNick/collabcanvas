@@ -3,7 +3,7 @@ import os
 import json
 import time
 from openai import OpenAI
-from prompts import CANVAS_SYSTEM_PROMPT
+from prompts import get_canvas_system_prompt
 
 client = None
 
@@ -43,15 +43,21 @@ def get_canvas_tools():
         },
     ]
 
-def text_to_canvas_commands(prompt: str, model: str) -> dict:
+def text_to_canvas_commands(prompt: str, model: str, selected_content=None) -> dict:
     """Converts a natural language prompt to canvas commands using OpenAI."""
     start_time = time.time()
     try:
+        is_editing = selected_content is not None
+        print(f"[OpenAI Service] Calling with model: {model}, editing: {is_editing}")
+
+        # Get system prompt with optional selected content context
+        system_prompt = get_canvas_system_prompt(selected_content)
+
         openai_client = get_openai_client()
         response = openai_client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": CANVAS_SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"{prompt}\n\nPlease generate ALL requested shapes in this single response."},
             ],
             tools=get_canvas_tools(),
@@ -64,6 +70,8 @@ def text_to_canvas_commands(prompt: str, model: str) -> dict:
 
         message = response.choices[0].message
         usage = response.usage
+
+        print(f"[OpenAI Service] Completed in {api_duration:.0f}ms, tool_calls: {len(message.tool_calls) if message.tool_calls else 0}")
         debug_info = {
             "tokens_used": usage.total_tokens if usage else None,
             "prompt_tokens": usage.prompt_tokens if usage else None,
@@ -92,9 +100,12 @@ def text_to_canvas_commands(prompt: str, model: str) -> dict:
                         command["text"] = function_args.get("text", "")
                         command["fontSize"] = function_args.get("fontSize", 16)
                     canvas_commands.append(command)
+            print(f"[OpenAI Service] Returning {len(canvas_commands)} commands")
             return {"success": True, "data": {"commands": canvas_commands}, "debug": debug_info}
         else:
+            print(f"[OpenAI Service] No tool calls in response")
             return {"success": True, "data": {"commands": []}, "debug": debug_info}
 
     except Exception as e:
+        print(f"[OpenAI Service] Error: {str(e)}")
         return {"success": False, "error": str(e)}

@@ -12,6 +12,7 @@ import { useCursorContext } from '../../hooks/useCursorContext'
 import { useContent } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
 import DraggableDebugWidget from './DraggableDebugWidget'
+import OnlineUsersWidget from './OnlineUsersWidget'
 
 interface FullScreenLayoutProps {
   children: React.ReactNode
@@ -34,12 +35,13 @@ interface UIState {
   propertiesPaneVisible: boolean
   gridlinesVisible: boolean
   selectedShapeId: string | null
-  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null
+  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
   aiAgentActive: boolean
   isDragging: boolean
   isPanning: boolean
   isResizing: boolean
   debugMode: boolean
+  showOnlineUsers: boolean
   showSelfCursor: boolean
   showFPS: boolean
   enableViewportCulling: boolean
@@ -99,6 +101,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     isPanning: false,
     isResizing: false,
     debugMode: false,
+    showOnlineUsers: false,
     showSelfCursor: false,
     showFPS: true,
     enableViewportCulling: false,
@@ -121,8 +124,35 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   })
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const [manualCanvasSize, setManualCanvasSize] = useState<{ width: number; height: number } | null>(null)
-  const [textOptions, setTextOptions] = useState({ text: 'hello world', fontSize: 24, fontFamily: 'Arial' as const, fontStyle: 'normal' as const })
+  const [textOptions, setTextOptions] = useState({ text: '', fontSize: 24, fontFamily: 'Arial' as const, fontStyle: 'normal' as const })
   const containerRef = useRef<HTMLDivElement>(null)
+  const fpsRef = useRef({ frames: 0, lastTime: performance.now() })
+
+  // Calculate FPS
+  useEffect(() => {
+    let animationFrameId: number
+
+    const updateFPS = () => {
+      const now = performance.now()
+      fpsRef.current.frames++
+
+      // Update FPS every second
+      if (now >= fpsRef.current.lastTime + 1000) {
+        const fps = Math.round((fpsRef.current.frames * 1000) / (now - fpsRef.current.lastTime))
+        setUIState(prev => ({ ...prev, fps }))
+        fpsRef.current.frames = 0
+        fpsRef.current.lastTime = now
+      }
+
+      animationFrameId = requestAnimationFrame(updateFPS)
+    }
+
+    animationFrameId = requestAnimationFrame(updateFPS)
+
+    return () => {
+      cancelAnimationFrame(animationFrameId)
+    }
+  }, [])
 
   // Apply cursor context based on selected tool and interaction state
   useCursorContext({
@@ -190,7 +220,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 
 
   // Toolbar handlers
-  const handleToolSelect = useCallback((tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | null) => {
+  const handleToolSelect = useCallback((tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null) => {
     const isShapeTool = tool === 'rectangle' || tool === 'circle' || tool === 'image';
     const isTextTool = tool === 'text';
     setUIState(prev => ({
@@ -247,10 +277,18 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 
   // Debug toggle handler
   const handleToggleDebug = useCallback(() => {
-    setUIState(prev => ({ 
-      ...prev, 
+    setUIState(prev => ({
+      ...prev,
       debugMode: !prev.debugMode,
       propertiesPaneVisible: !prev.debugMode ? true : prev.propertiesPaneVisible // Show properties pane when enabling debug
+    }))
+  }, [])
+
+  // Online users toggle handler
+  const handleToggleOnlineUsers = useCallback(() => {
+    setUIState(prev => ({
+      ...prev,
+      showOnlineUsers: !prev.showOnlineUsers
     }))
   }, [])
 
@@ -428,12 +466,16 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         <BottomToolbar
           onCreateShape={handleCreateShape}
           onCreateShapeWithOptions={handleCreateShapeWithOptions}
+          onCreateContent={createContent}
+          onUpdateContent={updateShape}
           onTextOptionsChange={handleTextOptionsChange}
           onOpenAIAgent={handleOpenAIAgent}
           selectedTool={uiState.selectedTool}
           onToolSelect={handleToolSelect}
           debugMode={uiState.debugMode}
           onToggleDebug={handleToggleDebug}
+          showOnlineUsers={uiState.showOnlineUsers}
+          onToggleOnlineUsers={handleToggleOnlineUsers}
           onResetCanvas={handleResetCanvas}
         />
 
@@ -463,6 +505,19 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         <ZoomWidget />
       </div>
 
+      {/* Online Users Widget - Top Right (below Zoom Widget) */}
+      {uiState.showOnlineUsers && (
+        <div
+          className="absolute right-4 z-50 w-80"
+          style={{
+            top: 'calc(1rem + 40px + 0.5rem)', // top-4 + ZoomWidget height + gap
+            maxHeight: 'calc(50vh - 1rem - 40px - 0.5rem)' // 50% viewport - top offset
+          }}
+        >
+          <OnlineUsersWidget presence={presence} />
+        </div>
+      )}
+
       {/* Floating Layers Panel - Left with dynamic height */}
       <div 
         className="absolute left-4 z-50"
@@ -483,12 +538,10 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         />
       </div>
 
-
       {/* Draggable Debug Widget */}
       <DraggableDebugWidget
         content={content}
         cursors={cursors}
-        presence={presence}
         selectedShapeId={uiState.selectedShapeId}
         debugMode={uiState.debugMode}
         showSelfCursor={uiState.showSelfCursor}

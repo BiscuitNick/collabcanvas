@@ -11,7 +11,7 @@ interface InteractionHandlingProps {
   onMouseMove: (x: number, y: number, canvasWidth: number, canvasHeight: number) => void;
   onPanStart?: () => void;
   onPanEnd?: () => void;
-  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'ai' | 'pan' | null;
+  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'ai' | 'pan' | 'agent' | null;
   onCanvasClick?: (event: { x: number; y: number }) => void;
   isCreatingShape?: boolean;
   unlockShape?: (id: string) => Promise<void>;

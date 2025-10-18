@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { firestore } from '../../lib/firebase';
-import { CANVAS_ID } from '../../lib/config';
+import { useCanvasId } from '../../contexts/CanvasContext';
 import type { Content } from '../../types';
 import { ContentVersion } from '../../types';
 import { useCanvasStore } from '../../store/canvasStore';
@@ -43,6 +43,7 @@ const useFirestoreEnabled = () => {
 };
 
 export const useFirestoreSync = (userUid: string | undefined) => {
+  const canvasId = useCanvasId();
   const [content, setContent] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -90,8 +91,8 @@ export const useFirestoreSync = (userUid: string | undefined) => {
       return;
     }
 
-    console.log('🔌 Firestore enabled - setting up listener');
-    const contentRef = collection(firestore, 'canvases', CANVAS_ID, 'content');
+    console.log('🔌 Firestore enabled - setting up listener', { canvasId });
+    const contentRef = collection(firestore, 'canvases', canvasId, 'content');
     const q = query(contentRef, orderBy('createdAt', 'asc'));
 
     const unsubscribe = onSnapshot(
@@ -229,7 +230,7 @@ export const useFirestoreSync = (userUid: string | undefined) => {
         clearTimeout(updateTimeoutRef.current);
       }
     };
-  }, [userUid, enableFirestore, setStoreContent]); // Note: storeContent is read inside but not a dependency to avoid infinite loops
+  }, [userUid, enableFirestore, setStoreContent, canvasId]); // Note: storeContent is read inside but not a dependency to avoid infinite loops
 
   return { content, setContent, loading, error, activelyEditingRef, isCreatingContent };
 };

@@ -3,7 +3,8 @@ import { useCallback, useRef, useState, useEffect } from 'react';
 import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { firestore } from '../../lib/firebase';
 import { useCanvasStore } from '../../store/canvasStore';
-import { SHAPE_RETRY_DELAY_MS, SHAPE_MAX_RETRIES, ENABLE_PERFORMANCE_LOGGING, CANVAS_ID } from '../../lib/config';
+import { useCanvasId } from '../../contexts/CanvasContext';
+import { SHAPE_RETRY_DELAY_MS, SHAPE_MAX_RETRIES, ENABLE_PERFORMANCE_LOGGING } from '../../lib/config';
 import type { Content } from '../../types';
 
 // Remove undefined values from an object for Firestore compatibility
@@ -23,6 +24,7 @@ export const useContentOperations = (
   activelyEditingRef: React.MutableRefObject<Set<string>>,
   isCreatingContent: React.MutableRefObject<boolean>
 ) => {
+  const canvasId = useCanvasId();
   const { addContent: addStoreContent, updateContent: updateStoreContent, deleteContent: deleteStoreContent, setSyncStatus, clearAllContent: clearAllContentStore } = useCanvasStore();
   const retryCount = useRef(0);
 
@@ -49,7 +51,7 @@ export const useContentOperations = (
 
   const throttledUpdate = useCallback(async (id: string, updates: Partial<Content>) => {
     try {
-      const contentRef = doc(firestore, 'canvases', CANVAS_ID, 'content', id);
+      const contentRef = doc(firestore, 'canvases', canvasId, 'content', id);
       const updateData = removeUndefinedValues({ ...updates, updatedAt: serverTimestamp() });
       await updateDoc(contentRef, updateData);
       setSyncStatus(id, 'synced');
@@ -66,7 +68,7 @@ export const useContentOperations = (
         }
       }
     }
-  }, [setSyncStatus]);
+  }, [setSyncStatus, canvasId]);
 
   const createContent = useCallback(async (contentData: Omit<Content, 'id' | 'createdAt' | 'updatedAt'>, skipFirestore = false): Promise<void> => {
     try {
@@ -89,9 +91,9 @@ export const useContentOperations = (
         console.log('⚠️ Content added to canvas store only:', localId);
       } else {
         // Firestore mode: Add to Firestore, listener will update local state
-        const path = `canvases/${CANVAS_ID}/content`;
+        const path = `canvases/${canvasId}/content`;
         console.log('📤 Firestore path:', path);
-        const contentRef = collection(firestore, 'canvases', CANVAS_ID, 'content');
+        const contentRef = collection(firestore, 'canvases', canvasId, 'content');
         const now = serverTimestamp();
         const newContent = removeUndefinedValues({ ...contentData, createdAt: now, updatedAt: now });
         console.log('📤 About to add to Firestore:', newContent);
@@ -108,7 +110,7 @@ export const useContentOperations = (
         isCreatingContent.current = false;
       }, 100);
     }
-  }, [setSyncStatus, isCreatingContent, addStoreContent]);
+  }, [setSyncStatus, isCreatingContent, addStoreContent, canvasId]);
 
   const updateContent = useCallback(async (id: string, updates: Partial<Content>): Promise<void> => {
     try {
@@ -151,7 +153,7 @@ export const useContentOperations = (
 
       // Only delete from Firestore if enabled and not a local-only item
       if (enableFirestore && !id.startsWith('local-')) {
-        const contentRef = doc(firestore, 'canvases', CANVAS_ID, 'content', id);
+        const contentRef = doc(firestore, 'canvases', canvasId, 'content', id);
         await deleteDoc(contentRef);
         console.log('✅ Content deleted from Firestore:', id);
       } else {
@@ -160,7 +162,7 @@ export const useContentOperations = (
     } catch (err) {
       console.error('Error deleting content:', err);
     }
-  }, [deleteStoreContent, enableFirestore]);
+  }, [deleteStoreContent, enableFirestore, canvasId]);
 
   const clearAllContent = useCallback(async (): Promise<void> => {
     try {
@@ -172,7 +174,7 @@ export const useContentOperations = (
         const deletePromises = currentContent
           .filter(c => !c.id.startsWith('local-')) // Don't try to delete local-only items from Firestore
           .map((content) => {
-            const contentRef = doc(firestore, 'canvases', CANVAS_ID, 'content', content.id);
+            const contentRef = doc(firestore, 'canvases', canvasId, 'content', content.id);
             return deleteDoc(contentRef);
           });
         await Promise.all(deletePromises);
@@ -183,7 +185,7 @@ export const useContentOperations = (
     } catch (err) {
       console.error('Error clearing all content:', err);
     }
-  }, [content, clearAllContentStore, enableFirestore]);
+  }, [content, clearAllContentStore, enableFirestore, canvasId]);
 
   const startEditingContent = useCallback((id: string): void => {
     activelyEditingRef.current.add(id);

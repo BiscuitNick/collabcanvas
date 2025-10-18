@@ -11,7 +11,8 @@ import {
 } from 'firebase/firestore'
 import { firestore } from '../lib/firebase'
 import { getUserColor } from '../lib/utils'
-import { CURSOR_THROTTLE_MS, CURSOR_DEBOUNCE_MS, ENABLE_PERFORMANCE_LOGGING, CANVAS_ID } from '../lib/config'
+import { useCanvasId } from '../contexts/CanvasContext'
+import { CURSOR_THROTTLE_MS, CURSOR_DEBOUNCE_MS, ENABLE_PERFORMANCE_LOGGING } from '../lib/config'
 import type { Cursor } from '../types'
 
 interface UseCursorsReturn {
@@ -21,6 +22,7 @@ interface UseCursorsReturn {
 }
 
 export const useCursors = (userId: string, userName: string, stagePosition?: { x: number; y: number }, viewportWidth?: number, viewportHeight?: number, stageScale?: number): UseCursorsReturn => {
+  const canvasId = useCanvasId()
   const [cursors, setCursors] = useState<Cursor[]>([])
   const [error, setError] = useState<string | null>(null)
   const lastUpdateRef = useRef<number>(0)
@@ -48,9 +50,9 @@ export const useCursors = (userId: string, userName: string, stagePosition?: { x
       // Throttle: only update if enough time has passed since last update
       if (now - lastUpdateRef.current >= CURSOR_THROTTLE_MS) {
         const startTime = ENABLE_PERFORMANCE_LOGGING ? performance.now() : 0
-        
+
         try {
-          const cursorRef = doc(firestore, 'canvases', CANVAS_ID, 'cursors', userId)
+          const cursorRef = doc(firestore, 'canvases', canvasId, 'cursors', userId)
           
           // Store absolute coordinates in canvas space
           const cursorData = {
@@ -77,7 +79,7 @@ export const useCursors = (userId: string, userName: string, stagePosition?: { x
         }
       }
     }, CURSOR_DEBOUNCE_MS)
-  }, [userId, userName])
+  }, [userId, userName, canvasId])
 
   // Listen to cursor changes
   useEffect(() => {
@@ -85,7 +87,7 @@ export const useCursors = (userId: string, userName: string, stagePosition?: { x
       return
     }
 
-    const cursorsRef = collection(firestore, 'canvases', CANVAS_ID, 'cursors')
+    const cursorsRef = collection(firestore, 'canvases', canvasId, 'cursors')
     const q = query(cursorsRef, orderBy('lastUpdated', 'desc'))
     
     const unsubscribe = onSnapshot(
@@ -153,7 +155,7 @@ export const useCursors = (userId: string, userName: string, stagePosition?: { x
     )
 
     return () => unsubscribe()
-  }, [userId, stagePosition, stageScale, viewportHeight, viewportWidth])
+  }, [userId, stagePosition, stageScale, viewportHeight, viewportWidth, canvasId])
 
   // Clean up on unmount
   useEffect(() => {
@@ -169,7 +171,7 @@ export const useCursors = (userId: string, userName: string, stagePosition?: { x
       // Remove own cursor from Firestore
       if (userId) {
         try {
-          const cursorRef = doc(firestore, 'canvases', CANVAS_ID, 'cursors', userId)
+          const cursorRef = doc(firestore, 'canvases', canvasId, 'cursors', userId)
           deleteDoc(cursorRef)
           console.log('🧹 Cleaned up cursor on unmount')
         } catch (err) {
@@ -177,7 +179,7 @@ export const useCursors = (userId: string, userName: string, stagePosition?: { x
         }
       }
     }
-  }, [userId])
+  }, [userId, canvasId])
 
   return {
     cursors,

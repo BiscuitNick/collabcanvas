@@ -64,10 +64,9 @@ const CircleComponent: React.FC<CircleProps> = memo(({
 
       // Throttle: only update if enough time has passed since last update
       if (now - lastUpdateRef.current >= RECTANGLE_DRAG_THROTTLE_MS) {
-        // Clamp position within canvas bounds (using diameter for bounds checking)
-        const diameter = effectiveRadius * 2
-        const clampedX = clamp(pendingUpdate.x, -CANVAS_HALF, CANVAS_HALF - diameter)
-        const clampedY = clamp(pendingUpdate.y, -CANVAS_HALF, CANVAS_HALF - diameter)
+        // Clamp position within canvas bounds (x,y is the center for circles)
+        const clampedX = clamp(pendingUpdate.x, -CANVAS_HALF + effectiveRadius, CANVAS_HALF - effectiveRadius)
+        const clampedY = clamp(pendingUpdate.y, -CANVAS_HALF + effectiveRadius, CANVAS_HALF - effectiveRadius)
 
         onDragMove(clampedX, clampedY)
         lastUpdateRef.current = now
@@ -164,15 +163,14 @@ const CircleComponent: React.FC<CircleProps> = memo(({
     // Get the current position of the circle
     const circleX = e.target.x()
     const circleY = e.target.y()
-    
-    // Clamp position within canvas bounds (using diameter for bounds checking)
-    const diameter = effectiveRadius * 2
-    const clampedX = clamp(circleX, -CANVAS_HALF, CANVAS_HALF - diameter)
-    const clampedY = clamp(circleY, -CANVAS_HALF, CANVAS_HALF - diameter)
-    
+
+    // Clamp position within canvas bounds (x,y is the center for circles)
+    const clampedX = clamp(circleX, -CANVAS_HALF + effectiveRadius, CANVAS_HALF - effectiveRadius)
+    const clampedY = clamp(circleY, -CANVAS_HALF + effectiveRadius, CANVAS_HALF - effectiveRadius)
+
     // Update position in store (React will handle the re-render)
     onDragEnd(clampedX, clampedY)
-    
+
     // Notify parent that dragging has ended
     onDragEndCallback()
   }
@@ -197,10 +195,9 @@ const CircleComponent: React.FC<CircleProps> = memo(({
     const newX = node.x()
     const newY = node.y()
 
-    // Clamp position within canvas bounds (using diameter for bounds checking)
-    const diameter = newRadius * 2
-    const clampedX = clamp(newX, -CANVAS_HALF, CANVAS_HALF - diameter)
-    const clampedY = clamp(newY, -CANVAS_HALF, CANVAS_HALF - diameter)
+    // Clamp position within canvas bounds (x,y is the center for circles)
+    const clampedX = clamp(newX, -CANVAS_HALF + newRadius, CANVAS_HALF - newRadius)
+    const clampedY = clamp(newY, -CANVAS_HALF + newRadius, CANVAS_HALF - newRadius)
 
     // Update shape in store
     onUpdate({

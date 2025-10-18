@@ -95,32 +95,17 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 
   // Handle copying content with offset
   const handleCopyContent = useCallback((itemToCopy: Content) => {
-    // Calculate new position based on shape type
-    let newX = itemToCopy.x
-    let newY = itemToCopy.y
-    let offset = 50 // Default offset for shapes without width
+    // Calculate new position - all content is now center-anchored
+    // Simply offset to the right and down
+    const offset = 50
 
-    // Handle different shape types
-    if (itemToCopy.type === 'rectangle' && 'width' in itemToCopy && itemToCopy.width) {
-      // Rectangle: move to the right by width + gap
-      newX = itemToCopy.x + itemToCopy.width + 20
-    } else if (itemToCopy.type === 'circle' && 'radius' in itemToCopy && itemToCopy.radius) {
-      // Circle: move to the right by diameter (2 * radius) + gap
-      newX = itemToCopy.x + (itemToCopy.radius * 2) + 20
-    } else if (itemToCopy.type === 'text') {
-      // Text: keep same X, move down by fontSize + gap
-      const textItem = itemToCopy as any
-      newY = itemToCopy.y + (textItem.fontSize || 16) + 20
-      // X stays the same for text
-    } else {
-      // Default fallback: move to the right
-      newX = itemToCopy.x + offset
-    }
+    const newX = itemToCopy.x + offset
+    const newY = itemToCopy.y + offset
 
     // Remove id, createdAt, updatedAt as they'll be generated
     const { id, createdAt, updatedAt, ...contentToCopy } = itemToCopy as any
     createContent({ ...contentToCopy, x: newX, y: newY })
-  }, [createContent, user])
+  }, [createContent])
 
   // Handle deleting content
   const handleDeleteContent = useCallback((contentId: string) => {

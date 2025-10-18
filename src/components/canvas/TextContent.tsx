@@ -226,12 +226,18 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
     node.y(clampedY)
   }
 
+  // Calculate text dimensions for centering
+  const textWidth = textRef.current?.getTextWidth() || 0
+  const textHeight = textRef.current?.getTextHeight() || 0
+
   return (
     <>
       <Text
         ref={textRef}
         x={content.x}
         y={content.y}
+        offsetX={textWidth / 2}
+        offsetY={textHeight / 2}
         text={content.text || ''}
         fontSize={content.fontSize}
         fontFamily={content.fontFamily}

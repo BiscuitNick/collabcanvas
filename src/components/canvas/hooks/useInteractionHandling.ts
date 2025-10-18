@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import Konva from 'konva';
 import { useCanvasStore } from '../../../store/canvasStore';
-import { CANVAS_HALF } from '../../../lib/constants';
 import { getZoomStep } from '../../../lib/utils';
 
 interface InteractionHandlingProps {
@@ -45,15 +44,9 @@ export const useInteractionHandling = ({
   const [lastTouchCenter, setLastTouchCenter] = useState<{ x: number; y: number } | null>(null);
 
   const clampPosition = (x: number, y: number) => {
-    const minX = -CANVAS_HALF;
-    const maxX = CANVAS_HALF;
-    const minY = -CANVAS_HALF;
-    const maxY = CANVAS_HALF;
-
-    return {
-      x: Math.max(minX, Math.min(maxX, x)),
-      y: Math.max(minY, Math.min(maxY, y)),
-    };
+    // For now, disable clamping to debug the zoom issue
+    // The clamping logic needs to be completely rethought for center-origin canvas
+    return { x, y };
   };
 
   const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -74,6 +67,14 @@ export const useInteractionHandling = ({
     onPanStart?.();
   };
 
+  const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+    const stage = e.target.getStage();
+    if (!stage || e.target !== stage) return;
+
+    // Update position during drag
+    updatePosition(stage.x(), stage.y());
+  };
+
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     const stage = e.target.getStage();
     if (!stage) return;
@@ -87,8 +88,11 @@ export const useInteractionHandling = ({
 
     setPanning(false);
     onPanEnd?.();
-    const clampedPos = clampPosition(e.target.x(), e.target.y());
-    updatePosition(clampedPos.x, clampedPos.y);
+
+    // Since we're now controlling position through x/y props, we need to prevent
+    // the stage from updating its position internally
+    stage.x(stagePosition.x);
+    stage.y(stagePosition.y);
 
     if (onMouseMove) {
       const pointer = stage.getPointerPosition();
@@ -106,27 +110,36 @@ export const useInteractionHandling = ({
 
     setZooming(true);
     const stage = e.target.getStage();
-    const oldScale = stage?.scaleX();
+    const oldScale = stageScale;
     const pointer = stage?.getPointerPosition();
 
-    if (!pointer || !stage || oldScale === undefined) {
+    if (!pointer || !stage) {
       setZooming(false);
       return;
     }
 
+    // Calculate new scale
     const currentPercentage = Math.round(oldScale * 100);
     const step = getZoomStep(currentPercentage);
     const newPercentage = e.evt.deltaY > 0 ? Math.max(5, currentPercentage - step) : Math.min(300, currentPercentage + step);
     const newScale = newPercentage / 100;
-    updateScale(newScale);
 
+    // Convert pointer position to canvas coordinates (where canvas center is 0,0)
+    // Canvas point = (viewport point - stage position) / scale
+    const canvasPointX = (pointer.x - stagePosition.x) / oldScale;
+    const canvasPointY = (pointer.y - stagePosition.y) / oldScale;
+
+    // Calculate new stage position so that the canvas point stays under the pointer
+    // viewport point = stage position + canvas point * new scale
+    // stage position = viewport point - canvas point * new scale
     const newPos = {
-      x: pointer.x - ((pointer.x - stage.x()) / oldScale) * newScale,
-      y: pointer.y - ((pointer.y - stage.y()) / oldScale) * newScale,
+      x: pointer.x - canvasPointX * newScale,
+      y: pointer.y - canvasPointY * newScale,
     };
 
     setZooming(false);
     const clampedPos = clampPosition(newPos.x, newPos.y);
+    updateScale(newScale);
     updatePosition(clampedPos.x, clampedPos.y);
   };
 
@@ -273,6 +286,7 @@ export const useInteractionHandling = ({
 
   return {
     onDragStart: handleDragStart,
+    onDragMove: handleDragMove,
     onDragEnd: handleDragEnd,
     onWheel: handleWheel,
     onClick: handleStageClick,

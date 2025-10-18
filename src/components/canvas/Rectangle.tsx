@@ -64,9 +64,11 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
 
       // Throttle: only update if enough time has passed since last update
       if (now - lastUpdateRef.current >= RECTANGLE_DRAG_THROTTLE_MS) {
-        // Clamp position within canvas bounds
-        const clampedX = clamp(pendingUpdate.x, -CANVAS_HALF, CANVAS_HALF - shape.width)
-        const clampedY = clamp(pendingUpdate.y, -CANVAS_HALF, CANVAS_HALF - shape.height)
+        // Clamp position within canvas bounds (x,y is now the center)
+        const halfWidth = shape.width / 2
+        const halfHeight = shape.height / 2
+        const clampedX = clamp(pendingUpdate.x, -CANVAS_HALF + halfWidth, CANVAS_HALF - halfWidth)
+        const clampedY = clamp(pendingUpdate.y, -CANVAS_HALF + halfHeight, CANVAS_HALF - halfHeight)
 
         onDragMove(clampedX, clampedY)
         lastUpdateRef.current = now
@@ -163,16 +165,18 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
     // Get the current position of the rectangle
     const rectX = e.target.x()
     const rectY = e.target.y()
-    
-    // Clamp position within canvas bounds
-    const clampedX = clamp(rectX, -CANVAS_HALF, CANVAS_HALF - shape.width)
-    const clampedY = clamp(rectY, -CANVAS_HALF, CANVAS_HALF - shape.height)
-    
+
+    // Clamp position within canvas bounds (x,y is now the center)
+    const halfWidth = shape.width / 2
+    const halfHeight = shape.height / 2
+    const clampedX = clamp(rectX, -CANVAS_HALF + halfWidth, CANVAS_HALF - halfWidth)
+    const clampedY = clamp(rectY, -CANVAS_HALF + halfHeight, CANVAS_HALF - halfHeight)
+
     // Update position in store (React will handle the re-render)
     onDragEnd(clampedX, clampedY)
-    
+
     // Removed as it is handled by the Canvas component directly
-    
+
     // Notify parent that dragging has ended
     onDragEndCallback()
   }
@@ -197,9 +201,11 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
     const newX = node.x()
     const newY = node.y()
 
-    // Clamp position within canvas bounds
-    const clampedX = clamp(newX, -CANVAS_HALF, CANVAS_HALF - newWidth)
-    const clampedY = clamp(newY, -CANVAS_HALF, CANVAS_HALF - newHeight)
+    // Clamp position within canvas bounds (x,y is now the center)
+    const halfWidth = newWidth / 2
+    const halfHeight = newHeight / 2
+    const clampedX = clamp(newX, -CANVAS_HALF + halfWidth, CANVAS_HALF - halfWidth)
+    const clampedY = clamp(newY, -CANVAS_HALF + halfHeight, CANVAS_HALF - halfHeight)
 
     // Normalize rotation to 0-360 degrees
     const normalizedRotation = ((rotation % 360) + 360) % 360
@@ -235,6 +241,8 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
         y={shape.y}
         width={shape.width}
         height={shape.height}
+        offsetX={shape.width / 2}
+        offsetY={shape.height / 2}
         rotation={shape.rotation}
         fill={shape.fill}
         stroke={isLockedByOther ? (shape.lockedByUserColor || '#FF0000') : (isSelected ? '#007AFF' : 'transparent')}

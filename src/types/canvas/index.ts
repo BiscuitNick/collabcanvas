@@ -16,6 +16,12 @@ export interface BaseContent {
   lockedByUserName?: string | null;
   lockedByUserColor?: string | null;
   lockedAt?: number | Date | null;
+  // Last edited tracking for collaborative features
+  lastEditedBy?: string | null;
+  lastEditedAt?: number | Date | null;
+  // Last interaction tracking (selection, viewing, etc.)
+  lastInteractedBy?: string | null;
+  lastInteractedAt?: number | Date | null;
   // Content type and version for enhanced content
   type: ContentType;
   version: ContentVersion;
@@ -197,6 +203,7 @@ export interface PresenceUser {
   userId: string;
   userName: string;
   color: string;
+  photoURL?: string | null;
   joinedAt: number | Date; // Firestore Timestamp can be Date object too
   lastSeen?: number | Date; // Firestore Timestamp can be Date object too
 }

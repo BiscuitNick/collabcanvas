@@ -197,17 +197,19 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
         />
       </div>
 
-      {/* Rotation */}
-      <div>
-        <Label htmlFor={`${content.id}-rotation`} className="text-xs">Rotation</Label>
-        <Input
-          id={`${content.id}-rotation`}
-          type="number"
-          value={Math.round(content.rotation || 0)}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('rotation', parseInt(e.target.value) || 0)}
-          className="h-7 text-xs"
-        />
-      </div>
+      {/* Rotation - Not available for circles */}
+      {!isCircleContent(content) && (
+        <div>
+          <Label htmlFor={`${content.id}-rotation`} className="text-xs">Rotation</Label>
+          <Input
+            id={`${content.id}-rotation`}
+            type="number"
+            value={Math.round(content.rotation || 0)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('rotation', parseInt(e.target.value) || 0)}
+            className="h-7 text-xs"
+          />
+        </div>
+      )}
     </div>
   )
 }

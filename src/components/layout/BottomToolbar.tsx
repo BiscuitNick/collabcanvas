@@ -21,13 +21,11 @@ import {
   ImagePlus,
   Lightbulb,
   ChevronDown,
-  Bug,
   Shapes,
   Trash2,
   Type,
   Bot,
-  Blocks,
-  Users
+  Blocks
 } from 'lucide-react'
 import ShapeCreationForm from './ShapeCreationForm'
 import TextToolbar from './TextToolbar'
@@ -59,10 +57,6 @@ interface BottomToolbarProps {
   onOpenAIAgent: () => void
   selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
   onToolSelect: (tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null) => void
-  debugMode: boolean
-  onToggleDebug: () => void
-  showOnlineUsers: boolean
-  onToggleOnlineUsers: () => void
   onResetCanvas: () => void
 }
 
@@ -76,10 +70,6 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   // onCreateText is not used yet but reserved for future use
   onOpenAIAgent,
   onToolSelect,
-  debugMode,
-  onToggleDebug,
-  showOnlineUsers,
-  onToggleOnlineUsers,
   onResetCanvas
 }) => {
 
@@ -101,7 +91,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   })
   const [aiModel, setAiModel] = useState<GPT5Model>(() => {
     const saved = localStorage.getItem('collabcanvas-ai-model')
-    return (saved as GPT5Model) || 'gpt-5-mini'
+    return (saved as GPT5Model) || 'gpt-4o-mini'
   })
 
   // Persist tool selection in localStorage
@@ -135,7 +125,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   useEffect(() => {
     // If switching to OpenAI and Meta model is selected, switch to default
     if (aiProvider === 'openai' && aiModel === 'meta/meta-llama-3-8b-instruct') {
-      setAiModel('gpt-5-mini')
+      setAiModel('gpt-4o-mini')
     }
   }, [aiProvider, aiModel])
 
@@ -322,12 +312,11 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
               if (
                 typeof command.x === 'number' &&
                 typeof command.y === 'number' &&
-                typeof command.text === 'string' &&
-                typeof command.fill === 'string'
+                typeof command.text === 'string'
               ) {
                 console.log('[Agent Toolbar] Creating text:', command)
                 try {
-                  await onCreateContent!({
+                  const textContent: any = {
                     type: ContentType.TEXT,
                     version: ContentVersion.V2,
                     x: command.x,
@@ -336,10 +325,13 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
                     fontSize: command.fontSize || 16,
                     fontFamily: (command.fontFamily as FontFamily) || FontFamily.ARIAL,
                     fontStyle: (command.fontStyle as FontStyle) || FontStyle.NORMAL,
-                    fill: command.fill,
-                    width: command.width,
-                    height: command.height
-                  } as any)
+                    fill: command.fill || '#000000'
+                  }
+                  // Only add width/height if they're defined
+                  if (typeof command.width === 'number') textContent.width = command.width
+                  if (typeof command.height === 'number') textContent.height = command.height
+
+                  await onCreateContent!(textContent)
                   console.log('[Agent Toolbar] Text created successfully')
                 } catch (err) {
                   console.error('[Agent Toolbar] Error creating text:', err)
@@ -478,22 +470,8 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
                 <SelectItem value="gpt-5-nano">GPT-5 Nano</SelectItem>
                 <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
                 <SelectItem value="gpt-4.1-nano">GPT-4.1 Nano</SelectItem>
-                {aiProvider === 'replicate' && (
-                  <SelectItem value="meta/meta-llama-3-8b-instruct">Llama 3 8B</SelectItem>
-                )}
               </SelectContent>
             </Select>
-
-            {/* Go Button */}
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleAgentGo}
-              disabled={!agentInput.trim() || agentLoading}
-              className="h-8 bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {agentLoading ? 'Processing...' : 'Go'}
-            </Button>
           </div>
         )
       }
@@ -525,24 +503,6 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
               title="Clear all shapes and reset canvas"
             >
               <Trash2 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onToggleOnlineUsers}
-              className={`h-8 w-8 p-0 ${showOnlineUsers ? 'text-green-600 bg-green-50' : 'text-gray-600 hover:text-gray-900'}`}
-              title="Toggle online users"
-            >
-              <Users className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onToggleDebug}
-              className={`h-8 w-8 p-0 ${debugMode ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900'}`}
-              title="Toggle debug info"
-            >
-              <Bug className="h-4 w-4" />
             </Button>
           </div>
         )
@@ -581,17 +541,30 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center">
       {/* Agent Input Field - Appears above toolbar when agent tool is active */}
       {activeTool === 'agent' && (
-        <div className="mb-2 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-4 py-2 space-y-2">
-          <Input
-            type="text"
-            value={agentInput}
-            onChange={(e) => handleAgentInputChange(e.target.value)}
-            placeholder={selectedContent ? "Edit the selected content..." : "Enter prompt for agent..."}
-            className="h-8 w-64 text-sm"
-            disabled={agentLoading}
-          />
+        <div className="mb-2 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-4 py-2 space-y-2 w-fit">
+          <div className="flex items-center gap-2">
+            <Input
+              type="text"
+              value={agentInput}
+              onChange={(e) => handleAgentInputChange(e.target.value)}
+              placeholder={selectedContent ? "Edit the selected content..." : "Enter prompt for agent..."}
+              className="h-8 text-sm"
+              style={{ width: '400px' }}
+              disabled={agentLoading}
+              onKeyPress={(e) => e.key === 'Enter' && handleAgentGo()}
+            />
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleAgentGo}
+              disabled={!agentInput.trim() || agentLoading}
+              className="h-8 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {agentLoading ? 'Processing...' : 'Go'}
+            </Button>
+          </div>
           {agentError && (
-            <div className="text-xs text-red-600 w-64">
+            <div className="text-xs text-red-600">
               {agentError}
             </div>
           )}

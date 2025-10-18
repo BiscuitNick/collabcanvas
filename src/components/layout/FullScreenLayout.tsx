@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react'
+import { Bug, Users, Layers } from 'lucide-react'
 import { useCanvasStore } from '../../store/canvasStore'
 import type { Shape, Content, Cursor as CursorType, PresenceUser } from '../../types'
 import type { CanvasProps } from '../canvas/Canvas'
-import ZoomWidget from './ZoomWidget'
+import UserProfileButton from './UserProfileButton'
 import PositionWidget from './PositionWidget'
 import DraggablePropertiesPane from './DraggablePropertiesPane'
 import BottomToolbar from './BottomToolbar'
@@ -73,7 +74,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   stopEditingShape
 }) => {
   useKeyboardShortcuts()
-  const { selectShape, resetView, selectedContentId } = useCanvasStore()
+  const { selectShape, resetView, selectedContentId, updatePosition } = useCanvasStore()
 
   // Convert presence array to a Map for efficient user lookup
   const usersMap = React.useMemo(() => {
@@ -85,8 +86,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   }, [presence]);
   // Use selectedContentId directly instead of the getter selectedShapeId for proper reactivity
   const canvasSelectedShapeId = selectedContentId
-  const { createContent, clearAllContent } = useContent()
-  
+  const { createContent, updateContent, clearAllContent } = useContent()
+
   // Legacy aliases for backward compatibility
   const createShape = createContent
   const clearAllShapes = clearAllContent
@@ -195,7 +196,15 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   const handleShapeSelect = useCallback((shapeId: string) => {
     setUIState(prev => ({ ...prev, selectedShapeId: shapeId }))
     selectShape(shapeId)
-  }, [selectShape])
+
+    // Track last interaction when selecting a shape
+    if (user?.uid) {
+      updateContent(shapeId, {
+        lastInteractedBy: user.uid,
+        lastInteractedAt: new Date()
+      })
+    }
+  }, [selectShape, user?.uid, updateContent])
 
   // Close properties pane
   const closePropertiesPane = useCallback(() => {
@@ -205,9 +214,15 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     }))
   }, [])
 
+  // Pan canvas to a specific content position
+  const handlePanToContent = useCallback((x: number, y: number) => {
+    // Set canvas position to match content position
+    updatePosition(x, y)
+  }, [updatePosition])
+
   // Reopen properties pane
   const reopenPropertiesPane = useCallback(() => {
-    setUIState(prev => ({ 
+    setUIState(prev => ({
       ...prev, 
       propertiesPaneVisible: true 
     }))
@@ -472,65 +487,77 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           onOpenAIAgent={handleOpenAIAgent}
           selectedTool={uiState.selectedTool}
           onToolSelect={handleToolSelect}
-          debugMode={uiState.debugMode}
-          onToggleDebug={handleToggleDebug}
-          showOnlineUsers={uiState.showOnlineUsers}
-          onToggleOnlineUsers={handleToggleOnlineUsers}
           onResetCanvas={handleResetCanvas}
         />
 
-      {/* Tool Button - Bottom Left (Properties Panel) */}
+      {/* Tool Button - Bottom Left (Layers Panel) */}
       {!uiState.propertiesPaneVisible && (
         <div className="absolute bottom-4 left-4 z-50">
           <ToolButton
             onClick={reopenPropertiesPane}
-            icon={
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            }
-            title="Open Properties Panel"
+            icon={<Layers className="h-5 w-5" />}
+            title="Open Layers Panel"
           />
         </div>
       )}
+
+      {/* Debug Button - Bottom Right */}
+      <div className="absolute bottom-4 right-4 z-50">
+        <ToolButton
+          onClick={handleToggleDebug}
+          icon={<Bug className="h-5 w-5" />}
+          title={uiState.debugMode ? "Hide Debug" : "Show Debug"}
+        />
+      </div>
 
       {/* Floating Position Widget - Top Left */}
       <div className="absolute top-4 left-4 z-50">
         <PositionWidget />
       </div>
 
-      {/* Floating Zoom Widget - Top Right */}
-      <div className="absolute top-4 right-4 z-50">
-        <ZoomWidget />
+      {/* Top Right Controls - Users Icon and User Profile */}
+      <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
+        {/* Online Users Button - only show when online users is closed */}
+        {!uiState.showOnlineUsers && (
+          <ToolButton
+            onClick={handleToggleOnlineUsers}
+            icon={<Users className="h-5 w-5" />}
+            title="Show Online Users"
+          />
+        )}
+        {/* User Profile Button */}
+        <UserProfileButton />
       </div>
 
-      {/* Online Users Widget - Top Right (below Zoom Widget) */}
+      {/* Online Users Widget - Dropdown below user avatar */}
       {uiState.showOnlineUsers && (
         <div
-          className="absolute right-4 z-50 w-80"
+          className="absolute z-50 w-80"
           style={{
-            top: 'calc(1rem + 40px + 0.5rem)', // top-4 + ZoomWidget height + gap
-            maxHeight: 'calc(50vh - 1rem - 40px - 0.5rem)' // 50% viewport - top offset
+            top: 'calc(1rem + 40px + 0.5rem)', // top-4 + avatar height + small gap
+            right: '1rem',
+            maxHeight: 'calc(100vh - (1rem + 40px + 0.5rem) - 1rem)'
           }}
         >
-          <OnlineUsersWidget presence={presence} />
+          <OnlineUsersWidget presence={presence} onClose={handleToggleOnlineUsers} />
         </div>
       )}
 
-      {/* Floating Layers Panel - Left with dynamic height */}
-      <div 
+      {/* Floating Layers Panel - Left with content-fit height */}
+      <div
         className="absolute left-4 z-50"
         style={{
           top: 'calc(1rem + 40px + 1rem)', // top-4 + PositionWidget height + gap
-          bottom: '1rem' // bottom-4
+          maxHeight: 'calc(100vh - (1rem + 40px + 1rem) - 1rem)', // viewport height - top offset - bottom padding
+          height: 'fit-content'
         }}
       >
         <DraggablePropertiesPane
           content={content}
           selectedShape={selectedShape}
-          onUpdateShape={updateShape}
+          onUpdateShape={updateContent}
           onSelectShape={handleShapeSelect}
+          onPanToContent={handlePanToContent}
           isVisible={uiState.propertiesPaneVisible}
           onClose={closePropertiesPane}
           currentUserId={currentUserId}

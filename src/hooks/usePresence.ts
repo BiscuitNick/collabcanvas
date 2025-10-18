@@ -19,7 +19,7 @@ interface UsePresenceReturn {
   error: string | null
 }
 
-export const usePresence = (userId: string, userName: string): UsePresenceReturn => {
+export const usePresence = (userId: string, userName: string, photoURL?: string | null): UsePresenceReturn => {
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([])
   const [error, setError] = useState<string | null>(null)
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -82,6 +82,7 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
           userId,
           userName,
           color: getUserColor(userId),
+          photoURL: photoURL || null,
           joinedAt: serverTimestamp(),
           lastSeen: serverTimestamp()
         }
@@ -100,7 +101,7 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
       if (isCleaningUpRef.current) return
 
       try {
-        const presenceRef = doc(firestore, 'presence', userId)
+        const presenceRef = doc(firestore, 'canvases', CANVAS_ID, 'presence', userId)
         await setDoc(presenceRef, { lastSeen: serverTimestamp() }, { merge: true })
       } catch (err) {
         // Error updating heartbeat
@@ -120,7 +121,7 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
     const handleVisibilityChange = () => {
       if (document.hidden) {
         // Page is hidden, update lastSeen
-        const presenceRef = doc(firestore, 'presence', userId)
+        const presenceRef = doc(firestore, 'canvases', CANVAS_ID, 'presence', userId)
         setDoc(presenceRef, { lastSeen: serverTimestamp() }, { merge: true })
       }
     }
@@ -137,7 +138,7 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       cleanupPresence()
     }
-  }, [userId, userName, cleanupPresence, cleanupStalePresence])
+  }, [userId, userName, photoURL, cleanupPresence, cleanupStalePresence])
 
   // Listen to presence changes
   useEffect(() => {
@@ -145,7 +146,7 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
       return
     }
 
-    const presenceRef = collection(firestore, 'presence')
+    const presenceRef = collection(firestore, 'canvases', CANVAS_ID, 'presence')
 
     const unsubscribe = onSnapshot(
       presenceRef,
@@ -164,6 +165,7 @@ export const usePresence = (userId: string, userName: string): UsePresenceReturn
                 userId: data.userId,
                 userName: data.userName,
                 color: data.color,
+                photoURL: data.photoURL || null,
                 joinedAt: data.joinedAt?.toMillis() || Date.now()
               }
 

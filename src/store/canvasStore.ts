@@ -75,8 +75,8 @@ export const useCanvasStore = create<CanvasState>()(
   },
   
   updateScale: (scale: number) => {
-    // Clamp scale between 0.01x (1%) and 3x (300%)
-    const clampedScale = Math.max(0.01, Math.min(3, scale))
+    // Clamp scale between 0.05x (5%) and 3x (300%)
+    const clampedScale = Math.max(0.05, Math.min(3, scale))
     set({ stageScale: clampedScale })
   },
   

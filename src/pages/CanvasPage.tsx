@@ -49,7 +49,7 @@ export const CanvasPage: React.FC = () => {
 
   const {
     presenceUsers
-  } = usePresence(user?.uid || '', user?.displayName || 'Anonymous')
+  } = usePresence(user?.uid || '', user?.displayName || 'Anonymous', user?.photoURL || null)
 
   // Handle user click - auto pan to cursor (zoom-aware)
   const handleUserClick = useCallback((userId: string) => {

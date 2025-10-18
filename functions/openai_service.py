@@ -33,11 +33,16 @@ def get_canvas_tools():
                         "y": {"type": "number"},
                         "width": {"type": "number"},
                         "height": {"type": "number"},
+                        "radius": {"type": "number"},
                         "fill": {"type": "string"},
+                        "stroke": {"type": "string"},
+                        "strokeWidth": {"type": "number"},
                         "text": {"type": "string"},
                         "fontSize": {"type": "number"},
+                        "fontFamily": {"type": "string"},
+                        "fontStyle": {"type": "string"},
                     },
-                    "required": ["shapeType", "x", "y", "width", "height", "fill"],
+                    "required": ["shapeType", "x", "y", "fill"],
                 },
             },
         },
@@ -92,13 +97,27 @@ def text_to_canvas_commands(prompt: str, model: str, selected_content=None) -> d
                         "type": function_args["shapeType"],
                         "x": function_args["x"],
                         "y": function_args["y"],
-                        "width": function_args["width"],
-                        "height": function_args["height"],
-                        "fill": function_args["fill"],
+                        "fill": function_args.get("fill") or "#000000",
                     }
-                    if function_args["shapeType"] == "text":
+
+                    # Add shape-specific properties
+                    if function_args["shapeType"] == "rectangle":
+                        command["width"] = function_args.get("width", 100)
+                        command["height"] = function_args.get("height", 100)
+                    elif function_args["shapeType"] == "circle":
+                        command["radius"] = function_args.get("radius", 50)
+                    elif function_args["shapeType"] == "text":
                         command["text"] = function_args.get("text", "")
                         command["fontSize"] = function_args.get("fontSize", 16)
+                        command["fontFamily"] = function_args.get("fontFamily", "Arial")
+                        command["fontStyle"] = function_args.get("fontStyle", "normal")
+
+                    # Add optional properties
+                    if "stroke" in function_args:
+                        command["stroke"] = function_args["stroke"]
+                    if "strokeWidth" in function_args:
+                        command["strokeWidth"] = function_args["strokeWidth"]
+
                     canvas_commands.append(command)
             print(f"[OpenAI Service] Returning {len(canvas_commands)} commands")
             return {"success": True, "data": {"commands": canvas_commands}, "debug": debug_info}

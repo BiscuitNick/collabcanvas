@@ -6,6 +6,17 @@ import { useCanvasStore } from '../../store/canvasStore';
 import { SHAPE_RETRY_DELAY_MS, SHAPE_MAX_RETRIES, ENABLE_PERFORMANCE_LOGGING, CANVAS_ID } from '../../lib/config';
 import type { Content } from '../../types';
 
+// Remove undefined values from an object for Firestore compatibility
+const removeUndefinedValues = (obj: any): any => {
+  const result: any = {};
+  for (const key in obj) {
+    if (obj[key] !== undefined) {
+      result[key] = obj[key];
+    }
+  }
+  return result;
+};
+
 export const useContentOperations = (
   content: Content[],
   _setContent: React.Dispatch<React.SetStateAction<Content[]>>, // Not used anymore - canvas store is source of truth
@@ -39,7 +50,7 @@ export const useContentOperations = (
   const throttledUpdate = useCallback(async (id: string, updates: Partial<Content>) => {
     try {
       const contentRef = doc(firestore, 'canvases', CANVAS_ID, 'content', id);
-      const updateData = { ...updates, updatedAt: serverTimestamp() };
+      const updateData = removeUndefinedValues({ ...updates, updatedAt: serverTimestamp() });
       await updateDoc(contentRef, updateData);
       setSyncStatus(id, 'synced');
       retryCount.current = 0;
@@ -82,7 +93,7 @@ export const useContentOperations = (
         console.log('📤 Firestore path:', path);
         const contentRef = collection(firestore, 'canvases', CANVAS_ID, 'content');
         const now = serverTimestamp();
-        const newContent = { ...contentData, createdAt: now, updatedAt: now };
+        const newContent = removeUndefinedValues({ ...contentData, createdAt: now, updatedAt: now });
         console.log('📤 About to add to Firestore:', newContent);
         const docRef = await addDoc(contentRef, newContent);
         console.log('✅ Content added to Firestore with ID:', docRef.id);

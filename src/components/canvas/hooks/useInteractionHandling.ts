@@ -116,7 +116,7 @@ export const useInteractionHandling = ({
 
     const currentPercentage = Math.round(oldScale * 100);
     const step = getZoomStep(currentPercentage);
-    const newPercentage = e.evt.deltaY > 0 ? Math.max(1, currentPercentage - step) : Math.min(300, currentPercentage + step);
+    const newPercentage = e.evt.deltaY > 0 ? Math.max(5, currentPercentage - step) : Math.min(300, currentPercentage + step);
     const newScale = newPercentage / 100;
     updateScale(newScale);
 
@@ -244,7 +244,7 @@ export const useInteractionHandling = ({
       if (distance && lastTouchDistance && center && lastTouchCenter) {
         const scaleBy = distance / lastTouchDistance;
         const newScale = stageScale * scaleBy;
-        const clampedScale = Math.max(0.1, Math.min(3, newScale));
+        const clampedScale = Math.max(0.05, Math.min(3, newScale));
         updateScale(clampedScale);
 
         const stage = e.target.getStage();

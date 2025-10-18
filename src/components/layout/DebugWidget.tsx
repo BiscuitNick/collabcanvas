@@ -1,5 +1,4 @@
 import React from 'react'
-import { Badge } from '../ui/badge'
 import { Switch } from '../ui/switch'
 import { Label } from '../ui/label'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion'
@@ -40,7 +39,7 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
   enableFirestore = true,
   onToggleFirestore
 }) => {
-  const { stagePosition, stageScale, isPanning, isDraggingShape, isZooming } = useCanvasStore()
+  const { stagePosition, stageScale } = useCanvasStore()
 
   if (!debugMode) return null
 
@@ -57,17 +56,6 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
               <div>Position: ({Math.round(stagePosition.x)}, {Math.round(stagePosition.y)})</div>
               <div>Scale: {Math.round(stageScale * 100)}%</div>
               <div>FPS: {Math.round(fps)}</div>
-              <div className="flex gap-1">
-                <Badge variant={isPanning ? "default" : "outline"} className="text-xs px-1 py-0">
-                  Panning
-                </Badge>
-                <Badge variant={isDraggingShape ? "default" : "outline"} className="text-xs px-1 py-0">
-                  Dragging
-                </Badge>
-                <Badge variant={isZooming ? "default" : "outline"} className="text-xs px-1 py-0">
-                  Zooming
-                </Badge>
-              </div>
             </div>
           </AccordionContent>
         </AccordionItem>

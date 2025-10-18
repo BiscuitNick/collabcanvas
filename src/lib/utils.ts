@@ -84,6 +84,29 @@ export function getTextExcerpt(text: string, maxLength: number = 20): string {
   return text.substring(0, maxLength) + '...'
 }
 
+// Format time elapsed (e.g., "2 minutes ago", "just now")
+export function formatTimeAgo(date: number | Date | null | undefined): string {
+  if (!date) return 'never'
+
+  const now = Date.now()
+  const dateTime = date instanceof Date ? date.getTime() : (typeof date === 'number' ? date : Date.now())
+  const elapsedMs = now - dateTime
+
+  if (elapsedMs < 1000) return 'just now'
+
+  const elapsedSecs = Math.floor(elapsedMs / 1000)
+  if (elapsedSecs < 60) return `${elapsedSecs}s ago`
+
+  const elapsedMins = Math.floor(elapsedSecs / 60)
+  if (elapsedMins < 60) return elapsedMins === 1 ? '1 minute ago' : `${elapsedMins} minutes ago`
+
+  const elapsedHours = Math.floor(elapsedMins / 60)
+  if (elapsedHours < 24) return elapsedHours === 1 ? '1 hour ago' : `${elapsedHours} hours ago`
+
+  const elapsedDays = Math.floor(elapsedHours / 24)
+  return elapsedDays === 1 ? '1 day ago' : `${elapsedDays} days ago`
+}
+
 // Import types for factory function
 import type { TextContent } from '../types'
 import { ContentType, ContentVersion, DEFAULT_CONTENT_VALUES } from '../types'

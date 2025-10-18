@@ -25,13 +25,15 @@ import {
   Trash2,
   Type,
   Bot,
-  Blocks
+  Blocks,
+  Grid3X3
 } from 'lucide-react'
 import ShapeCreationForm from './ShapeCreationForm'
 import TextToolbar from './TextToolbar'
 import { ShapeType, FontFamily, FontStyle, ContentType, ContentVersion } from '../../types'
 import type { Content } from '../../types'
 import { callAITest, type AIProvider, type GPT5Model } from '../../lib/aiApi'
+import { buildGrid } from '../../lib/utils'
 import { useCanvasStore } from '../../store/canvasStore'
 
 interface BottomToolbarProps {
@@ -60,7 +62,7 @@ interface BottomToolbarProps {
   onResetCanvas: () => void
 }
 
-type ToolType = 'pan' | 'shapes' | 'text' | 'ai' | 'agent'
+type ToolType = 'pan' | 'shapes' | 'text' | 'ai' | 'agent' | 'grid'
 
 const BottomToolbar: React.FC<BottomToolbarProps> = ({
   onCreateShapeWithOptions,
@@ -94,12 +96,61 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     return (saved as GPT5Model) || 'gpt-4o-mini'
   })
 
+  // Grid tool state
+  const [gridStartX, setGridStartX] = useState(0)
+  const [gridStartY, setGridStartY] = useState(0)
+  const [gridRows, setGridRows] = useState(5)
+  const [gridCols, setGridCols] = useState(5)
+  const [gridCellWidth, setGridCellWidth] = useState(100)
+  const [gridCellHeight, setGridCellHeight] = useState(100)
+  const [gridGap, setGridGap] = useState(10)
+  const [gridColorMode, setGridColorMode] = useState<'random' | 'palette'>('random')
+  const [gridCustomColors, setGridCustomColors] = useState<string[]>(['#FF6B6B', '#4ECDC4', '#45B7D1'])
+
+  // Handle grid generation
+  const handleGenerateGrid = async () => {
+    if (!onCreateContent) return
+
+    const colors = gridColorMode === 'random' ? 'random' : gridCustomColors
+    const commands = buildGrid({
+      startX: gridStartX,
+      startY: gridStartY,
+      rows: gridRows,
+      cols: gridCols,
+      cellWidth: gridCellWidth,
+      cellHeight: gridCellHeight,
+      gap: gridGap,
+      colors
+    })
+
+    // Create each cell as content
+    for (const command of commands) {
+      if (command.type === 'rectangle') {
+        await onCreateContent({
+          type: ContentType.RECTANGLE,
+          version: ContentVersion.V2,
+          x: command.x || 0,
+          y: command.y || 0,
+          width: command.width || 100,
+          height: command.height || 100,
+          fill: command.fill || '#000000',
+          stroke: command.stroke || '#000000',
+          strokeWidth: command.strokeWidth || 1
+        } as any)
+      }
+    }
+  }
+
   // Persist tool selection in localStorage
   useEffect(() => {
     const savedTool = localStorage.getItem('collabcanvas-active-tool') as ToolType
     if (savedTool) {
       setActiveTool(savedTool)
-      onToolSelect(savedTool === 'shapes' ? 'rectangle' : savedTool)
+      // Skip onToolSelect for grid tool
+      if (savedTool === 'grid') {
+        return
+      }
+      onToolSelect(savedTool === 'shapes' ? 'rectangle' : (savedTool as any))
     }
   }, [onToolSelect])
 
@@ -133,6 +184,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     { id: 'pan' as ToolType, label: 'Hand Tool', icon: Hand, description: 'Pan around the canvas' },
     { id: 'shapes' as ToolType, label: 'Shapes Tool', icon: Shapes, description: 'Create shapes' },
     { id: 'text' as ToolType, label: 'Text Tool', icon: Type, description: 'Create text' },
+    { id: 'grid' as ToolType, label: 'Grid Tool', icon: Grid3X3, description: 'Create grid' },
     { id: 'agent' as ToolType, label: 'Agent Tool', icon: Bot, description: 'AI agent' }
   ]
 
@@ -150,6 +202,11 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     setActiveTool(tool)
     localStorage.setItem('collabcanvas-active-tool', tool)
 
+    // Grid tool doesn't need to call onToolSelect
+    if (tool === 'grid') {
+      return
+    }
+
     // Map internal tool types to external tool types
     if (tool === 'shapes') {
       onToolSelect(selectedShape)
@@ -165,7 +222,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     } else if (tool === 'pan') {
       onToolSelect('pan')
     } else {
-      onToolSelect(tool)
+      onToolSelect(tool as any)
     }
   }
 
@@ -507,6 +564,18 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
           </div>
         )
       
+      case 'grid':
+        return (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleGenerateGrid}
+            className="h-8 bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            Generate Grid
+          </Button>
+        )
+
       default:
         return null
     }
@@ -583,6 +652,150 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
           />
         </div>
       )}
+
+      {/* Grid Input Field - Appears above toolbar when grid tool is active */}
+      {activeTool === 'grid' && (() => {
+        const handleAddColor = () => {
+          if (gridCustomColors.length < 5) {
+            setGridCustomColors([...gridCustomColors, '#000000'])
+          }
+        }
+
+        const handleRemoveColor = (index: number) => {
+          setGridCustomColors(gridCustomColors.filter((_, i) => i !== index))
+        }
+
+        const handleColorChange = (index: number, color: string) => {
+          const newColors = [...gridCustomColors]
+          newColors[index] = color
+          setGridCustomColors(newColors)
+        }
+
+        return (
+          <div className="mb-2 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-4 py-2 space-y-2 w-fit">
+            {/* First row: Position and dimensions */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <label className="text-xs text-gray-600">X:</label>
+                <input
+                  type="number"
+                  value={gridStartX}
+                  onChange={(e) => setGridStartX(parseInt(e.target.value) || 0)}
+                  className="h-7 w-12 text-xs border border-gray-300 rounded px-1"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <label className="text-xs text-gray-600">Y:</label>
+                <input
+                  type="number"
+                  value={gridStartY}
+                  onChange={(e) => setGridStartY(parseInt(e.target.value) || 0)}
+                  className="h-7 w-12 text-xs border border-gray-300 rounded px-1"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <label className="text-xs text-gray-600">Rows:</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={gridRows}
+                  onChange={(e) => setGridRows(parseInt(e.target.value) || 5)}
+                  className="h-7 w-12 text-xs border border-gray-300 rounded px-1"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <label className="text-xs text-gray-600">Cols:</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={gridCols}
+                  onChange={(e) => setGridCols(parseInt(e.target.value) || 5)}
+                  className="h-7 w-12 text-xs border border-gray-300 rounded px-1"
+                />
+              </div>
+            </div>
+
+            {/* Second row: Cell size and gap */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <label className="text-xs text-gray-600">W:</label>
+                <input
+                  type="number"
+                  min="10"
+                  max="500"
+                  value={gridCellWidth}
+                  onChange={(e) => setGridCellWidth(parseInt(e.target.value) || 100)}
+                  className="h-7 w-14 text-xs border border-gray-300 rounded px-1"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <label className="text-xs text-gray-600">H:</label>
+                <input
+                  type="number"
+                  min="10"
+                  max="500"
+                  value={gridCellHeight}
+                  onChange={(e) => setGridCellHeight(parseInt(e.target.value) || 100)}
+                  className="h-7 w-14 text-xs border border-gray-300 rounded px-1"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <label className="text-xs text-gray-600">Gap:</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={gridGap}
+                  onChange={(e) => setGridGap(parseInt(e.target.value) || 10)}
+                  className="h-7 w-12 text-xs border border-gray-300 rounded px-1"
+                />
+              </div>
+              <Select value={gridColorMode} onValueChange={(value: any) => setGridColorMode(value)}>
+                <SelectTrigger className="h-7 w-24 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="random">Random</SelectItem>
+                  <SelectItem value="palette">Palette</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Third row: Custom colors (only if palette mode) */}
+            {gridColorMode === 'palette' && (
+              <div className="flex items-center gap-1 flex-wrap">
+                <label className="text-xs text-gray-600 w-full">Colors ({gridCustomColors.length}/5):</label>
+                {gridCustomColors.map((color, index) => (
+                  <div key={index} className="flex items-center gap-1">
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => handleColorChange(index, e.target.value)}
+                      className="h-7 w-8 border border-gray-300 rounded cursor-pointer"
+                    />
+                    <button
+                      onClick={() => handleRemoveColor(index)}
+                      className="px-1 py-0 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                    >
+                      -
+                    </button>
+                  </div>
+                ))}
+                {gridCustomColors.length < 5 && (
+                  <button
+                    onClick={handleAddColor}
+                    className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600"
+                  >
+                    + Add
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Main Toolbar */}
       <div className="bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-4 py-2 flex items-center space-x-4">

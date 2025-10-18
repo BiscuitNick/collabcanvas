@@ -543,13 +543,15 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         </div>
       )}
 
-      {/* Floating Layers Panel - Left with content-fit height */}
+      {/* Floating Layers Panel - Left with scroll support */}
       <div
         className="absolute left-4 z-50"
         style={{
           top: 'calc(1rem + 40px + 1rem)', // top-4 + PositionWidget height + gap
           maxHeight: 'calc(100vh - (1rem + 40px + 1rem) - 1rem)', // viewport height - top offset - bottom padding
-          height: 'fit-content'
+          height: 'calc(100vh - (1rem + 40px + 1rem) - 1rem)',
+          display: 'flex',
+          flexDirection: 'column'
         }}
       >
         <DraggablePropertiesPane

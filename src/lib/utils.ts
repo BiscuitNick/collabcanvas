@@ -153,3 +153,103 @@ export function createTextContent(
     // createdAt and updatedAt will be added by Firestore with serverTimestamp()
   }
 }
+
+// Build a grid of rectangles matching AI model CanvasCommand output format
+interface GridBuilderOptions {
+  startX?: number
+  startY?: number
+  rows?: number
+  cols?: number
+  cellWidth?: number
+  cellHeight?: number
+  gap?: number
+  colors?: string[] | 'random'
+  stroke?: string
+  strokeWidth?: number
+}
+
+interface CanvasCommand {
+  action: 'create' | 'edit'
+  type?: 'rectangle' | 'circle' | 'text'
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  radius?: number
+  fill?: string
+  stroke?: string
+  strokeWidth?: number
+  text?: string
+  fontSize?: number
+  fontFamily?: string
+  fontStyle?: string
+  shapeId?: string
+  rotation?: number
+}
+
+export function buildGrid(options: GridBuilderOptions = {}): CanvasCommand[] {
+  // Set reasonable defaults
+  const startX = options.startX ?? 0
+  const startY = options.startY ?? 0
+  const rows = options.rows ?? 5
+  const cols = options.cols ?? 5
+  const cellWidth = options.cellWidth ?? 100
+  const cellHeight = options.cellHeight ?? 100
+  const gap = options.gap ?? 10
+  const colors = options.colors ?? 'random'
+  const stroke = options.stroke ?? '#000000'
+  const strokeWidth = options.strokeWidth ?? 1
+
+  // Color palette for non-random mode
+  const defaultColors = [
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+    '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+    '#FF9FF3', '#54A0FF', '#48DBFB', '#1DD1A1', '#FFA502'
+  ]
+
+  const colorArray = colors === 'random' ? null : (Array.isArray(colors) ? colors : defaultColors)
+
+  // Helper to get color for a cell
+  const getColor = (row: number, col: number): string => {
+    if (colors === 'random') {
+      // Generate random color for each cell
+      return `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`
+    }
+    if (colorArray && colorArray.length > 0) {
+      if (colorArray.length === 1) {
+        // Single color: use same color for all cells
+        return colorArray[0]
+      } else {
+        // Multiple colors: use checkerboard pattern
+        // (row + col) % 2 determines which color in the palette to use
+        const paletteIndex = (row + col) % colorArray.length
+        return colorArray[paletteIndex]
+      }
+    }
+    return '#000000'
+  }
+
+  const commands: CanvasCommand[] = []
+
+  // Generate grid cells
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const x = startX + col * (cellWidth + gap)
+      const y = startY + row * (cellHeight + gap)
+
+      commands.push({
+        action: 'create',
+        type: 'rectangle',
+        x,
+        y,
+        width: cellWidth,
+        height: cellHeight,
+        fill: getColor(row, col),
+        stroke,
+        strokeWidth
+      })
+    }
+  }
+
+  return commands
+}

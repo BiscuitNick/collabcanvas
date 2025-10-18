@@ -113,7 +113,7 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
   });
 
   return (
-    <div className="w-64 h-full bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg flex flex-col">
+    <div className="w-64 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg flex flex-col overflow-hidden" style={{ height: '100%', maxHeight: '100%' }}>
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-gray-200 flex-shrink-0">
         <h3 className="text-xs font-semibold text-gray-700">Layers</h3>
@@ -129,7 +129,7 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
       </div>
 
       {/* Shape List - Scrollable Content */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 p-3 space-y-1.5">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 p-3 space-y-1.5 w-full">
         {sortedContent.length > 0 ? (
           sortedContent.map((shape) => {
             const label = isTextContent(shape)
@@ -173,7 +173,7 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
               <div
                 key={shape.id}
                 ref={isSelected ? selectedItemRef : null}
-                className={`rounded cursor-pointer transition-colors ${
+                className={`rounded cursor-pointer transition-colors w-full overflow-hidden ${
                   isExpanded ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 hover:bg-gray-100 border border-transparent'
                 } ${isLockedByOther ? 'opacity-60' : ''}`}
               >

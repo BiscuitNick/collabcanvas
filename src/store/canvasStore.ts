@@ -1,45 +1,58 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Rectangle, SyncStatus } from '../types'
+import type { Content, SyncStatus } from '../types'
 
 interface CanvasState {
   // Stage position and scale
   stagePosition: { x: number; y: number }
   stageScale: number
   
-  // Shapes array
-  shapes: Rectangle[]
+  // Content array
+  content: Content[]
   
   // Interaction states
   isPanning: boolean
   isZooming: boolean
-  isDraggingShape: boolean
+  isDraggingContent: boolean
   
-  // Selected shape
-  selectedShapeId: string | null
+  // Selected content
+  selectedContentId: string | null
   
-  // Sync status for each shape
-  shapeSyncStatus: Record<string, SyncStatus>
+  // Sync status for each content
+  contentSyncStatus: Record<string, SyncStatus>
   
   // Pending updates queue for offline operations
-  pendingUpdates: Map<string, Partial<Rectangle>>
+  pendingUpdates: Map<string, Partial<Content>>
   
   // Actions
   updatePosition: (x: number, y: number) => void
   updateScale: (scale: number) => void
   setPanning: (isPanning: boolean) => void
   setZooming: (isZooming: boolean) => void
-  setDraggingShape: (isDraggingShape: boolean) => void
-  addShape: (shape: Rectangle) => void
-  updateShape: (id: string, updates: Partial<Rectangle>) => void
-  deleteShape: (id: string) => void
-  selectShape: (id: string | null) => void
+  setDraggingContent: (isDraggingContent: boolean) => void
+  addContent: (content: Content) => void
+  updateContent: (id: string, updates: Partial<Content>) => void
+  deleteContent: (id: string) => void
+  selectContent: (id: string | null) => void
   resetView: () => void
   setSyncStatus: (id: string, status: SyncStatus) => void
-  addPendingUpdate: (id: string, updates: Partial<Rectangle>) => void
+  addPendingUpdate: (id: string, updates: Partial<Content>) => void
   clearPendingUpdates: () => void
-  setShapes: (shapes: Rectangle[]) => void
+  setContent: (content: Content[]) => void
+  clearAllContent: () => void
+  
+  // Legacy properties for backward compatibility during migration
+  get shapes(): Content[]
+  get isDraggingShape(): boolean
+  get selectedShapeId(): string | null
+  get shapeSyncStatus(): Record<string, SyncStatus>
+  addShape: (shape: Content) => void
+  updateShape: (id: string, updates: Partial<Content>) => void
+  deleteShape: (id: string) => void
+  selectShape: (id: string | null) => void
+  setShapes: (shapes: Content[]) => void
   clearAllShapes: () => void
+  setDraggingShape: (isDraggingShape: boolean) => void
 }
 
 export const useCanvasStore = create<CanvasState>()(
@@ -48,12 +61,12 @@ export const useCanvasStore = create<CanvasState>()(
   // Initial state - blank canvas
   stagePosition: { x: 0, y: 0 },
   stageScale: 1,
-  shapes: [],
+  content: [],
   isPanning: false,
   isZooming: false,
-  isDraggingShape: false,
-  selectedShapeId: null,
-  shapeSyncStatus: {},
+  isDraggingContent: false,
+  selectedContentId: null,
+  contentSyncStatus: {},
   pendingUpdates: new Map(),
   
   // Actions
@@ -62,8 +75,8 @@ export const useCanvasStore = create<CanvasState>()(
   },
   
   updateScale: (scale: number) => {
-    // Clamp scale between 0.1x and 3x
-    const clampedScale = Math.max(0.1, Math.min(3, scale))
+    // Clamp scale between 0.05x (5%) and 3x (300%)
+    const clampedScale = Math.max(0.05, Math.min(3, scale))
     set({ stageScale: clampedScale })
   },
   
@@ -75,56 +88,56 @@ export const useCanvasStore = create<CanvasState>()(
     set({ isZooming })
   },
   
-  setDraggingShape: (isDraggingShape: boolean) => {
-    set({ isDraggingShape })
+  setDraggingContent: (isDraggingContent: boolean) => {
+    set({ isDraggingContent })
   },
   
-  addShape: (shape: Rectangle) => {
+  addContent: (content: Content) => {
     set((state) => ({
-      shapes: [...state.shapes, shape]
+      content: [...state.content, content]
     }))
   },
   
-  updateShape: (id: string, updates: Partial<Rectangle>) => {
+  updateContent: (id: string, updates: Partial<Content>) => {
     set((state) => ({
-      shapes: state.shapes.map(shape =>
-        shape.id === id ? { ...shape, ...updates } : shape
+      content: state.content.map(content =>
+        content.id === id ? { ...content, ...updates } as Content : content
       )
     }))
   },
   
-  deleteShape: (id: string) => {
+  deleteContent: (id: string) => {
     set((state) => ({
-      shapes: state.shapes.filter((shape) => shape.id !== id),
-      selectedShapeId: state.selectedShapeId === id ? null : state.selectedShapeId,
-      shapeSyncStatus: Object.fromEntries(
-        Object.entries(state.shapeSyncStatus).filter(([key]) => key !== id)
+      content: state.content.filter((content) => content.id !== id),
+      selectedContentId: state.selectedContentId === id ? null : state.selectedContentId,
+      contentSyncStatus: Object.fromEntries(
+        Object.entries(state.contentSyncStatus).filter(([key]) => key !== id)
       )
     }))
   },
   
-  selectShape: (id: string | null) => {
-    set({ selectedShapeId: id })
+  selectContent: (id: string | null) => {
+    set({ selectedContentId: id })
   },
   
   resetView: () => {
     set({
       stagePosition: { x: 0, y: 0 },
       stageScale: 1,
-      selectedShapeId: null
+      selectedContentId: null
     })
   },
   
   setSyncStatus: (id: string, status: SyncStatus) => {
     set((state) => ({
-      shapeSyncStatus: {
-        ...state.shapeSyncStatus,
+      contentSyncStatus: {
+        ...state.contentSyncStatus,
         [id]: status
       }
     }))
   },
   
-  addPendingUpdate: (id: string, updates: Partial<Rectangle>) => {
+  addPendingUpdate: (id: string, updates: Partial<Content>) => {
     set((state) => {
       const newPendingUpdates = new Map(state.pendingUpdates)
       newPendingUpdates.set(id, updates)
@@ -136,25 +149,71 @@ export const useCanvasStore = create<CanvasState>()(
     set({ pendingUpdates: new Map() })
   },
   
-  setShapes: (shapes: Rectangle[]) => {
-    set({ shapes })
+  setContent: (content: Content[]) => {
+    set({ content })
   },
   
-  clearAllShapes: () => {
+  clearAllContent: () => {
     set({ 
-      shapes: [],
-      selectedShapeId: null,
-      shapeSyncStatus: {},
+      content: [],
+      selectedContentId: null,
+      contentSyncStatus: {},
       pendingUpdates: new Map()
     })
-  }
+  },
+  
+  // Legacy implementations for backward compatibility during migration
+  addShape: (shape: Content) => {
+    set((state) => ({
+      content: [...state.content, shape]
+    }))
+  },
+  updateShape: (id: string, updates: Partial<Content>) => {
+    set((state) => ({
+      content: state.content.map(content =>
+        content.id === id ? { ...content, ...updates } as Content : content
+      )
+    }))
+  },
+  deleteShape: (id: string) => {
+    set((state) => ({
+      content: state.content.filter((content) => content.id !== id),
+      selectedContentId: state.selectedContentId === id ? null : state.selectedContentId,
+      contentSyncStatus: Object.fromEntries(
+        Object.entries(state.contentSyncStatus).filter(([key]) => key !== id)
+      )
+    }))
+  },
+  selectShape: (id: string | null) => {
+    set({ selectedContentId: id })
+  },
+  setShapes: (shapes: Content[]) => {
+    set({ content: shapes })
+  },
+  clearAllShapes: () => {
+    set({ 
+      content: [],
+      selectedContentId: null,
+      contentSyncStatus: {},
+      pendingUpdates: new Map()
+    })
+  },
+  setDraggingShape: (isDraggingShape: boolean) => {
+    set({ isDraggingContent: isDraggingShape })
+  },
+  
+  // Legacy getter implementations
+  get shapes() { return this.content; },
+  get isDraggingShape() { return this.isDraggingContent; },
+  get selectedShapeId() { return this.selectedContentId; },
+  get shapeSyncStatus() { return this.contentSyncStatus; }
 }),
     {
       name: 'canvas-store',
       partialize: (state) => ({
         stagePosition: state.stagePosition,
         stageScale: state.stageScale,
-        selectedShapeId: state.selectedShapeId
+        selectedContentId: state.selectedContentId
       })
     }
   )

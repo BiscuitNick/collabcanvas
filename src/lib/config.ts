@@ -19,8 +19,15 @@ export const SHAPE_MAX_RETRIES = parseInt(import.meta.env.VITE_SHAPE_MAX_RETRIES
 export const PRESENCE_UPDATE_INTERVAL_MS = parseInt(import.meta.env.VITE_PRESENCE_UPDATE_INTERVAL_MS || '30000', 10)
 export const PRESENCE_CLEANUP_INTERVAL_MS = parseInt(import.meta.env.VITE_PRESENCE_CLEANUP_INTERVAL_MS || '300000', 10)
 
+// Shape locking configuration
+export const LOCK_TTL_MS = parseInt(import.meta.env.VITE_LOCK_TTL_MS || '30000', 10)
+
 // Performance monitoring
 export const ENABLE_PERFORMANCE_LOGGING = import.meta.env.VITE_ENABLE_PERFORMANCE_LOGGING === 'true'
+
+// Canvas identifier (single shared canvas for now)
+// Persisted via env with safe default
+export const CANVAS_ID = (import.meta.env.VITE_CANVAS_ID || 'default-canvas').toString()
 
 // Validate configuration values
 if (CURSOR_THROTTLE_MS < 1 || CURSOR_THROTTLE_MS > 1000) {
@@ -63,5 +70,8 @@ if (import.meta.env.DEV) {
     presenceUpdateInterval: `${PRESENCE_UPDATE_INTERVAL_MS}ms`,
     presenceCleanupInterval: `${PRESENCE_CLEANUP_INTERVAL_MS}ms`,
     performanceLogging: ENABLE_PERFORMANCE_LOGGING
+  })
+  console.log('🖼️ Canvas Configuration:', {
+    canvasId: CANVAS_ID
   })
 }

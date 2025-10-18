@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useCanvasStore } from '../store/canvasStore'
+import type { Rectangle } from '../types'
+import { ShapeType, ShapeVersion } from '../types'
 
 describe('Canvas Store', () => {
   beforeEach(() => {
@@ -38,8 +40,8 @@ describe('Canvas Store', () => {
 
   it('should clamp scale within bounds', () => {
     // Too small
-    useCanvasStore.getState().updateScale(0.05)
-    expect(useCanvasStore.getState().stageScale).toBe(0.1)
+    useCanvasStore.getState().updateScale(0.005)
+    expect(useCanvasStore.getState().stageScale).toBe(0.01)
 
     // Too large
     useCanvasStore.getState().updateScale(5)
@@ -47,8 +49,10 @@ describe('Canvas Store', () => {
   })
 
   it('should add shapes to array', () => {
-    const shape = {
+    const shape: Rectangle = {
       id: '1',
+      type: ShapeType.RECTANGLE,
+      version: ShapeVersion.V2,
       x: 100,
       y: 100,
       width: 100,
@@ -67,8 +71,10 @@ describe('Canvas Store', () => {
   })
 
   it('should update shapes', () => {
-    const shape = {
+    const shape: Rectangle = {
       id: '1',
+      type: ShapeType.RECTANGLE,
+      version: ShapeVersion.V2,
       x: 100,
       y: 100,
       width: 100,
@@ -135,8 +141,10 @@ describe('Canvas Store', () => {
   it('should handle multiple shape operations', () => {
     const { addShape, updateShape, selectShape } = useCanvasStore.getState()
     
-    const shape1 = {
+    const shape1: Rectangle = {
       id: '1',
+      type: ShapeType.RECTANGLE,
+      version: ShapeVersion.V2,
       x: 100,
       y: 100,
       width: 100,
@@ -148,8 +156,10 @@ describe('Canvas Store', () => {
       updatedAt: Date.now(),
     }
     
-    const shape2 = {
+    const shape2: Rectangle = {
       id: '2',
+      type: ShapeType.RECTANGLE,
+      version: ShapeVersion.V2,
       x: 200,
       y: 200,
       width: 150,

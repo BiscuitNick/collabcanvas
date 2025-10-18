@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
 
 // Your web app's Firebase configuration
 // Using environment variables for security
@@ -19,6 +19,12 @@ const app = initializeApp(firebaseConfig)
 
 // Initialize Firebase services
 export const auth = getAuth(app)
-export const firestore = getFirestore(app)
+
+// Initialize Firestore with persistent cache for better performance and offline support
+export const firestore = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+})
 
 export default app

@@ -16,7 +16,7 @@ export const COLOR_PALETTE = [
 export const CANVAS_SIZE = 64000
 export const CANVAS_HALF = CANVAS_SIZE / 2
 export const MIN_SHAPE_SIZE = 20
-export const MAX_SHAPE_SIZE = 1000
+export const MAX_SHAPE_SIZE = 2000
 
 export const STALE_PRESENCE_THRESHOLD = 300000 // 5 minutes
 export const OFFLINE_PRESENCE_THRESHOLD = 30000 // 30 seconds - more aggressive cleanup

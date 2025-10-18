@@ -33,7 +33,7 @@ import TextToolbar from './TextToolbar'
 import ImageToolbar from './ImageToolbar'
 import { ShapeType, FontFamily, FontStyle, ContentType, ContentVersion } from '../../types'
 import type { Content } from '../../types'
-import { callAITest, type AIProvider, type GPT5Model } from '../../lib/aiApi'
+import { callAITest, generateImage, type AIProvider, type GPT5Model, type ImageModel } from '../../lib/aiApi'
 import { buildGrid } from '../../lib/utils'
 import { useCanvasStore } from '../../store/canvasStore'
 
@@ -98,6 +98,10 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   const [aiModel, setAiModel] = useState<GPT5Model>(() => {
     const saved = localStorage.getItem('collabcanvas-ai-model')
     return (saved as GPT5Model) || 'gpt-4o-mini'
+  })
+  const [imageModel, setImageModel] = useState<ImageModel>(() => {
+    const saved = localStorage.getItem('collabcanvas-image-model')
+    return (saved as ImageModel) || 'seedream-4'
   })
 
   // Grid tool state
@@ -176,6 +180,11 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     localStorage.setItem('collabcanvas-ai-model', aiModel)
   }, [aiModel])
 
+  // Persist image model selection
+  useEffect(() => {
+    localStorage.setItem('collabcanvas-image-model', imageModel)
+  }, [imageModel])
+
   // Handle model compatibility when switching providers
   useEffect(() => {
     // If switching to OpenAI and Meta model is selected, switch to default
@@ -244,6 +253,56 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   const handleAgentGo = async () => {
     if (!agentInput.trim() || agentLoading) return
 
+    // Check if user selected image generation
+    if (selectedAgentOption === 'imageplus') {
+      if (!onCreateContent) {
+        console.error('[Agent Toolbar] onCreateContent not provided for image generation')
+        setAgentError('Content creation not available')
+        return
+      }
+
+      setAgentLoading(true)
+      setAgentError(null)
+
+      try {
+        console.log('[Agent Toolbar] Generating image with model:', imageModel, 'prompt:', agentInput.trim())
+
+        // Call image generation API
+        const response = await generateImage(agentInput.trim(), imageModel)
+
+        console.log('[Agent Toolbar] Image generation response:', response)
+
+        if (response.success && response.data?.imageUrl) {
+          // Create image content on canvas
+          // Place at center of viewport, with 4:3 aspect ratio to match Seedream 4 output
+          await onCreateContent({
+            type: ContentType.IMAGE,
+            version: ContentVersion.V2,
+            x: 100, // Default position
+            y: 100,
+            width: 512, // Default dimensions for generated images (4:3 aspect ratio)
+            height: 384, // 512 * 3/4 = 384 for 4:3 aspect ratio
+            src: response.data.imageUrl,
+            alt: agentInput.trim()
+          } as any)
+
+          // Clear input on success
+          setAgentInput('')
+          console.log('[Agent Toolbar] Successfully created image on canvas')
+        } else {
+          console.warn('[Agent Toolbar] No image URL in response:', response)
+          setAgentError('Failed to generate image. Please try again.')
+        }
+      } catch (error) {
+        console.error('[Agent Toolbar] Image generation error:', error)
+        setAgentError('Failed to generate image. Please try again.')
+      } finally {
+        setAgentLoading(false)
+      }
+      return
+    }
+
+    // Handle regular content creation/editing (blocks mode)
     // Check if we're editing or creating
     const isEditing = !!selectedContent
 
@@ -507,13 +566,11 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <DropdownMenuContent className="bg-white">
                 {agentOptions.map((option) => {
                   const Icon = option.icon
-                  const isDisabled = option.type === 'imageplus'
                   return (
                     <DropdownMenuItem
                       key={option.type}
-                      onClick={() => !isDisabled && setSelectedAgentOption(option.type)}
-                      disabled={isDisabled}
-                      className={`flex items-center ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      onClick={() => setSelectedAgentOption(option.type)}
+                      className="flex items-center"
                     >
                       <Icon className="h-4 w-4 mr-2" />
                       {option.label}
@@ -523,30 +580,48 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* AI Provider Dropdown */}
-            <Select value={aiProvider} onValueChange={(value) => setAiProvider(value as AIProvider)} disabled={agentLoading}>
-              <SelectTrigger className="h-8 w-24 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="openai">OpenAI</SelectItem>
-                <SelectItem value="replicate">Replicate</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* AI Provider Dropdown - Only show for blocks mode */}
+            {selectedAgentOption === 'blocks' && (
+              <Select value={aiProvider} onValueChange={(value) => setAiProvider(value as AIProvider)} disabled={agentLoading}>
+                <SelectTrigger className="h-8 w-24 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="replicate">Replicate</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
 
-            {/* Model Dropdown */}
-            <Select value={aiModel} onValueChange={(value) => setAiModel(value as GPT5Model)} disabled={agentLoading}>
-              <SelectTrigger className="h-8 w-32 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="gpt-5">GPT-5</SelectItem>
-                <SelectItem value="gpt-5-mini">GPT-5 Mini</SelectItem>
-                <SelectItem value="gpt-5-nano">GPT-5 Nano</SelectItem>
-                <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
-                <SelectItem value="gpt-4.1-nano">GPT-4.1 Nano</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Model Dropdown - Only show for blocks mode */}
+            {selectedAgentOption === 'blocks' && (
+              <Select value={aiModel} onValueChange={(value) => setAiModel(value as GPT5Model)} disabled={agentLoading}>
+                <SelectTrigger className="h-8 w-32 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  <SelectItem value="gpt-5">GPT-5</SelectItem>
+                  <SelectItem value="gpt-5-mini">GPT-5 Mini</SelectItem>
+                  <SelectItem value="gpt-5-nano">GPT-5 Nano</SelectItem>
+                  <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                  <SelectItem value="gpt-4.1-nano">GPT-4.1 Nano</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Image Model Dropdown - Only show for image mode */}
+            {selectedAgentOption === 'imageplus' && (
+              <Select value={imageModel} onValueChange={(value) => setImageModel(value as ImageModel)} disabled={agentLoading}>
+                <SelectTrigger className="h-8 w-40 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  <SelectItem value="seedream-4">Seedream 4</SelectItem>
+                  <SelectItem value="nano-banana">Nano Banana</SelectItem>
+                  <SelectItem value="flux-kontext-pro">Flux Kontext Pro</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </div>
         )
       }
@@ -792,7 +867,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
                 <SelectTrigger className="h-7 w-24 text-xs">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white">
                   <SelectItem value="random">Random</SelectItem>
                   <SelectItem value="palette">Palette</SelectItem>
                 </SelectContent>

@@ -174,6 +174,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const [manualCanvasSize, setManualCanvasSize] = useState<{ width: number; height: number } | null>(null)
   const [textOptions, setTextOptions] = useState({ text: '', fontSize: 24, fontFamily: 'Arial' as const, fontStyle: 'normal' as const })
+  const [imageUrl, setImageUrl] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
   const fpsRef = useRef({ frames: 0, lastTime: performance.now() })
 
@@ -290,12 +291,13 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 
   // Toolbar handlers
   const handleToolSelect = useCallback((tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null) => {
-    const isShapeTool = tool === 'rectangle' || tool === 'circle' || tool === 'image';
+    const isShapeTool = tool === 'rectangle' || tool === 'circle';
     const isTextTool = tool === 'text';
+    const isImageTool = tool === 'image';
     setUIState(prev => ({
       ...prev,
       selectedTool: tool,
-      isCreatingShape: isShapeTool || isTextTool,
+      isCreatingShape: isShapeTool || isTextTool || isImageTool,
       // Reset shape options if switching away from a shape tool
       shapeCreationOptions: isShapeTool ? prev.shapeCreationOptions : undefined
     }))
@@ -393,6 +395,10 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     setTextOptions(options)
   }, [])
 
+  const handleImageUrlChange = useCallback((url: string) => {
+    setImageUrl(url)
+  }, [])
+
   // Reset canvas - clear all shapes and recenter zoom/pan
   const handleResetCanvas = useCallback(async () => {
     try {
@@ -432,6 +438,36 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         await createContent(textContent, !enableFirestore)
 
         // TODO: Task 2.3 - Immediately enter edit mode with caret visible
+      } catch {
+        // Silently fail
+      }
+      return
+    }
+
+    // Handle image creation
+    if (uiState.selectedTool === 'image') {
+      try {
+        const { createImageContent } = await import('../../lib/utils')
+
+        if (!imageUrl.trim()) {
+          // Don't create image if no URL provided
+          return
+        }
+
+        const imageContent = createImageContent(
+          event.x,
+          event.y,
+          user?.uid || 'anonymous',
+          {
+            src: imageUrl,
+            width: 100,
+            height: 100,
+            alt: 'User image',
+          }
+        )
+
+        // Create content - skipFirestore parameter controls whether to save to Firestore
+        await createContent(imageContent, !enableFirestore)
       } catch {
         // Silently fail
       }
@@ -489,7 +525,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         // ignore
       }
     }
-  }, [createShape, user?.uid, uiState, createContent, enableFirestore, textOptions])
+  }, [createShape, user?.uid, uiState, createContent, enableFirestore, textOptions, imageUrl])
 
 
 
@@ -538,6 +574,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           onCreateContent={createContent}
           onUpdateContent={updateShape}
           onTextOptionsChange={handleTextOptionsChange}
+          onImageUrlChange={handleImageUrlChange}
           onOpenAIAgent={handleOpenAIAgent}
           selectedTool={uiState.selectedTool}
           onToolSelect={handleToolSelect}

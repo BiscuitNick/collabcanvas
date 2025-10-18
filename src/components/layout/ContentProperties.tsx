@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '../ui/select'
 import type { Content } from '../../types'
-import { isRectangleContent, isCircleContent, isTextContent, FontFamily, FontStyle } from '../../types'
+import { isRectangleContent, isCircleContent, isTextContent, isImageContent, FontFamily, FontStyle } from '../../types'
 
 interface ContentPropertiesProps {
   content: Content
@@ -200,6 +200,60 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('radius', parseInt(e.target.value) || 0)}
             className="h-7 text-xs"
           />
+        </div>
+      )}
+
+      {/* Image Properties */}
+      {isImageContent(content) && (
+        <div className="space-y-2">
+          <div>
+            <Label htmlFor={`${content.id}-src`} className="text-xs">Image URL</Label>
+            <Input
+              key={`src-${content.id}`}
+              id={`${content.id}-src`}
+              type="text"
+              value={content.src}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('src', e.target.value)}
+              className="h-7 text-xs"
+              placeholder="https://example.com/image.jpg"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label htmlFor={`${content.id}-width`} className="text-xs">Width</Label>
+              <Input
+                key={`width-${content.id}`}
+                id={`${content.id}-width`}
+                type="number"
+                value={Math.round(content.width)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('width', parseInt(e.target.value) || 100)}
+                className="h-7 text-xs"
+              />
+            </div>
+            <div>
+              <Label htmlFor={`${content.id}-height`} className="text-xs">Height</Label>
+              <Input
+                key={`height-${content.id}`}
+                id={`${content.id}-height`}
+                type="number"
+                value={Math.round(content.height)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('height', parseInt(e.target.value) || 100)}
+                className="h-7 text-xs"
+              />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor={`${content.id}-rotation`} className="text-xs">Rotation</Label>
+            <Input
+              key={`rotation-${content.id}`}
+              id={`${content.id}-rotation`}
+              type="number"
+              value={Math.round(content.rotation || 0)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('rotation', parseInt(e.target.value) || 0)}
+              className="h-7 text-xs"
+              placeholder="0°"
+            />
+          </div>
         </div>
       )}
 

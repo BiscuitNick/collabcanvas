@@ -108,7 +108,7 @@ export function formatTimeAgo(date: number | Date | null | undefined): string {
 }
 
 // Import types for factory function
-import type { TextContent } from '../types'
+import type { TextContent, ImageContent } from '../types'
 import { ContentType, ContentVersion, DEFAULT_CONTENT_VALUES } from '../types'
 
 // Factory function to create TextContent
@@ -149,6 +149,37 @@ export function createTextContent(
     verticalAlign: options?.verticalAlign ?? defaults.verticalAlign,
     opacity: options?.opacity ?? defaults.opacity,
     rotation: options?.rotation ?? defaults.rotation,
+    createdBy: userId,
+    // createdAt and updatedAt will be added by Firestore with serverTimestamp()
+  }
+}
+
+export function createImageContent(
+  x: number,
+  y: number,
+  userId: string,
+  options?: {
+    src?: string
+    width?: number
+    height?: number
+    alt?: string
+    opacity?: number
+    rotation?: number
+  }
+): Omit<ImageContent, 'id' | 'createdAt' | 'updatedAt'> {
+  const defaults = DEFAULT_CONTENT_VALUES.image
+
+  return {
+    type: ContentType.IMAGE,
+    version: ContentVersion.V2,
+    x,
+    y,
+    src: options?.src ?? defaults.src,
+    width: options?.width ?? defaults.width,
+    height: options?.height ?? defaults.height,
+    alt: options?.alt ?? defaults.alt,
+    opacity: options?.opacity ?? 1,
+    rotation: options?.rotation ?? 0,
     createdBy: userId,
     // createdAt and updatedAt will be added by Firestore with serverTimestamp()
   }

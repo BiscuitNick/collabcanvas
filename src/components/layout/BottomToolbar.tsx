@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import ShapeCreationForm from './ShapeCreationForm'
 import TextToolbar from './TextToolbar'
+import ImageToolbar from './ImageToolbar'
 import { ShapeType, FontFamily, FontStyle, ContentType, ContentVersion } from '../../types'
 import type { Content } from '../../types'
 import { callAITest, type AIProvider, type GPT5Model } from '../../lib/aiApi'
@@ -55,6 +56,7 @@ interface BottomToolbarProps {
     fontFamily: FontFamily
     fontStyle: FontStyle
   }) => void
+  onImageUrlChange?: (url: string) => void
   onCreateText?: () => void
   onOpenAIAgent: () => void
   selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
@@ -62,13 +64,14 @@ interface BottomToolbarProps {
   onResetCanvas: () => void
 }
 
-type ToolType = 'pan' | 'shapes' | 'text' | 'ai' | 'agent' | 'grid'
+type ToolType = 'pan' | 'shapes' | 'text' | 'image' | 'ai' | 'agent' | 'grid'
 
 const BottomToolbar: React.FC<BottomToolbarProps> = ({
   onCreateShapeWithOptions,
   onCreateContent,
   onUpdateContent,
   onTextOptionsChange,
+  onImageUrlChange,
   // onCreateText is not used yet but reserved for future use
   onOpenAIAgent,
   onToolSelect,
@@ -83,6 +86,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   const [activeTool, setActiveTool] = useState<ToolType>('pan')
   const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle')
   const [textInput, setTextInput] = useState('')
+  const [imageUrl, setImageUrl] = useState('')
   const [agentInput, setAgentInput] = useState('')
   const [selectedAgentOption, setSelectedAgentOption] = useState<'blocks' | 'imageplus'>('blocks')
   const [agentLoading, setAgentLoading] = useState(false)
@@ -184,6 +188,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     { id: 'pan' as ToolType, label: 'Hand Tool', icon: Hand, description: 'Pan around the canvas' },
     { id: 'shapes' as ToolType, label: 'Shapes Tool', icon: Shapes, description: 'Create shapes' },
     { id: 'text' as ToolType, label: 'Text Tool', icon: Type, description: 'Create text' },
+    { id: 'image' as ToolType, label: 'Image Tool', icon: ImagePlus, description: 'Add images' },
     { id: 'grid' as ToolType, label: 'Grid Tool', icon: Grid3X3, description: 'Create grid' },
     { id: 'agent' as ToolType, label: 'Agent Tool', icon: Bot, description: 'AI agent' }
   ]
@@ -213,6 +218,9 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     } else if (tool === 'text') {
       onToolSelect('text')
       // Text creation will be triggered by clicking on canvas
+    } else if (tool === 'image') {
+      onToolSelect('image')
+      // Image creation will be triggered by clicking on canvas
     } else if (tool === 'agent') {
       onToolSelect('agent')
       // Agent tool selected
@@ -471,6 +479,16 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
           </div>
         )
 
+      case 'image':
+        return (
+          <div className="flex items-center space-x-2">
+            <ImageToolbar onImageUrlChange={(url) => {
+              setImageUrl(url)
+              onImageUrlChange?.(url)
+            }} />
+          </div>
+        )
+
       case 'agent': {
         const currentAgentOption = getCurrentAgentOption()
         return (
@@ -597,6 +615,11 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     }
   }
 
+  const handleImageUrlChange = (value: string) => {
+    setImageUrl(value)
+    localStorage.setItem('collabcanvas-image-url', value)
+  }
+
   const handleAgentInputChange = (value: string) => {
     setAgentInput(value)
     localStorage.setItem('collabcanvas-agent-input', value)
@@ -649,6 +672,19 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
             onChange={(e) => handleTextInputChange(e.target.value)}
             placeholder="Enter text..."
             className="h-8 w-64 text-sm"
+          />
+        </div>
+      )}
+
+      {/* Image URL Input Field - Appears above toolbar when image tool is active */}
+      {activeTool === 'image' && (
+        <div className="mb-2 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-4 py-2">
+          <Input
+            type="text"
+            value={imageUrl}
+            onChange={(e) => handleImageUrlChange(e.target.value)}
+            placeholder="https://example.com/image.jpg"
+            className="h-8 w-96 text-sm"
           />
         </div>
       )}

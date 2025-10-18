@@ -2,8 +2,9 @@ import React from 'react'
 import Rectangle from './Rectangle'
 import Circle from './Circle'
 import TextContent from './TextContent'
-import type { Shape, Rectangle as RectangleType, Circle as CircleType, TextContent as TextContentType } from '../../types'
-import { isRectangle, isCircle, isTextContent } from '../../types'
+import Image from './Image'
+import type { Shape, Rectangle as RectangleType, Circle as CircleType, TextContent as TextContentType, ImageContent as ImageContentType } from '../../types'
+import { isRectangle, isCircle, isTextContent, isImageContent } from '../../types'
 
 interface ShapeFactoryProps {
   shape: Shape
@@ -85,6 +86,24 @@ const ShapeFactory: React.FC<ShapeFactoryProps> = ({
         isSelected={isSelected}
         onSelect={onSelect}
         onUpdate={onUpdate as (updates: Partial<TextContentType>) => void}
+        onDragMove={onDragMove}
+        onDragEnd={onDragEnd}
+        onDragStart={onDragStart}
+        onDragEndCallback={onDragEndCallback}
+        currentUserId={currentUserId}
+        selectedTool={selectedTool}
+      />
+    )
+  }
+
+  // Render Image component
+  if (isImageContent(shape)) {
+    return (
+      <Image
+        content={shape as ImageContentType}
+        isSelected={isSelected}
+        onSelect={onSelect}
+        onUpdate={onUpdate as (updates: Partial<ImageContentType>) => void}
         onDragMove={onDragMove}
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}

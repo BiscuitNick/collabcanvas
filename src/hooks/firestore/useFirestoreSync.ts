@@ -157,10 +157,11 @@ export const useFirestoreSync = (userUid: string | undefined) => {
             contentData.push({
               ...baseContent,
               type: 'image',
-              src: data.src,
-              width: data.width,
-              height: data.height,
-              alt: data.alt,
+              src: data.src || '',
+              width: data.width || 100,
+              height: data.height || 100,
+              alt: data.alt || 'Image',
+              opacity: data.opacity !== undefined ? data.opacity : 1,
             });
           }
         });
@@ -193,7 +194,7 @@ export const useFirestoreSync = (userUid: string | undefined) => {
 
         // Add any remaining local-only items (those not in Firestore)
         storeContentMap.forEach((localItem) => {
-          if (localItem.id.startsWith('local-')) {
+          if (localItem.id.startsWith('local-') || localItem.id.startsWith('hardcoded-')) {
             mergedContent.push(localItem);
           }
         });

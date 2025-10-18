@@ -50,8 +50,8 @@ export function getViewportCenter(
 // Calculate dynamic step for zoom based on current zoom level
 export const getZoomStep = (currentPercentage: number) => {
   if (currentPercentage < 25) return 1
-  if (currentPercentage < 100) return 5
-  return 10
+  if (currentPercentage < 100) return 2
+  return 3
 }
 
 // Text validation constants

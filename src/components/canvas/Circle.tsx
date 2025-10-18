@@ -4,7 +4,7 @@ import Konva from 'konva' // Import Konva for types
 import type { Circle } from '../../types'
 import { clamp } from '../../lib/utils'
 import { CANVAS_HALF, MIN_SHAPE_SIZE, MAX_SHAPE_SIZE } from '../../lib/constants'
-import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS } from '../../lib/config'
+import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS, LOCK_INDICATOR_STROKE_WIDTH } from '../../lib/config'
 
 interface CircleProps {
   shape: Circle
@@ -213,8 +213,8 @@ const CircleComponent: React.FC<CircleProps> = memo(({
         y={shape.y}
         radius={effectiveRadius}
         fill={shape.fill}
-        stroke={shape.stroke || 'transparent'}
-        strokeWidth={shape.strokeWidth || 0}
+        stroke={isLockedByOther ? (shape.lockedByUserColor || '#FF0000') : (shape.stroke || 'transparent')}
+        strokeWidth={isLockedByOther ? LOCK_INDICATOR_STROKE_WIDTH : (shape.strokeWidth || 0)}
         shadowColor="rgba(0, 0, 0, 0.1)"
         shadowBlur={4}
         shadowOffset={{ x: 2, y: 2 }}
@@ -249,6 +249,7 @@ const CircleComponent: React.FC<CircleProps> = memo(({
           }
         }}
       />
+
       {isSelected && !isLockedByOther && (
         <Transformer
           ref={transformerRef}
@@ -272,7 +273,7 @@ const CircleComponent: React.FC<CircleProps> = memo(({
           anchorFill="#FFFFFF"
           anchorStrokeWidth={2}
           borderStroke={isLockedByOther ? (shape.lockedByUserColor || '#FF0000') : '#007AFF'}
-          borderStrokeWidth={isLockedByOther ? Math.min(20, shape.radius * 0.1) : 2}
+          borderStrokeWidth={2}
           borderDash={[5, 5]}
           rotateEnabled={false} // No rotation for circles as per requirements
         />

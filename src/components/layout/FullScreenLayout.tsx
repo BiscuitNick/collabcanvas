@@ -74,7 +74,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   stopEditingShape
 }) => {
   useKeyboardShortcuts()
-  const { selectShape, resetView, selectedContentId, updatePosition } = useCanvasStore()
+  const { user } = useAuth()
+  const { selectShape, resetView, selectedContentId, updatePosition, stageScale } = useCanvasStore()
 
   // Convert presence array to a Map for efficient user lookup
   const usersMap = React.useMemo(() => {
@@ -86,12 +87,45 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   }, [presence]);
   // Use selectedContentId directly instead of the getter selectedShapeId for proper reactivity
   const canvasSelectedShapeId = selectedContentId
-  const { createContent, updateContent, clearAllContent } = useContent()
+  const { createContent, updateContent, clearAllContent, deleteContent } = useContent()
 
   // Legacy aliases for backward compatibility
   const createShape = createContent
   const clearAllShapes = clearAllContent
-  const { user } = useAuth()
+
+  // Handle copying content with offset
+  const handleCopyContent = useCallback((itemToCopy: Content) => {
+    // Calculate new position based on shape type
+    let newX = itemToCopy.x
+    let newY = itemToCopy.y
+    let offset = 50 // Default offset for shapes without width
+
+    // Handle different shape types
+    if (itemToCopy.type === 'rectangle' && 'width' in itemToCopy && itemToCopy.width) {
+      // Rectangle: move to the right by width + gap
+      newX = itemToCopy.x + itemToCopy.width + 20
+    } else if (itemToCopy.type === 'circle' && 'radius' in itemToCopy && itemToCopy.radius) {
+      // Circle: move to the right by diameter (2 * radius) + gap
+      newX = itemToCopy.x + (itemToCopy.radius * 2) + 20
+    } else if (itemToCopy.type === 'text') {
+      // Text: keep same X, move down by fontSize + gap
+      const textItem = itemToCopy as any
+      newY = itemToCopy.y + (textItem.fontSize || 16) + 20
+      // X stays the same for text
+    } else {
+      // Default fallback: move to the right
+      newX = itemToCopy.x + offset
+    }
+
+    // Remove id, createdAt, updatedAt as they'll be generated
+    const { id, createdAt, updatedAt, ...contentToCopy } = itemToCopy as any
+    createContent({ ...contentToCopy, x: newX, y: newY })
+  }, [createContent, user])
+
+  // Handle deleting content
+  const handleDeleteContent = useCallback((contentId: string) => {
+    deleteContent(contentId)
+  }, [deleteContent])
   const [uiState, setUIState] = useState<UIState>({
     propertiesPaneVisible: true,
     gridlinesVisible: false,
@@ -111,12 +145,26 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     isCreatingShape: false
   })
 
-  // Sync canvas store selection with UI state
+  // Track previous selection ID to detect when a new item is selected
+  const prevSelectionRef = useRef<string | null>(null)
+
+  // Sync canvas store selection with UI state and auto-open panel for new selections
   useEffect(() => {
     setUIState(prev => ({
       ...prev,
       selectedShapeId: canvasSelectedShapeId
     }))
+
+    // Auto-open properties pane only when a NEW (different) content item is selected
+    if (canvasSelectedShapeId && canvasSelectedShapeId !== prevSelectionRef.current && !uiState.propertiesPaneVisible) {
+      setUIState(prev => ({
+        ...prev,
+        propertiesPaneVisible: true
+      }))
+    }
+
+    // Update the previous selection reference
+    prevSelectionRef.current = canvasSelectedShapeId
   }, [canvasSelectedShapeId])
 
   const [enableFirestore, setEnableFirestore] = useState(() => {
@@ -214,11 +262,17 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     }))
   }, [])
 
-  // Pan canvas to a specific content position
+  // Pan canvas to a specific content position (center it on the viewport)
   const handlePanToContent = useCallback((x: number, y: number) => {
-    // Set canvas position to match content position
-    updatePosition(x, y)
-  }, [updatePosition])
+    // Only pan if canvas size is valid
+    if (canvasSize.width === 0 || canvasSize.height === 0) return
+
+    // Calculate stage position to center the content on the viewport
+    // accounting for current zoom level
+    const desiredX = (canvasSize.width / 2) - (x * stageScale)
+    const desiredY = (canvasSize.height / 2) - (y * stageScale)
+    updatePosition(desiredX, desiredY)
+  }, [canvasSize.width, canvasSize.height, stageScale, updatePosition])
 
   // Reopen properties pane
   const reopenPropertiesPane = useCallback(() => {
@@ -564,6 +618,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           onClose={closePropertiesPane}
           currentUserId={currentUserId}
           users={usersMap}
+          onCopyContent={handleCopyContent}
+          onDeleteContent={handleDeleteContent}
         />
       </div>
 

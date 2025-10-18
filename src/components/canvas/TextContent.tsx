@@ -4,6 +4,7 @@ import Konva from 'konva'
 import type { TextContent } from '../../types'
 import { clamp } from '../../lib/utils'
 import { CANVAS_HALF } from '../../lib/constants'
+import { LOCK_INDICATOR_STROKE_WIDTH } from '../../lib/config'
 
 interface TextContentProps {
   content: TextContent
@@ -223,11 +224,11 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
         fontFamily={content.fontFamily}
         fontStyle={content.fontStyle}
         fill={content.fill}
+        stroke={isLockedByOther ? (content.lockedByUserColor || '#FF0000') : undefined}
+        strokeWidth={isLockedByOther ? LOCK_INDICATOR_STROKE_WIDTH : 0}
         rotation={content.rotation || 0}
         align={content.textAlign || 'left'}
         verticalAlign={content.verticalAlign || 'top'}
-        stroke={isLockedByOther ? (content.lockedByUserColor || '#FF0000') : (isSelected ? '#007AFF' : undefined)}
-        strokeWidth={isLockedByOther ? 2 : (isSelected ? 1 : 0)}
         draggable={isSelected && !isLockedByOther}
         onClick={handleClick}
         onTap={handleClick}
@@ -260,6 +261,7 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
           }
         }}
       />
+
       {isSelected && !isLockedByOther && (
         <Transformer
           ref={transformerRef}

@@ -30,13 +30,12 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
 
   return (
     <div className="space-y-3 p-1">
-      <h4 className="text-xs font-medium text-gray-500">Properties</h4>
-
       {/* Position */}
       <div className="grid grid-cols-2 gap-2">
         <div>
           <Label htmlFor={`${content.id}-x`} className="text-xs">X</Label>
           <Input
+            key={`x-${content.id}`}
             id={`${content.id}-x`}
             type="number"
             value={Math.round(content.x)}
@@ -47,6 +46,7 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
         <div>
           <Label htmlFor={`${content.id}-y`} className="text-xs">Y</Label>
           <Input
+            key={`y-${content.id}`}
             id={`${content.id}-y`}
             type="number"
             value={Math.round(content.y)}
@@ -73,20 +73,35 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
       {/* Font Properties */}
       {isTextContent(content) && (
         <div className="space-y-2">
-          {/* Font Size */}
-          <div>
-            <Label htmlFor={`${content.id}-fontSize`} className="text-xs">Font Size</Label>
-            <div className="flex items-center gap-2">
+          {/* Font Size and Rotation - same row for text */}
+          <div className="grid grid-cols-2 gap-2">
+            {/* Font Size */}
+            <div>
+              <Label htmlFor={`${content.id}-fontSize`} className="text-xs">Font Size</Label>
               <Input
+                key={`fontSize-${content.id}`}
                 id={`${content.id}-fontSize`}
                 type="number"
-                value={content.fontSize}
+                value={Math.round(content.fontSize)}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('fontSize', parseInt(e.target.value) || 24)}
                 className="h-7 text-xs"
                 min="8"
-                max="200"
+                placeholder="24 px"
               />
-              <span className="text-xs text-gray-400">px</span>
+            </div>
+
+            {/* Rotation */}
+            <div>
+              <Label htmlFor={`${content.id}-rotation`} className="text-xs">Rotation</Label>
+              <Input
+                key={`rotation-${content.id}`}
+                id={`${content.id}-rotation`}
+                type="number"
+                value={Math.round(content.rotation || 0)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('rotation', parseInt(e.target.value) || 0)}
+                className="h-7 text-xs"
+                placeholder="0°"
+              />
             </div>
           </div>
 
@@ -153,9 +168,10 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
           <div>
             <Label htmlFor={`${content.id}-width`} className="text-xs">Width</Label>
             <Input
+              key={`width-${content.id}`}
               id={`${content.id}-width`}
               type="number"
-              value={content.width}
+              value={Math.round(content.width)}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('width', parseInt(e.target.value) || 0)}
               className="h-7 text-xs"
             />
@@ -163,9 +179,10 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
           <div>
             <Label htmlFor={`${content.id}-height`} className="text-xs">Height</Label>
             <Input
+              key={`height-${content.id}`}
               id={`${content.id}-height`}
               type="number"
-              value={content.height}
+              value={Math.round(content.height)}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('height', parseInt(e.target.value) || 0)}
               className="h-7 text-xs"
             />
@@ -176,9 +193,10 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
         <div>
           <Label htmlFor={`${content.id}-radius`} className="text-xs">Radius</Label>
           <Input
+            key={`radius-${content.id}`}
             id={`${content.id}-radius`}
             type="number"
-            value={content.radius}
+            value={Math.round(content.radius)}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('radius', parseInt(e.target.value) || 0)}
             className="h-7 text-xs"
           />
@@ -197,19 +215,6 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
         />
       </div>
 
-      {/* Rotation - Not available for circles */}
-      {!isCircleContent(content) && (
-        <div>
-          <Label htmlFor={`${content.id}-rotation`} className="text-xs">Rotation</Label>
-          <Input
-            id={`${content.id}-rotation`}
-            type="number"
-            value={Math.round(content.rotation || 0)}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('rotation', parseInt(e.target.value) || 0)}
-            className="h-7 text-xs"
-          />
-        </div>
-      )}
     </div>
   )
 }

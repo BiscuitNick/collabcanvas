@@ -4,8 +4,8 @@ import { Avatar, AvatarFallback } from '../ui/avatar'
 import ContentProperties from './ContentProperties'
 import type { Content } from '../../types'
 import { isTextContent, isRectangleContent, isCircleContent } from '../../types'
-import { getTextExcerpt, formatTimeAgo } from '../../lib/utils'
-import { Lock } from 'lucide-react'
+import { getTextExcerpt } from '../../lib/utils'
+import { Lock, Copy, Trash2 } from 'lucide-react'
 
 interface DraggablePropertiesPaneProps {
   content: Content[]
@@ -17,6 +17,8 @@ interface DraggablePropertiesPaneProps {
   onClose: () => void
   currentUserId?: string
   users?: Map<string, { displayName?: string; email?: string; color?: string }>
+  onCopyContent?: (content: Content) => void
+  onDeleteContent?: (id: string) => void
 }
 
 const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
@@ -29,6 +31,8 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
   onClose,
   currentUserId,
   users,
+  onCopyContent,
+  onDeleteContent,
 }) => {
   const selectedItemRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -90,16 +94,27 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
     return null
   }
 
-  // Scroll to selected item when selection changes
+  // Scroll to selected item and auto-expand when selection changes
   useEffect(() => {
-    if (selectedShape && selectedItemRef.current && scrollContainerRef.current) {
-      selectedItemRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
-        inline: 'nearest'
-      })
+    if (selectedShape) {
+      // Auto-expand the selected item
+      setExpandedItemId(selectedShape.id)
     }
   }, [selectedShape?.id])
+
+  // Scroll to show full expanded content in view
+  useEffect(() => {
+    if (selectedShape && expandedItemId === selectedShape.id && selectedItemRef.current && scrollContainerRef.current) {
+      // Use requestAnimationFrame to ensure DOM has rendered the expanded content
+      requestAnimationFrame(() => {
+        selectedItemRef.current?.scrollIntoView({
+          behavior: 'auto',
+          block: 'start',
+          inline: 'nearest'
+        })
+      })
+    }
+  }, [expandedItemId, selectedShape?.id])
 
   if (!isVisible) {
     return null
@@ -149,23 +164,6 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
               lockedByUserColor = user?.color || '#999'
             }
 
-            // Get last edited info
-            let lastEditedByUserName = ''
-            let lastEditedByUserColor = ''
-            if (shape.lastEditedBy && users) {
-              const user = users.get(shape.lastEditedBy)
-              lastEditedByUserName = user?.displayName || user?.email || 'Unknown User'
-              lastEditedByUserColor = user?.color || '#999'
-            }
-
-            // Get last interaction info
-            let lastInteractedByUserName = ''
-            let lastInteractedByUserColor = ''
-            if (shape.lastInteractedBy && users) {
-              const user = users.get(shape.lastInteractedBy)
-              lastInteractedByUserName = user?.displayName || user?.email || 'Unknown User'
-              lastInteractedByUserColor = user?.color || '#999'
-            }
 
             const isExpanded = expandedItemId === shape.id
 
@@ -210,23 +208,6 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
                   ) : null}
                 </div>
 
-                {/* Bottom row: last edited info */}
-                {shape.lastEditedBy && (
-                  <div className="mt-1 flex items-center gap-1.5 min-w-0">
-                    <Avatar className="h-4 w-4 flex-shrink-0">
-                      <AvatarFallback
-                        className="text-xs font-semibold leading-none"
-                        style={{ backgroundColor: lastEditedByUserColor, color: 'white' }}
-                      >
-                        {getInitials(lastEditedByUserName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs text-gray-500 truncate">
-                      {lastEditedByUserName} • {formatTimeAgo(shape.lastEditedAt)}
-                    </span>
-                  </div>
-                )}
-
                 {/* Content properties - only show if expanded and not locked by someone else */}
                 {!isLockedByOther && isExpanded && (
                   <div className="px-2 pb-2 pt-2 border-t border-gray-200">
@@ -237,22 +218,29 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
                   </div>
                 )}
 
-                {/* Last interaction info - shown at bottom of properties when expanded */}
-                {isExpanded && shape.lastInteractedBy && (
-                  <div className="px-2 pb-2 pt-2 border-t border-gray-200">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <Avatar className="h-4 w-4 flex-shrink-0">
-                        <AvatarFallback
-                          className="text-xs font-semibold leading-none"
-                          style={{ backgroundColor: lastInteractedByUserColor, color: 'white' }}
-                        >
-                          {getInitials(lastInteractedByUserName)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-xs text-gray-500 truncate">
-                        {lastInteractedByUserName} • {formatTimeAgo(shape.lastInteractedAt)}
-                      </span>
-                    </div>
+                {/* Action buttons - shown at bottom of properties when expanded */}
+                {!isLockedByOther && isExpanded && (
+                  <div className="px-2 pb-2 pt-2 border-t border-gray-200 space-y-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onCopyContent?.(shape)}
+                      className="w-full h-8 flex items-center justify-center gap-2 text-blue-600 border-blue-200 hover:bg-blue-50"
+                      title="Duplicate content"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      <span>Copy</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onDeleteContent?.(shape.id)}
+                      className="w-full h-8 flex items-center justify-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                      title="Delete content"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Delete</span>
+                    </Button>
                   </div>
                 )}
 

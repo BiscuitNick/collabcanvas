@@ -112,8 +112,23 @@ export const useContentOperations = (
 
   const updateContent = useCallback(async (id: string, updates: Partial<Content>): Promise<void> => {
     try {
+      // Mark as actively editing and refresh the timeout
       activelyEditingRef.current.add(id);
+
+      // Update the local store immediately for instant UI feedback
+      console.log('✏️ Updating local store for', id, updates);
       updateStoreContent(id, updates);
+
+      // Clear any existing timeout for this content
+      if ((window as any)[`editTimeout_${id}`]) {
+        clearTimeout((window as any)[`editTimeout_${id}`]);
+      }
+
+      // Set a new timeout to clear the editing state after 2 seconds of inactivity
+      (window as any)[`editTimeout_${id}`] = setTimeout(() => {
+        activelyEditingRef.current.delete(id);
+        delete (window as any)[`editTimeout_${id}`];
+      }, 2000);
 
       // Only update Firestore if enabled
       if (enableFirestore) {

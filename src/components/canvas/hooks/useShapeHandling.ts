@@ -50,34 +50,66 @@ export const useShapeHandling = ({
 
   const handleShapeUpdate = useCallback(
     (shapeId: string, updates: Partial<Content>) => {
+      // Check if shape is locked by another user
+      const shape = content.find((s) => s.id === shapeId);
+      const isLockedByOther = shape?.lockedByUserId && shape.lockedByUserId !== currentUserId;
+
+      if (isLockedByOther) {
+        return;
+      }
+
       updateShape(shapeId, updates);
     },
-    [updateShape]
+    [updateShape, content, currentUserId]
   );
 
   const handleShapeDragStart = useCallback(
     (shapeId: string) => {
+      // Check if shape is locked by another user
+      const shape = content.find((s) => s.id === shapeId);
+      const isLockedByOther = shape?.lockedByUserId && shape.lockedByUserId !== currentUserId;
+
+      if (isLockedByOther) {
+        return;
+      }
+
       setDraggingShape(true);
       startEditingShape?.(shapeId);
       onDragStart?.();
     },
-    [startEditingShape, onDragStart, setDraggingShape]
+    [startEditingShape, onDragStart, setDraggingShape, content, currentUserId]
   );
 
   const handleShapeDragMove = useCallback(
     (shapeId: string, x: number, y: number) => {
+      // Check if shape is locked by another user
+      const shape = content.find((s) => s.id === shapeId);
+      const isLockedByOther = shape?.lockedByUserId && shape.lockedByUserId !== currentUserId;
+
+      if (isLockedByOther) {
+        return;
+      }
+
       updateShape(shapeId, { x, y });
     },
-    [updateShape]
+    [updateShape, content, currentUserId]
   );
 
   const handleShapeDragEnd = useCallback(
     (shapeId: string, x: number, y: number) => {
+      // Check if shape is locked by another user
+      const shape = content.find((s) => s.id === shapeId);
+      const isLockedByOther = shape?.lockedByUserId && shape.lockedByUserId !== currentUserId;
+
+      if (isLockedByOther) {
+        return;
+      }
+
       updateShape(shapeId, { x, y });
       stopEditingShape?.(shapeId);
       onDragEnd?.();
     },
-    [updateShape, stopEditingShape, onDragEnd]
+    [updateShape, stopEditingShape, onDragEnd, content, currentUserId]
   );
 
   return {

@@ -52,8 +52,15 @@ export const useFirestoreSync = (userUid: string | undefined) => {
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const enableFirestore = useFirestoreEnabled();
 
-  // Get canvas store content - used when Firestore is disabled
+  // Get canvas store content and setContent action
   const storeContent = useCanvasStore((state) => state.content);
+  const setStoreContent = useCanvasStore((state) => state.setContent);
+
+  // Keep a ref to the latest store content for use in callbacks
+  const storeContentRef = useRef<Content[]>(storeContent);
+  useEffect(() => {
+    storeContentRef.current = storeContent;
+  }, [storeContent]);
 
   useEffect(() => {
     contentStateRef.current = content;
@@ -63,6 +70,7 @@ export const useFirestoreSync = (userUid: string | undefined) => {
   useEffect(() => {
     if (!enableFirestore && userUid) {
       setContent(storeContent);
+      // Store already has the content, no need to set it again
     }
   }, [storeContent, enableFirestore, userUid]);
 
@@ -77,6 +85,7 @@ export const useFirestoreSync = (userUid: string | undefined) => {
     if (!enableFirestore) {
       console.log('🔌 Firestore disabled - using canvas store');
       setContent(storeContent);
+      // Store already has the content, no need to set it again
       setLoading(false);
       return;
     }
@@ -156,29 +165,52 @@ export const useFirestoreSync = (userUid: string | undefined) => {
           }
         });
 
-        // Merge remote content with local-only content
-        // Preserve local-only items (those with IDs starting with "local-")
-        const localOnlyItems = contentStateRef.current.filter(c => c.id.startsWith('local-'));
+        // Get current store content for comparison from ref
+        const currentStoreContent = storeContentRef.current;
 
-        // Merge: prioritize local state for actively editing items, add local-only items
-        const mergedContent = [
-          ...contentData.map((remoteContent) => {
-            const local = contentStateRef.current.find((c) => c.id === remoteContent.id);
-            const isActivelyEditing = activelyEditingRef.current.has(remoteContent.id);
-            if (isActivelyEditing && local) {
-              return local;
-            }
-            return remoteContent;
-          }),
-          ...localOnlyItems
-        ];
+        // Create a map of current store content for quick lookup
+        const storeContentMap = new Map(currentStoreContent.map(c => [c.id, c]));
+
+        // Build the merged content array
+        const mergedContent: Content[] = [];
+
+        // Process remote content
+        contentData.forEach((remoteContent) => {
+          const isActivelyEditing = activelyEditingRef.current.has(remoteContent.id);
+          const storeItem = storeContentMap.get(remoteContent.id);
+
+          if (isActivelyEditing && storeItem) {
+            // User is editing this item - keep their local changes
+            mergedContent.push(storeItem);
+          } else {
+            // Not editing - use remote content (this updates other users' changes)
+            mergedContent.push(remoteContent);
+          }
+
+          // Remove from map to track what's been processed
+          storeContentMap.delete(remoteContent.id);
+        });
+
+        // Add any remaining local-only items (those not in Firestore)
+        storeContentMap.forEach((localItem) => {
+          if (localItem.id.startsWith('local-')) {
+            mergedContent.push(localItem);
+          }
+        });
 
         if (updateTimeoutRef.current) {
           clearTimeout(updateTimeoutRef.current);
         }
 
         updateTimeoutRef.current = setTimeout(() => {
+          console.log('📥 Firestore sync: Updating store with merged content', {
+            remoteCount: contentData.length,
+            localOnlyCount: mergedContent.filter(c => c.id.startsWith('local-')).length,
+            activelyEditingCount: Array.from(activelyEditingRef.current).length,
+            totalMerged: mergedContent.length
+          });
           setContent(mergedContent);
+          setStoreContent(mergedContent); // Update Zustand store with merged content
           setLoading(false);
           setError(null);
         }, isCreatingContent.current ? 100 : 0);
@@ -196,7 +228,7 @@ export const useFirestoreSync = (userUid: string | undefined) => {
         clearTimeout(updateTimeoutRef.current);
       }
     };
-  }, [userUid, enableFirestore]);
+  }, [userUid, enableFirestore, setStoreContent]); // Note: storeContent is read inside but not a dependency to avoid infinite loops
 
   return { content, setContent, loading, error, activelyEditingRef, isCreatingContent };
 };

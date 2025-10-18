@@ -21,6 +21,7 @@ export const PRESENCE_CLEANUP_INTERVAL_MS = parseInt(import.meta.env.VITE_PRESEN
 
 // Shape locking configuration
 export const LOCK_TTL_MS = parseInt(import.meta.env.VITE_LOCK_TTL_MS || '30000', 10)
+export const LOCK_INDICATOR_STROKE_WIDTH = parseInt(import.meta.env.VITE_LOCK_INDICATOR_STROKE_WIDTH || '4', 10)
 
 // Performance monitoring
 export const ENABLE_PERFORMANCE_LOGGING = import.meta.env.VITE_ENABLE_PERFORMANCE_LOGGING === 'true'

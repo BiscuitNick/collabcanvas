@@ -22,7 +22,8 @@ export const useContentOperations = (
   content: Content[],
   _setContent: React.Dispatch<React.SetStateAction<Content[]>>, // Not used anymore - canvas store is source of truth
   activelyEditingRef: React.MutableRefObject<Set<string>>,
-  isCreatingContent: React.MutableRefObject<boolean>
+  isCreatingContent: React.MutableRefObject<boolean>,
+  userUid: string | undefined
 ) => {
   const canvasId = useCanvasId();
   const canEdit = useCanEdit();
@@ -53,7 +54,13 @@ export const useContentOperations = (
   const throttledUpdate = useCallback(async (id: string, updates: Partial<Content>) => {
     try {
       const contentRef = doc(firestore, 'canvases', canvasId, 'content', id);
-      const updateData = removeUndefinedValues({ ...updates, updatedAt: serverTimestamp() });
+      const updateData = removeUndefinedValues({
+        ...updates,
+        updatedAt: serverTimestamp(),
+        lastEditedBy: userUid || null,
+        lastEditedAt: serverTimestamp()
+      });
+      console.log(`📝 [EDIT TRACKING] Updating content ${id} with lastEditedBy: ${userUid}`);
       await updateDoc(contentRef, updateData);
       setSyncStatus(id, 'synced');
       retryCount.current = 0;
@@ -69,7 +76,7 @@ export const useContentOperations = (
         }
       }
     }
-  }, [setSyncStatus, canvasId]);
+  }, [setSyncStatus, canvasId, userUid]);
 
   const createContent = useCallback(async (contentData: Omit<Content, 'id' | 'createdAt' | 'updatedAt'>, skipFirestore = false): Promise<void> => {
     // Check edit permission
@@ -93,17 +100,25 @@ export const useContentOperations = (
           id: localId,
           createdAt: now,
           updatedAt: now,
+          lastEditedBy: userUid || null,
+          lastEditedAt: now,
         } as Content;
         addStoreContent(localContent);
-        console.log('⚠️ Content added to canvas store only:', localId);
+        console.log(`⚠️ [EDIT TRACKING] Content added to canvas store only: ${localId}, lastEditedBy: ${userUid}`);
       } else {
         // Firestore mode: Add to Firestore, listener will update local state
         const path = `canvases/${canvasId}/content`;
         console.log('📤 Firestore path:', path);
         const contentRef = collection(firestore, 'canvases', canvasId, 'content');
         const now = serverTimestamp();
-        const newContent = removeUndefinedValues({ ...contentData, createdAt: now, updatedAt: now });
-        console.log('📤 About to add to Firestore:', newContent);
+        const newContent = removeUndefinedValues({
+          ...contentData,
+          createdAt: now,
+          updatedAt: now,
+          lastEditedBy: userUid || null,
+          lastEditedAt: now
+        });
+        console.log(`📤 [EDIT TRACKING] About to add to Firestore with lastEditedBy: ${userUid}`, newContent);
         const docRef = await addDoc(contentRef, newContent);
         console.log('✅ Content added to Firestore with ID:', docRef.id);
         console.log('✅ Full Firestore path:', docRef.path);
@@ -168,20 +183,21 @@ export const useContentOperations = (
     }
 
     try {
+      console.log(`🗑️ [EDIT TRACKING] Deleting content ${id}, deletedBy: ${userUid}`);
       deleteStoreContent(id);
 
       // Only delete from Firestore if enabled and not a local-only item
       if (enableFirestore && !id.startsWith('local-')) {
         const contentRef = doc(firestore, 'canvases', canvasId, 'content', id);
         await deleteDoc(contentRef);
-        console.log('✅ Content deleted from Firestore:', id);
+        console.log(`✅ [EDIT TRACKING] Content deleted from Firestore: ${id}, by user: ${userUid}`);
       } else {
-        console.log('⚠️ Content deleted from canvas store only:', id);
+        console.log(`⚠️ [EDIT TRACKING] Content deleted from canvas store only: ${id}, by user: ${userUid}`);
       }
     } catch (err) {
       console.error('Error deleting content:', err);
     }
-  }, [deleteStoreContent, enableFirestore, canvasId, canEdit]);
+  }, [deleteStoreContent, enableFirestore, canvasId, canEdit, userUid]);
 
   const clearAllContent = useCallback(async (): Promise<void> => {
     try {

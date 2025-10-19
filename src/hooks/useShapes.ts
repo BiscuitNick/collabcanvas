@@ -10,7 +10,8 @@ export const useContent = () => {
     content,
     setContent,
     activelyEditingRef,
-    isCreatingContent
+    isCreatingContent,
+    user?.uid
   );
   const { lockContent, unlockContent } = useContentLocking(content);
 

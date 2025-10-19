@@ -12,7 +12,8 @@ export const useContent = () => {
     firestoreContent,
     setContent,
     activelyEditingRef,
-    isCreatingContent
+    isCreatingContent,
+    user?.uid
   );
   // Get content directly from Zustand store for immediate UI updates
   const storeContent = useCanvasStore((state) => state.content);

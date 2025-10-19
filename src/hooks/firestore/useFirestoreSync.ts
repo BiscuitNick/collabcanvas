@@ -98,6 +98,7 @@ export const useFirestoreSync = (userUid: string | undefined) => {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
+        console.log(`📡 [FIRESTORE] Received snapshot update with ${snapshot.size} documents for user: ${userUid}`);
         const contentData: Content[] = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
@@ -116,6 +117,8 @@ export const useFirestoreSync = (userUid: string | undefined) => {
             lockedByUserName: data.lockedByUserName || null,
             lockedByUserColor: data.lockedByUserColor || null,
             lockedAt: data.lockedAt || null,
+            lastEditedBy: data.lastEditedBy || null,
+            lastEditedAt: data.lastEditedAt || null,
             syncStatus: 'synced' as const,
           };
 
@@ -180,12 +183,28 @@ export const useFirestoreSync = (userUid: string | undefined) => {
         contentData.forEach((remoteContent) => {
           const isActivelyEditing = activelyEditingRef.current.has(remoteContent.id);
           const storeItem = storeContentMap.get(remoteContent.id);
+          const wasLastEditedByCurrentUser = remoteContent.lastEditedBy === userUid;
+
+          // Log the decision-making process
+          console.log(`🔄 [SYNC DECISION] Content ${remoteContent.id}:`, {
+            isActivelyEditing,
+            wasLastEditedByCurrentUser,
+            lastEditedBy: remoteContent.lastEditedBy,
+            currentUser: userUid,
+            hasStoreItem: !!storeItem
+          });
 
           if (isActivelyEditing && storeItem) {
-            // User is editing this item - keep their local changes
+            // User is actively editing this item - keep their local changes
+            console.log(`✏️ [SYNC DECISION] Keeping local version (actively editing): ${remoteContent.id}`);
+            mergedContent.push(storeItem);
+          } else if (wasLastEditedByCurrentUser && storeItem) {
+            // Current user was the last to edit - ignore Firestore update to avoid race condition
+            console.log(`🚫 [SYNC DECISION] Ignoring Firestore update (current user was last editor): ${remoteContent.id}`);
             mergedContent.push(storeItem);
           } else {
-            // Not editing - use remote content (this updates other users' changes)
+            // Not editing and not our edit - use remote content (this updates other users' changes)
+            console.log(`📥 [SYNC DECISION] Using Firestore update (other user's changes): ${remoteContent.id}`);
             mergedContent.push(remoteContent);
           }
 
@@ -205,11 +224,17 @@ export const useFirestoreSync = (userUid: string | undefined) => {
         }
 
         updateTimeoutRef.current = setTimeout(() => {
-          console.log('📥 Firestore sync: Updating store with merged content', {
+          const ignoredDueToLastEdit = contentData.filter(c => c.lastEditedBy === userUid).length;
+          const activelyEditingCount = Array.from(activelyEditingRef.current).length;
+          const localOnlyCount = mergedContent.filter(c => c.id.startsWith('local-')).length;
+
+          console.log('📥 [SYNC SUMMARY] Firestore sync: Updating store with merged content', {
             remoteCount: contentData.length,
-            localOnlyCount: mergedContent.filter(c => c.id.startsWith('local-')).length,
-            activelyEditingCount: Array.from(activelyEditingRef.current).length,
-            totalMerged: mergedContent.length
+            localOnlyCount,
+            activelyEditingCount,
+            ignoredDueToLastEdit,
+            totalMerged: mergedContent.length,
+            currentUser: userUid
           });
           setContent(mergedContent);
           setStoreContent(mergedContent); // Update Zustand store with merged content

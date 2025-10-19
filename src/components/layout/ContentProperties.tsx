@@ -3,7 +3,7 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Textarea } from '../ui/textarea'
 import { Button } from '../ui/button'
-import { Bold, Italic } from 'lucide-react'
+import { Bold, Italic, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -18,9 +18,21 @@ interface ContentPropertiesProps {
   content: Content
   onUpdate: (updates: Partial<Content>) => void
   readOnly?: boolean
+  onBringToFront?: (id: string) => void
+  onSendToBack?: (id: string) => void
+  onMoveUp?: (id: string) => void
+  onMoveDown?: (id: string) => void
 }
 
-const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate, readOnly = false }) => {
+const ContentProperties: React.FC<ContentPropertiesProps> = ({
+  content,
+  onUpdate,
+  readOnly = false,
+  onBringToFront,
+  onSendToBack,
+  onMoveUp,
+  onMoveDown
+}) => {
   const handleInputChange = (field: string, value: string | number) => {
     onUpdate({ [field]: value } as Partial<Content>)
   }
@@ -58,6 +70,55 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
           />
         </div>
       </div>
+
+      {/* Z-Index Controls */}
+      {onBringToFront && onSendToBack && onMoveUp && onMoveDown && !readOnly && (
+        <div className="space-y-2">
+          <Label className="text-xs">Layer Order</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onBringToFront(content.id)}
+              className="h-7 text-xs"
+              title="Bring to Front"
+            >
+              <ChevronsUp className="h-3 w-3 mr-1" />
+              To Front
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onSendToBack(content.id)}
+              className="h-7 text-xs"
+              title="Send to Back"
+            >
+              <ChevronsDown className="h-3 w-3 mr-1" />
+              To Back
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onMoveUp(content.id)}
+              className="h-7 text-xs"
+              title="Move Up One Layer"
+            >
+              <ArrowUp className="h-3 w-3 mr-1" />
+              Move Up
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onMoveDown(content.id)}
+              className="h-7 text-xs"
+              title="Move Down One Layer"
+            >
+              <ArrowDown className="h-3 w-3 mr-1" />
+              Move Down
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Text Content */}
       {isTextContent(content) && (

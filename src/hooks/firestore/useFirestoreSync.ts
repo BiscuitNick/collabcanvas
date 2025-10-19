@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
 import { firestore } from '../../lib/firebase';
 import { useCanvasId } from '../../contexts/CanvasContext';
 import type { Content } from '../../types';
@@ -47,6 +47,7 @@ export const useFirestoreSync = (userUid: string | undefined) => {
   const [content, setContent] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [contentIds, setContentIds] = useState<string[]>([]);
   const contentStateRef = useRef<Content[]>([]);
   const activelyEditingRef = useRef<Set<string>>(new Set());
   const isCreatingContent = useRef(false);
@@ -66,6 +67,23 @@ export const useFirestoreSync = (userUid: string | undefined) => {
   useEffect(() => {
     contentStateRef.current = content;
   }, [content]);
+
+  // Listen to canvas document for contentIds ordering
+  useEffect(() => {
+    if (!userUid || !enableFirestore) {
+      return;
+    }
+
+    const canvasRef = doc(firestore, 'canvases', canvasId);
+    const unsubscribe = onSnapshot(canvasRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setContentIds(data.contentIds || []);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [userUid, enableFirestore, canvasId]);
 
   // When Firestore is disabled, sync with canvas store
   useEffect(() => {
@@ -268,13 +286,31 @@ export const useFirestoreSync = (userUid: string | undefined) => {
           }
         });
 
+        // Order content based on contentIds (z-index)
+        const orderedContent: Content[] = [];
+        const contentMap = new Map(mergedContent.map(c => [c.id, c]));
+
+        // Add content in the order specified by contentIds
+        contentIds.forEach(id => {
+          const item = contentMap.get(id);
+          if (item) {
+            orderedContent.push(item);
+            contentMap.delete(id);
+          }
+        });
+
+        // Add any remaining items not in contentIds (new items)
+        contentMap.forEach(item => {
+          orderedContent.push(item);
+        });
+
         if (updateTimeoutRef.current) {
           clearTimeout(updateTimeoutRef.current);
         }
 
         updateTimeoutRef.current = setTimeout(() => {
-          setContent(mergedContent);
-          setStoreContent(mergedContent); // Update Zustand store with merged content
+          setContent(orderedContent);
+          setStoreContent(orderedContent); // Update Zustand store with ordered content
           setLoading(false);
           setError(null);
         }, isCreatingContent.current ? 100 : 0);

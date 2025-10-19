@@ -89,7 +89,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   }, [presence]);
   // Use selectedContentId directly instead of the getter selectedShapeId for proper reactivity
   const canvasSelectedShapeId = selectedContentId
-  const { createContent: createContentOriginal, createContentBatch: createContentBatchOriginal, updateContent, updateContentBatch, clearAllContent, deleteContent } = useContent()
+  const { createContent: createContentOriginal, createContentBatch: createContentBatchOriginal, updateContent, updateContentBatch, clearAllContent, deleteContent, bringToFront, sendToBack, moveUp, moveDown } = useContent()
 
   // Firestore state - must be defined before the wrappers that use it
   const [enableFirestore, setEnableFirestore] = useState(() => {
@@ -818,6 +818,10 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           users={usersMap}
           onCopyContent={handleCopyContent}
           onDeleteContent={handleDeleteContent}
+          onBringToFront={bringToFront}
+          onSendToBack={sendToBack}
+          onMoveUp={moveUp}
+          onMoveDown={moveDown}
         />
       </div>
 

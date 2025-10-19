@@ -20,6 +20,10 @@ interface DraggablePropertiesPaneProps {
   users?: Map<string, { displayName?: string; email?: string; color?: string }>
   onCopyContent?: (content: Content) => void
   onDeleteContent?: (id: string) => void
+  onBringToFront?: (id: string) => void
+  onSendToBack?: (id: string) => void
+  onMoveUp?: (id: string) => void
+  onMoveDown?: (id: string) => void
 }
 
 const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
@@ -34,6 +38,10 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
   users,
   onCopyContent,
   onDeleteContent,
+  onBringToFront,
+  onSendToBack,
+  onMoveUp,
+  onMoveDown,
 }) => {
   const selectedItemRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -294,6 +302,10 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
                       content={shape}
                       onUpdate={(updates) => onUpdateShape(shape.id, updates)}
                       readOnly={!canEdit}
+                      onBringToFront={onBringToFront}
+                      onSendToBack={onSendToBack}
+                      onMoveUp={onMoveUp}
+                      onMoveDown={onMoveDown}
                     />
                   </div>
                 )}

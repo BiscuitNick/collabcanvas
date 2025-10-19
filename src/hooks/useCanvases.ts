@@ -130,7 +130,8 @@ export function useCanvases(userId?: string) {
         createdByName: userName || 'Unknown',
         visibility,
         publicCanEdit: false,
-        permissions: []
+        permissions: [],
+        contentIds: [] // Initialize empty contentIds array for z-index ordering
       }
 
       const docRef = await addDoc(canvasesRef, newCanvas)

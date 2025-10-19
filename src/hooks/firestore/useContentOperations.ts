@@ -58,7 +58,8 @@ export const useContentOperations = (
   _setContent: React.Dispatch<React.SetStateAction<Content[]>>, // Not used anymore - canvas store is source of truth
   activelyEditingRef: React.MutableRefObject<Set<string>>,
   isCreatingContent: React.MutableRefObject<boolean>,
-  userUid: string | undefined
+  userUid: string | undefined,
+  addToContentIds?: (id: string) => Promise<void>
 ) => {
   const canvasId = useCanvasId();
   const canEdit = useCanEdit();
@@ -174,6 +175,11 @@ export const useContentOperations = (
         useCanvasStore.setState({ content: newContent });
 
         setSyncStatus(docRef.id, 'synced');
+
+        // Add to contentIds for z-index ordering
+        if (addToContentIds) {
+          await addToContentIds(docRef.id);
+        }
       }
     } catch (err) {
       console.error('❌ Error creating content:', err);
@@ -182,7 +188,7 @@ export const useContentOperations = (
         isCreatingContent.current = false;
       }, 100);
     }
-  }, [setSyncStatus, isCreatingContent, addStoreContent, canvasId, canEdit]);
+  }, [setSyncStatus, isCreatingContent, addStoreContent, canvasId, canEdit, addToContentIds]);
 
   const updateContent = useCallback(async (id: string, updates: Partial<Content>): Promise<void> => {
     // Check edit permission
@@ -476,6 +482,11 @@ export const useContentOperations = (
 
         // Set all items to pending sync status
         docRefs.forEach(id => setSyncStatus(id, 'pending'));
+
+        // Add all IDs to contentIds for z-index ordering
+        if (addToContentIds) {
+          await Promise.all(docRefs.map(id => addToContentIds(id)));
+        }
       }
     } catch (err) {
       console.error('❌ Error creating content batch:', err);
@@ -484,7 +495,7 @@ export const useContentOperations = (
       // Don't delay for batch operations - we want immediate feedback
       isCreatingContent.current = false;
     }
-  }, [setSyncStatus, isCreatingContent, addStoreContent, canvasId, canEdit, userUid, enableFirestore]);
+  }, [setSyncStatus, isCreatingContent, addStoreContent, canvasId, canEdit, userUid, enableFirestore, addToContentIds]);
 
   return {
     createContent,

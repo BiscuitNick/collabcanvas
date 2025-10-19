@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback, memo } from 'react'
-import { Rect, Transformer } from 'react-konva'
+import { Rect, Transformer, Group, Text, Circle } from 'react-konva'
 import Konva from 'konva' // Import Konva for types
 import type { Rectangle } from '../../types'
 import { clamp } from '../../lib/utils'
@@ -103,7 +103,23 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     // Log shape click
-    console.log('🖱️ Canvas clicked - Shape:', { type: 'rectangle', id: shape.id, x: shape.x.toFixed(2), y: shape.y.toFixed(2) })
+    console.log('🖱️ Canvas clicked - Shape:', {
+      type: 'rectangle',
+      id: shape.id,
+      x: shape.x.toFixed(2),
+      y: shape.y.toFixed(2),
+      lockedBy: shape.lockedByUserId || 'none',
+      currentUser: currentUserId
+    })
+
+    // Prevent selection if locked by another user
+    if (isLockedByOther) {
+      console.log('🔒 Cannot select - locked by', shape.lockedByUserName || shape.lockedByUserId)
+      // IMPORTANT: Must stop propagation to prevent canvas panning!
+      e.cancelBubble = true
+      e.evt.stopPropagation()
+      return
+    }
 
     // Only allow selection with select, pan, or ai tools
     const allowSelection = selectedTool === 'select' || selectedTool === 'pan' || selectedTool === 'ai' || selectedTool === null
@@ -111,15 +127,6 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
     if (!allowSelection) {
       // Don't stop propagation - let the tool action happen
       console.log('🔧 Tool active - passing click through to canvas')
-      return
-    }
-
-    // Prevent selection if locked by another user
-    if (isLockedByOther) {
-      console.log('⚠️ Cannot select - locked by another user')
-      // IMPORTANT: Must stop propagation to prevent canvas panning!
-      e.cancelBubble = true
-      e.evt.stopPropagation()
       return
     }
 
@@ -237,10 +244,11 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
 
   return (
     <>
-      <Rect
-        ref={rectRef}
-        x={shape.x}
-        y={shape.y}
+      <Group>
+        <Rect
+          ref={rectRef}
+          x={shape.x}
+          y={shape.y}
         width={shape.width}
         height={shape.height}
         offsetX={shape.width / 2}
@@ -283,7 +291,54 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
             // Ignore errors in test environment
           }
         }}
-      />
+        />
+
+        {/* Lock indicator */}
+        {isLockedByOther && (
+          <Group
+            x={shape.x}
+            y={shape.y}
+            offsetX={shape.width / 2}
+            offsetY={shape.height / 2}
+          >
+            {/* Lock background circle */}
+            <Circle
+              x={shape.width - 15}
+              y={15}
+              radius={12}
+              fill="#FF4444"
+              stroke="#FFFFFF"
+              strokeWidth={2}
+              shadowColor="black"
+              shadowBlur={4}
+              shadowOpacity={0.3}
+            />
+            {/* Lock icon (simplified) */}
+            <Text
+              x={shape.width - 21}
+              y={9}
+              text="🔒"
+              fontSize={12}
+              fill="white"
+            />
+            {/* Lock owner label */}
+            {shape.lockedByUserName && (
+              <Text
+                x={shape.width / 2 - 50}
+                y={-25}
+                text={`Locked by ${shape.lockedByUserName}`}
+                fontSize={12}
+                fill="#FF4444"
+                stroke="white"
+                strokeWidth={0.5}
+                align="center"
+                width={100}
+              />
+            )}
+          </Group>
+        )}
+      </Group>
+
       {isSelected && !isLockedByOther && canEdit && (
         <Transformer
           ref={transformerRef}

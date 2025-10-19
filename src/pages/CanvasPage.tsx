@@ -55,10 +55,12 @@ const CanvasPageContent: React.FC = () => {
     loading: contentLoading,
     lockContent,
     unlockContent,
+    setSelection,
+    flushToFirestore,
     startEditingContent,
     stopEditingContent
   } = useContent()
-  
+
   // Legacy aliases for backward compatibility
   const updateShape = updateContent
   const lockShape = lockContent
@@ -212,6 +214,8 @@ const CanvasPageContent: React.FC = () => {
           onVisibleShapesChange={setVisibleShapesCount}
           lockShape={lockShape}
           unlockShape={unlockShape}
+          setSelection={setSelection}
+          flushToFirestore={flushToFirestore}
           startEditingShape={startEditingShape}
           stopEditingShape={stopEditingShape}
           canEdit={canEdit}

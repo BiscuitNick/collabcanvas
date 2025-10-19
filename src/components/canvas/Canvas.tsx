@@ -17,7 +17,7 @@ export interface CanvasProps {
   height: number;
   content: Content[];
   cursors: CursorType[];
-  updateShape: (id: string, updates: Partial<Content>) => Promise<void>;
+  updateShape: (id: string, updates: Partial<Content>, immediate?: boolean) => Promise<void>;
   onMouseMove: (x: number, y: number, canvasWidth: number, canvasHeight: number) => void;
   showSelfCursor?: boolean;
   currentUserId?: string;
@@ -25,6 +25,8 @@ export interface CanvasProps {
   onVisibleShapesChange?: (visibleCount: number) => void;
   lockShape?: (id: string) => Promise<void>;
   unlockShape?: (id: string) => Promise<void>;
+  setSelection?: (id: string | null) => Promise<void>;
+  flushToFirestore?: (id: string) => Promise<void>;
   startEditingShape?: (id: string) => void;
   stopEditingShape?: (id: string) => void;
   onDragStart?: () => void;
@@ -51,6 +53,8 @@ const Canvas: React.FC<CanvasProps> = ({
   onVisibleShapesChange,
   lockShape,
   unlockShape,
+  setSelection,
+  flushToFirestore,
   startEditingShape,
   stopEditingShape,
   onDragStart,
@@ -81,10 +85,12 @@ const Canvas: React.FC<CanvasProps> = ({
     updateShape,
     lockShape,
     unlockShape,
+    setSelection,
     startEditingShape,
     stopEditingShape,
     onDragStart,
     onDragEnd,
+    flushToFirestore,
   });
 
   const interactionHandlers = useInteractionHandling({
@@ -97,6 +103,7 @@ const Canvas: React.FC<CanvasProps> = ({
     onCanvasClick,
     isCreatingShape,
     unlockShape,
+    setSelection,
   });
 
   const visibleShapes = useViewportCulling({

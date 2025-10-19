@@ -6,6 +6,8 @@ import { useContentLocking } from './firestore/useContentLocking';
 import { useContentOrdering } from './firestore/useContentOrdering';
 import { useCanvasStore } from '../store/canvasStore';
 import { useCanvasId } from '../contexts/CanvasContext';
+import { useRTDBContentSync } from './rtdb/useRTDBContentSync';
+import { useRTDBLocking } from './rtdb/useRTDBLocking';
 import type { Content } from '../types';
 
 export const useContent = () => {
@@ -21,6 +23,23 @@ export const useContent = () => {
   const storeMoveUp = useCanvasStore((state) => state.moveUp);
   const storeMoveDown = useCanvasStore((state) => state.moveDown);
 
+  // Initialize RTDB sync for real-time updates (MUST be before we use it)
+  const {
+    updateContentRTDB,
+    updateContentIdsRTDB,
+    removeContentRTDB,
+    flushFirestoreUpdate,
+  } = useRTDBContentSync(canvasId, {
+    enableFirestorePersistence: true,
+  });
+
+  // Initialize RTDB locking for selection-based locks
+  const {
+    setSelection: setSelectionRTDB,
+    acquireLock: acquireLockRTDB,
+    releaseLock: releaseLockRTDB,
+  } = useRTDBLocking(canvasId);
+
   // Get Firestore ordering operations (for syncing to Firestore when enabled)
   const {
     addToContentIds: fsAddToContentIds,
@@ -34,39 +53,61 @@ export const useContent = () => {
     user?.uid
   );
 
-  // Wrapper functions that update store first, then sync to Firestore
+  // Wrapper functions that update store first, then sync to RTDB and Firestore
   const addToContentIds = async (id: string) => {
     storeAddToContentIds(id);
+    const newIds = [...useCanvasStore.getState().contentIds];
+    updateContentIdsRTDB(newIds); // Sync to RTDB
     fsAddToContentIds(id); // Sync to Firestore
   };
 
   const removeFromContentIds = async (id: string) => {
     storeRemoveFromContentIds(id);
+    const newIds = [...useCanvasStore.getState().contentIds];
+    updateContentIdsRTDB(newIds); // Sync to RTDB
     fsRemoveFromContentIds(id); // Sync to Firestore
   };
 
   const bringToFront = (id: string) => {
     storeBringToFront(id);
+    const newIds = [...useCanvasStore.getState().contentIds];
+    updateContentIdsRTDB(newIds); // Sync to RTDB
     fsBringToFront(id); // Sync to Firestore
   };
 
   const sendToBack = (id: string) => {
     storeSendToBack(id);
+    const newIds = [...useCanvasStore.getState().contentIds];
+    updateContentIdsRTDB(newIds); // Sync to RTDB
     fsSendToBack(id); // Sync to Firestore
   };
 
   const moveUp = (id: string) => {
     storeMoveUp(id);
+    const newIds = [...useCanvasStore.getState().contentIds];
+    updateContentIdsRTDB(newIds); // Sync to RTDB
     fsMoveUp(id); // Sync to Firestore
   };
 
   const moveDown = (id: string) => {
     storeMoveDown(id);
+    const newIds = [...useCanvasStore.getState().contentIds];
+    updateContentIdsRTDB(newIds); // Sync to RTDB
     fsMoveDown(id); // Sync to Firestore
   };
 
   // Pass addToContentIds and removeFromContentIds to content operations
-  const { createContent, updateContent, deleteContent, clearAllContent, startEditingContent, stopEditingContent, createContentBatch, updateContentBatch, deleteContentBatch } = useContentOperations(
+  const {
+    createContent: createContentFS,
+    updateContent: updateContentFS,
+    deleteContent: deleteContentFS,
+    clearAllContent,
+    startEditingContent,
+    stopEditingContent,
+    createContentBatch,
+    updateContentBatch,
+    deleteContentBatch
+  } = useContentOperations(
     firestoreContent,
     setContent,
     activelyEditingRef,
@@ -75,6 +116,29 @@ export const useContent = () => {
     addToContentIds,      // Pass this so it can be called with the real Firestore ID
     removeFromContentIds  // Pass this so it can be called when content is deleted
   );
+
+  // Wrap updateContent to use RTDB for real-time sync
+  const updateContent = React.useCallback(async (id: string, updates: Partial<Content>, immediate = false) => {
+    // Check if RTDB is enabled
+    const enableRTDB = localStorage.getItem('enableRTDB');
+
+    if (enableRTDB !== 'false') {
+      // RTDB enabled: Update via RTDB (which also handles Firestore debouncing internally)
+      updateContentRTDB(id, updates, immediate);
+    } else {
+      // RTDB disabled: Fall back to direct Firestore update
+      return updateContentFS(id, updates);
+    }
+  }, [updateContentRTDB, updateContentFS]);
+
+  // Wrap deleteContent to remove from RTDB
+  const deleteContent = React.useCallback((id: string) => {
+    removeContentRTDB(id);
+    return deleteContentFS(id);
+  }, [removeContentRTDB, deleteContentFS]);
+
+  // Create is Firestore-only (initial creation)
+  const createContent = createContentFS;
 
   // Get content and contentIds directly from Zustand store for immediate UI updates
   const storeContent = useCanvasStore((state) => state.content);
@@ -106,7 +170,45 @@ export const useContent = () => {
     return ordered;
   }, [storeContent, storeContentIds]);
 
-  const { lockContent, unlockContent } = useContentLocking(orderedContent);
+  const { lockContent: lockContentFS, unlockContent: unlockContentFS } = useContentLocking(orderedContent);
+
+  // Wrap locking to use RTDB when enabled
+  const lockContent = React.useCallback(async (id: string) => {
+    const enableRTDB = localStorage.getItem('enableRTDB');
+    if (enableRTDB !== 'false') {
+      // RTDB enabled: Use RTDB locking
+      await acquireLockRTDB(id);
+    } else {
+      // RTDB disabled: Fall back to Firestore locking
+      await lockContentFS(id);
+    }
+  }, [acquireLockRTDB, lockContentFS]);
+
+  const unlockContent = React.useCallback(async (id: string) => {
+    const enableRTDB = localStorage.getItem('enableRTDB');
+    if (enableRTDB !== 'false') {
+      // RTDB enabled: Use RTDB unlocking
+      await releaseLockRTDB(id);
+    } else {
+      // RTDB disabled: Fall back to Firestore unlocking
+      await unlockContentFS(id);
+    }
+  }, [releaseLockRTDB, unlockContentFS]);
+
+  // Selection-based locking (RTDB only)
+  const setSelection = React.useCallback(async (id: string | null) => {
+    const enableRTDB = localStorage.getItem('enableRTDB');
+    if (enableRTDB !== 'false') {
+      // RTDB enabled: Use RTDB selection tracking
+      await setSelectionRTDB(id);
+    } else if (id) {
+      // RTDB disabled: Just use basic locking for selection
+      await lockContentFS(id);
+    } else {
+      // Deselection: release all locks
+      // Note: This may need more sophisticated handling for Firestore-only mode
+    }
+  }, [setSelectionRTDB, lockContentFS]);
 
   // deleteContent already removes from contentIds in the store, no need to wrap
 
@@ -128,6 +230,8 @@ export const useContent = () => {
     retry,
     lockContent,
     unlockContent,
+    setSelection,
+    flushToFirestore: flushFirestoreUpdate,
     startEditingContent,
     stopEditingContent,
     // Z-index operations

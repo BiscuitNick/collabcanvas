@@ -98,6 +98,12 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     return stored ? JSON.parse(stored) : true;
   })
 
+  // RTDB state for real-time sync
+  const [enableRTDB, setEnableRTDB] = useState(() => {
+    const stored = localStorage.getItem('enableRTDB');
+    return stored ? JSON.parse(stored) : true;
+  })
+
   // Group caching state for performance optimization
   const [enableGroupCaching, setEnableGroupCaching] = useState(() => {
     const stored = localStorage.getItem('enableGroupCaching');
@@ -561,6 +567,15 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   const handleToggleFirestore = useCallback((enable: boolean) => {
     setEnableFirestore(enable)
     localStorage.setItem('enableFirestore', JSON.stringify(enable))
+    console.log(`🔧 [FullScreenLayout] Firestore ${enable ? 'enabled' : 'disabled'}`)
+  }, [])
+
+  const handleToggleRTDB = useCallback((enable: boolean) => {
+    setEnableRTDB(enable)
+    localStorage.setItem('enableRTDB', JSON.stringify(enable))
+    console.log(`🔧 [FullScreenLayout] RTDB ${enable ? 'enabled' : 'disabled'}`)
+    // Reload page to reinitialize RTDB listeners
+    window.location.reload()
   }, [])
 
   const handleToggleGroupCaching = useCallback((enable: boolean) => {
@@ -884,6 +899,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         fps={uiState.fps}
         enableFirestore={enableFirestore}
         onToggleFirestore={handleToggleFirestore}
+        enableRTDB={enableRTDB}
+        onToggleRTDB={handleToggleRTDB}
         enableGroupCaching={enableGroupCaching}
         onToggleGroupCaching={handleToggleGroupCaching}
         canvasWidth={canvasSize.width}

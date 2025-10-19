@@ -14,6 +14,7 @@ interface InteractionHandlingProps {
   onCanvasClick?: (event: { x: number; y: number }) => void;
   isCreatingShape?: boolean;
   unlockShape?: (id: string) => Promise<void>;
+  setSelection?: (id: string | null) => Promise<void>;
 }
 
 export const useInteractionHandling = ({
@@ -26,6 +27,7 @@ export const useInteractionHandling = ({
   onCanvasClick,
   isCreatingShape,
   unlockShape,
+  setSelection,
 }: InteractionHandlingProps) => {
   const {
     stagePosition,
@@ -163,8 +165,11 @@ export const useInteractionHandling = ({
 
     if (clickedOnEmpty) {
       // Clicked on empty canvas area
-      // Unlock the currently selected shape before deselecting
-      if (selectedContentId && unlockShape) {
+      // Use setSelection for RTDB-based deselection and unlocking
+      if (setSelection) {
+        setSelection(null);  // This will handle unlocking and clearing selection in RTDB
+      } else if (selectedContentId && unlockShape) {
+        // Fallback to old unlocking mechanism
         unlockShape(selectedContentId);
       }
 

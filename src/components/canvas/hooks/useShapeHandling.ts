@@ -6,13 +6,15 @@ import type { Content } from '../../../types';
 interface ShapeHandlingProps {
   content: Content[];
   currentUserId?: string;
-  updateShape: (id: string, updates: Partial<Content>) => Promise<void>;
+  updateShape: (id: string, updates: Partial<Content>, immediate?: boolean) => Promise<void>;
   lockShape?: (id: string) => Promise<void>;
   unlockShape?: (id: string) => Promise<void>;
+  setSelection?: (id: string | null) => Promise<void>;
   startEditingShape?: (id: string) => void;
   stopEditingShape?: (id: string) => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  flushToFirestore?: (id: string) => Promise<void>;
 }
 
 export const useShapeHandling = ({
@@ -21,31 +23,52 @@ export const useShapeHandling = ({
   updateShape,
   lockShape,
   unlockShape,
+  setSelection,
   startEditingShape,
   stopEditingShape,
   onDragStart,
   onDragEnd,
+  flushToFirestore,
 }: ShapeHandlingProps) => {
   const { selectedContentId, selectShape, setDraggingShape } = useCanvasStore();
   // Use selectedContentId directly instead of the getter selectedShapeId for proper reactivity
   const selectedShapeId = selectedContentId;
 
   const handleShapeSelect = useCallback(
-    (shapeId: string) => {
+    async (shapeId: string) => {
       const shape = content.find((s) => s.id === shapeId);
       const isLockedByOther = shape?.lockedByUserId && shape.lockedByUserId !== currentUserId;
 
-      if (selectedShapeId && selectedShapeId !== shapeId && unlockShape) {
-        unlockShape(selectedShapeId);
+      // Don't allow selection if locked by another user
+      if (isLockedByOther) {
+        console.log('🔒 [Lock] Cannot select - locked by:', shape?.lockedByUserName || shape?.lockedByUserId);
+        // Don't update selection state if locked
+        return;
       }
 
+      // Clear previous selection if different
+      if (selectedShapeId && selectedShapeId !== shapeId) {
+        if (setSelection) {
+          // This will release the lock on the previous item
+          await setSelection(null);
+        } else if (unlockShape) {
+          await unlockShape(selectedShapeId);
+        }
+      }
+
+      // Update local selection state
       selectShape(shapeId);
 
-      if (lockShape && !isLockedByOther) {
-        lockShape(shapeId);
+      // Acquire lock for the new selection
+      if (setSelection) {
+        await setSelection(shapeId);
+        console.log('✅ [Lock] Selection set for:', shapeId);
+      } else if (lockShape) {
+        // Fallback to old locking mechanism
+        await lockShape(shapeId);
       }
     },
-    [selectShape, lockShape, unlockShape, selectedShapeId, content, currentUserId]
+    [selectShape, lockShape, unlockShape, setSelection, selectedShapeId, content, currentUserId]
   );
 
   const handleShapeUpdate = useCallback(
@@ -55,6 +78,7 @@ export const useShapeHandling = ({
       const isLockedByOther = shape?.lockedByUserId && shape.lockedByUserId !== currentUserId;
 
       if (isLockedByOther) {
+        console.log('🔒 [Lock] Cannot update - locked by:', shape?.lockedByUserName || shape?.lockedByUserId);
         return;
       }
 
@@ -70,6 +94,7 @@ export const useShapeHandling = ({
       const isLockedByOther = shape?.lockedByUserId && shape.lockedByUserId !== currentUserId;
 
       if (isLockedByOther) {
+        console.log('🔒 [Lock] Cannot drag - locked by:', shape?.lockedByUserName || shape?.lockedByUserId);
         return;
       }
 
@@ -96,7 +121,7 @@ export const useShapeHandling = ({
   );
 
   const handleShapeDragEnd = useCallback(
-    (shapeId: string, x: number, y: number) => {
+    async (shapeId: string, x: number, y: number) => {
       // Check if shape is locked by another user
       const shape = content.find((s) => s.id === shapeId);
       const isLockedByOther = shape?.lockedByUserId && shape.lockedByUserId !== currentUserId;
@@ -105,11 +130,18 @@ export const useShapeHandling = ({
         return;
       }
 
-      updateShape(shapeId, { x, y });
+      // Update position with immediate flag to sync RTDB immediately
+      await updateShape(shapeId, { x, y }, true);
       stopEditingShape?.(shapeId);
+
+      // Flush to Firestore to ensure consistency
+      if (flushToFirestore) {
+        await flushToFirestore(shapeId);
+      }
+
       onDragEnd?.();
     },
-    [updateShape, stopEditingShape, onDragEnd, content, currentUserId]
+    [updateShape, stopEditingShape, onDragEnd, flushToFirestore, content, currentUserId]
   );
 
   return {

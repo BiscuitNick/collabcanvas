@@ -21,6 +21,8 @@ interface DebugWidgetProps {
   fps: number
   enableFirestore?: boolean
   onToggleFirestore?: (enable: boolean) => void
+  enableRTDB?: boolean
+  onToggleRTDB?: (enable: boolean) => void
   enableGroupCaching?: boolean
   onToggleGroupCaching?: (enable: boolean) => void
   canvasWidth: number
@@ -52,6 +54,8 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
   fps,
   enableFirestore = true,
   onToggleFirestore,
+  enableRTDB = true,
+  onToggleRTDB,
   enableGroupCaching = false,
   onToggleGroupCaching,
   lastEvent
@@ -217,6 +221,20 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
                     id="firestore-updates"
                     checked={enableFirestore}
                     onCheckedChange={onToggleFirestore}
+                    className="scale-75"
+                  />
+                </div>
+              )}
+
+              {onToggleRTDB && (
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="rtdb-updates" className="text-xs">
+                    RTDB Updates
+                  </Label>
+                  <Switch
+                    id="rtdb-updates"
+                    checked={enableRTDB}
+                    onCheckedChange={onToggleRTDB}
                     className="scale-75"
                   />
                 </div>

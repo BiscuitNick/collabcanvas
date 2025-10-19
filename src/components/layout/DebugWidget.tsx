@@ -24,6 +24,16 @@ interface DebugWidgetProps {
   canvasHeight: number
   onCanvasWidthChange?: (width: number) => void
   onCanvasHeightChange?: (height: number) => void
+  lastEvent?: {
+    type: 'mouse' | 'touch'
+    x: number
+    y: number
+    canvasX?: number
+    canvasY?: number
+    target: string
+    tool: string
+    timestamp: number
+  } | null
 }
 
 const DebugWidget: React.FC<DebugWidgetProps> = ({
@@ -37,7 +47,8 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
   onToggleViewportCulling,
   fps,
   enableFirestore = true,
-  onToggleFirestore
+  onToggleFirestore,
+  lastEvent
 }) => {
   const { stagePosition, stageScale } = useCanvasStore()
 
@@ -45,7 +56,7 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
 
   return (
     <div className="text-xs">
-      <Accordion type="multiple" defaultValue={["canvas-state", "debug-controls"]} className="w-full">
+      <Accordion type="multiple" defaultValue={["canvas-state", "last-event", "debug-controls"]} className="w-full">
         {/* Canvas State */}
         <AccordionItem value="canvas-state" className="border-b">
           <AccordionTrigger className="py-2 text-xs font-medium text-gray-700 hover:no-underline">
@@ -57,6 +68,47 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
               <div>Scale: {Math.round(stageScale * 100)}%</div>
               <div>FPS: {Math.round(fps)}</div>
             </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Last Event */}
+        <AccordionItem value="last-event" className="border-b">
+          <AccordionTrigger className="py-2 text-xs font-medium text-gray-700 hover:no-underline">
+            Last Event
+          </AccordionTrigger>
+          <AccordionContent className="pb-2">
+            {lastEvent ? (
+              <div className="space-y-1 text-gray-600">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Type:</span>
+                  <span className="font-mono">{lastEvent.type}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Tool:</span>
+                  <span className="font-mono">{lastEvent.tool}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Screen:</span>
+                  <span className="font-mono">({lastEvent.x}, {lastEvent.y})</span>
+                </div>
+                {lastEvent.canvasX !== undefined && lastEvent.canvasY !== undefined && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Canvas:</span>
+                    <span className="font-mono">({lastEvent.canvasX}, {lastEvent.canvasY})</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Target:</span>
+                  <span className="font-mono text-xs break-all">{lastEvent.target}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Time:</span>
+                  <span className="font-mono text-xs">{new Date(lastEvent.timestamp).toLocaleTimeString()}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-gray-400 italic">No events yet</div>
+            )}
           </AccordionContent>
         </AccordionItem>
 

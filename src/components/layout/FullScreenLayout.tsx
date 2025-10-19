@@ -37,7 +37,7 @@ interface UIState {
   propertiesPaneVisible: boolean
   gridlinesVisible: boolean
   selectedShapeId: string | null
-  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
+  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null
   aiAgentActive: boolean
   isDragging: boolean
   isPanning: boolean
@@ -77,7 +77,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   useKeyboardShortcuts()
   const { user } = useAuth()
   const canEdit = useCanEdit()
-  const { selectShape, resetView, selectedContentId, updatePositionAnimated, stageScale } = useCanvasStore()
+  const { selectShape, resetView, selectedContentId, updatePositionAnimated, stageScale, stagePosition } = useCanvasStore()
 
   // Convert presence array to a Map for efficient user lookup
   const usersMap = React.useMemo(() => {
@@ -89,7 +89,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   }, [presence]);
   // Use selectedContentId directly instead of the getter selectedShapeId for proper reactivity
   const canvasSelectedShapeId = selectedContentId
-  const { createContent, updateContent, clearAllContent, deleteContent } = useContent()
+  const { createContent, createContentBatch, updateContent, updateContentBatch, clearAllContent, deleteContent } = useContent()
 
   // Legacy aliases for backward compatibility
   const createShape = createContent
@@ -171,6 +171,17 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   const [imageUrl, setImageUrl] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
   const fpsRef = useRef({ frames: 0, lastTime: performance.now() })
+  const gridPositionHandlerRef = useRef<((x: number, y: number) => void) | null>(null)
+  const [lastEvent, setLastEvent] = useState<{
+    type: 'mouse' | 'touch'
+    x: number
+    y: number
+    canvasX?: number
+    canvasY?: number
+    target: string
+    tool: string
+    timestamp: number
+  } | null>(null)
 
   // Calculate FPS
   useEffect(() => {
@@ -205,6 +216,89 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     isPanning: uiState.isPanning,
     isResizing: uiState.isResizing
   })
+
+  // Track last mouse/touch event for debugging
+  useEffect(() => {
+    const getTargetDescription = (target: EventTarget | null): string => {
+      if (!target || !(target instanceof Element)) return 'unknown'
+
+      const element = target as HTMLElement
+
+      // Check if it's a canvas element
+      if (element.tagName === 'CANVAS') return 'canvas'
+
+      // Check for specific UI elements
+      if (element.closest('button')) {
+        const button = element.closest('button')
+        return `button: ${button?.getAttribute('title') || button?.textContent?.trim() || 'unnamed'}`
+      }
+
+      if (element.closest('input')) {
+        const input = element.closest('input')
+        return `input: ${input?.getAttribute('placeholder') || input?.getAttribute('type') || 'unnamed'}`
+      }
+
+      if (element.closest('[class*="toolbar"]') || element.closest('[class*="Toolbar"]')) {
+        return 'toolbar'
+      }
+
+      if (element.closest('[class*="properties"]') || element.closest('[class*="Properties"]')) {
+        return 'properties panel'
+      }
+
+      if (element.closest('[class*="debug"]') || element.closest('[class*="Debug"]')) {
+        return 'debug widget'
+      }
+
+      // Return class name or tag name
+      const className = element.className
+      if (typeof className === 'string' && className) {
+        return `${element.tagName.toLowerCase()}.${className.split(' ')[0]}`
+      }
+
+      return element.tagName.toLowerCase()
+    }
+
+    const handleClick = (e: MouseEvent | TouchEvent) => {
+      const isTouch = e.type.startsWith('touch')
+      const clientX = isTouch ? (e as TouchEvent).touches[0]?.clientX || (e as TouchEvent).changedTouches[0]?.clientX : (e as MouseEvent).clientX
+      const clientY = isTouch ? (e as TouchEvent).touches[0]?.clientY || (e as TouchEvent).changedTouches[0]?.clientY : (e as MouseEvent).clientY
+
+      // Calculate canvas coordinates if clicked on canvas
+      let canvasX: number | undefined
+      let canvasY: number | undefined
+
+      const target = e.target
+      if (target instanceof Element && target.tagName === 'CANVAS') {
+        // Convert screen coordinates to canvas coordinates
+        const rect = target.getBoundingClientRect()
+        const screenX = clientX - rect.left
+        const screenY = clientY - rect.top
+        canvasX = Math.round((screenX - stagePosition.x) / stageScale)
+        canvasY = Math.round((screenY - stagePosition.y) / stageScale)
+      }
+
+      setLastEvent({
+        type: isTouch ? 'touch' : 'mouse',
+        x: Math.round(clientX),
+        y: Math.round(clientY),
+        canvasX,
+        canvasY,
+        target: getTargetDescription(e.target),
+        tool: uiState.selectedTool || 'none',
+        timestamp: Date.now()
+      })
+    }
+
+    // Listen for both mouse and touch events
+    document.addEventListener('click', handleClick)
+    document.addEventListener('touchend', handleClick)
+
+    return () => {
+      document.removeEventListener('click', handleClick)
+      document.removeEventListener('touchend', handleClick)
+    }
+  }, [uiState.selectedTool, stagePosition, stageScale])
 
   // Calculate canvas size - full screen or manual
   const calculateCanvasSize = useCallback(() => {
@@ -284,7 +378,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 
 
   // Toolbar handlers
-  const handleToolSelect = useCallback((tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null) => {
+  const handleToolSelect = useCallback((tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null) => {
     const isShapeTool = tool === 'rectangle' || tool === 'circle';
     const isTextTool = tool === 'text';
     const isImageTool = tool === 'image';
@@ -391,6 +485,10 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 
   const handleImageUrlChange = useCallback((url: string) => {
     setImageUrl(url)
+  }, [])
+
+  const handleGridPositionHandlerRegistration = useCallback((handler: (x: number, y: number) => void) => {
+    gridPositionHandlerRef.current = handler
   }, [])
 
   // Reset canvas - clear all shapes and recenter zoom/pan
@@ -519,6 +617,11 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         // ignore
       }
     }
+
+    // Handle grid tool - update grid position when canvas is clicked
+    if (gridPositionHandlerRef.current) {
+      gridPositionHandlerRef.current(event.x, event.y)
+    }
   }, [createShape, user?.uid, uiState, createContent, enableFirestore, textOptions, imageUrl])
 
 
@@ -566,7 +669,9 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           onCreateShape={handleCreateShape}
           onCreateShapeWithOptions={handleCreateShapeWithOptions}
           onCreateContent={createContent}
+          onCreateContentBatch={createContentBatch}
           onUpdateContent={updateShape}
+          onUpdateContentBatch={updateContentBatch}
           onTextOptionsChange={handleTextOptionsChange}
           onImageUrlChange={handleImageUrlChange}
           onOpenAIAgent={handleOpenAIAgent}
@@ -574,6 +679,13 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           onToolSelect={handleToolSelect}
           onResetCanvas={handleResetCanvas}
           canEdit={canEdit}
+          canvasViewport={{
+            position: stagePosition,
+            scale: stageScale,
+            width: canvasSize.width,
+            height: canvasSize.height
+          }}
+          onGridPositionClick={handleGridPositionHandlerRegistration}
         />
 
       {/* Tool Button - Bottom Left (Layers Panel) */}
@@ -675,6 +787,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         onCanvasWidthChange={handleCanvasWidthChange}
         onCanvasHeightChange={handleCanvasHeightChange}
         onClose={() => setUIState(prev => ({ ...prev, debugMode: false }))}
+        lastEvent={lastEvent}
       />
     </div>
   )

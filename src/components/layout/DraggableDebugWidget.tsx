@@ -22,6 +22,16 @@ interface DraggableDebugWidgetProps {
   canvasHeight: number
   onCanvasWidthChange?: (width: number) => void
   onCanvasHeightChange?: (height: number) => void
+  lastEvent?: {
+    type: 'mouse' | 'touch'
+    x: number
+    y: number
+    canvasX?: number
+    canvasY?: number
+    target: string
+    tool: string
+    timestamp: number
+  } | null
 }
 
 const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
@@ -42,7 +52,8 @@ const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
   canvasWidth,
   canvasHeight,
   onCanvasWidthChange,
-  onCanvasHeightChange
+  onCanvasHeightChange,
+  lastEvent
 }) => {
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
@@ -155,6 +166,7 @@ const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
             canvasHeight={canvasHeight}
             onCanvasWidthChange={onCanvasWidthChange}
             onCanvasHeightChange={onCanvasHeightChange}
+            lastEvent={lastEvent}
           />
         </div>
       </div>

@@ -16,7 +16,7 @@ interface TextContentProps {
   onDragStart: () => void
   onDragEndCallback: () => void
   currentUserId?: string
-  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
+  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null
   canEdit?: boolean
 }
 
@@ -97,21 +97,16 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
   }, [])
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    // Log text content click
-    console.log('🖱️ Canvas clicked - Shape:', { type: 'text', id: content.id, x: content.x.toFixed(2), y: content.y.toFixed(2), text: content.text })
-
     // Only allow selection with select, pan, or ai tools
     const allowSelection = selectedTool === 'select' || selectedTool === 'pan' || selectedTool === 'ai' || selectedTool === null
 
     if (!allowSelection) {
       // Don't stop propagation - let the tool action happen
-      console.log('🔧 Tool active - passing click through to canvas')
       return
     }
 
     // Prevent selection if locked by another user
     if (isLockedByOther) {
-      console.log('⚠️ Cannot select - locked by another user')
       // IMPORTANT: Must stop propagation to prevent canvas panning!
       e.cancelBubble = true
       e.evt.stopPropagation()
@@ -133,7 +128,6 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
 
     // Prevent editing if locked by another user
     if (isLockedByOther) {
-      console.log('⚠️ Cannot edit - locked by another user')
       // Already stopped propagation above, so just return
       return
     }

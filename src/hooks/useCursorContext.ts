@@ -12,7 +12,7 @@ export type CursorContext =
   | 'not-allowed'
 
 interface UseCursorContextProps {
-  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
+  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null
   isDragging?: boolean
   isPanning?: boolean
   isResizing?: boolean
@@ -48,6 +48,9 @@ export const useCursorContext = ({
           break
         case 'rectangle':
         case 'circle':
+          cursor = 'crosshair'
+          break
+        case 'grid':
           cursor = 'crosshair'
           break
         case 'ai':

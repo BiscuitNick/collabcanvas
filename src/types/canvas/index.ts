@@ -22,6 +22,10 @@ export interface BaseContent {
   // Last interaction tracking (selection, viewing, etc.)
   lastInteractedBy?: string | null;
   lastInteractedAt?: number | Date | null;
+  // Soft delete flag for collaborative deletion
+  deleted?: boolean;
+  deletedBy?: string | null;
+  deletedAt?: number | Date | null;
   // Content type and version for enhanced content
   type: ContentType;
   version: ContentVersion;

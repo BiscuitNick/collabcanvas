@@ -84,24 +84,30 @@ export const useFirestoreSync = (userUid: string | undefined) => {
 
     // If Firestore is disabled, use canvas store as source of truth
     if (!enableFirestore) {
-      console.log('🔌 Firestore disabled - using canvas store');
       setContent(storeContent);
       // Store already has the content, no need to set it again
       setLoading(false);
       return;
     }
 
-    console.log('🔌 Firestore enabled - setting up listener', { canvasId });
     const contentRef = collection(firestore, 'canvases', canvasId, 'content');
     const q = query(contentRef, orderBy('createdAt', 'asc'));
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        console.log(`📡 [FIRESTORE] Received snapshot update with ${snapshot.size} documents for user: ${userUid}`);
         const contentData: Content[] = [];
+        const deletedIds: string[] = [];
+
         snapshot.forEach((doc) => {
           const data = doc.data();
+
+          // Skip deleted items - filter them out from sync
+          // This handles soft deletes propagating to all users
+          if (data.deleted === true) {
+            deletedIds.push(doc.id);
+            return;
+          }
 
           // Common fields for all content types
           const baseContent = {
@@ -119,6 +125,9 @@ export const useFirestoreSync = (userUid: string | undefined) => {
             lockedAt: data.lockedAt || null,
             lastEditedBy: data.lastEditedBy || null,
             lastEditedAt: data.lastEditedAt || null,
+            deleted: data.deleted || false,
+            deletedBy: data.deletedBy || null,
+            deletedAt: data.deletedAt || null,
             syncStatus: 'synced' as const,
           };
 
@@ -185,26 +194,14 @@ export const useFirestoreSync = (userUid: string | undefined) => {
           const storeItem = storeContentMap.get(remoteContent.id);
           const wasLastEditedByCurrentUser = remoteContent.lastEditedBy === userUid;
 
-          // Log the decision-making process
-          console.log(`🔄 [SYNC DECISION] Content ${remoteContent.id}:`, {
-            isActivelyEditing,
-            wasLastEditedByCurrentUser,
-            lastEditedBy: remoteContent.lastEditedBy,
-            currentUser: userUid,
-            hasStoreItem: !!storeItem
-          });
-
           if (isActivelyEditing && storeItem) {
             // User is actively editing this item - keep their local changes
-            console.log(`✏️ [SYNC DECISION] Keeping local version (actively editing): ${remoteContent.id}`);
             mergedContent.push(storeItem);
           } else if (wasLastEditedByCurrentUser && storeItem) {
             // Current user was the last to edit - ignore Firestore update to avoid race condition
-            console.log(`🚫 [SYNC DECISION] Ignoring Firestore update (current user was last editor): ${remoteContent.id}`);
             mergedContent.push(storeItem);
           } else {
             // Not editing and not our edit - use remote content (this updates other users' changes)
-            console.log(`📥 [SYNC DECISION] Using Firestore update (other user's changes): ${remoteContent.id}`);
             mergedContent.push(remoteContent);
           }
 
@@ -213,8 +210,9 @@ export const useFirestoreSync = (userUid: string | undefined) => {
         });
 
         // Add any remaining local-only items (those not in Firestore)
+        // But exclude any that were marked as deleted
         storeContentMap.forEach((localItem) => {
-          if (localItem.id.startsWith('local-') || localItem.id.startsWith('hardcoded-')) {
+          if ((localItem.id.startsWith('local-') || localItem.id.startsWith('hardcoded-')) && !deletedIds.includes(localItem.id)) {
             mergedContent.push(localItem);
           }
         });
@@ -224,18 +222,6 @@ export const useFirestoreSync = (userUid: string | undefined) => {
         }
 
         updateTimeoutRef.current = setTimeout(() => {
-          const ignoredDueToLastEdit = contentData.filter(c => c.lastEditedBy === userUid).length;
-          const activelyEditingCount = Array.from(activelyEditingRef.current).length;
-          const localOnlyCount = mergedContent.filter(c => c.id.startsWith('local-')).length;
-
-          console.log('📥 [SYNC SUMMARY] Firestore sync: Updating store with merged content', {
-            remoteCount: contentData.length,
-            localOnlyCount,
-            activelyEditingCount,
-            ignoredDueToLastEdit,
-            totalMerged: mergedContent.length,
-            currentUser: userUid
-          });
           setContent(mergedContent);
           setStoreContent(mergedContent); // Update Zustand store with merged content
           setLoading(false);

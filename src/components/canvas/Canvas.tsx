@@ -31,7 +31,7 @@ export interface CanvasProps {
   onDragEnd?: () => void;
   onPanStart?: () => void;
   onPanEnd?: () => void;
-  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null;
+  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null;
   onCanvasClick?: (event: { x: number; y: number }) => void;
   isCreatingShape?: boolean;
   canEdit?: boolean;
@@ -91,6 +91,7 @@ const Canvas: React.FC<CanvasProps> = ({
     onMouseMove,
     onPanStart,
     onPanEnd,
+    selectedTool,
     onCanvasClick,
     isCreatingShape,
     unlockShape,

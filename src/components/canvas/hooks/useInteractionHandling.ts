@@ -10,7 +10,7 @@ interface InteractionHandlingProps {
   onMouseMove: (x: number, y: number, canvasWidth: number, canvasHeight: number) => void;
   onPanStart?: () => void;
   onPanEnd?: () => void;
-  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'ai' | 'pan' | 'agent' | null;
+  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null;
   onCanvasClick?: (event: { x: number; y: number }) => void;
   isCreatingShape?: boolean;
   unlockShape?: (id: string) => Promise<void>;
@@ -22,10 +22,11 @@ export const useInteractionHandling = ({
   onMouseMove,
   onPanStart,
   onPanEnd,
+  selectedTool,
   onCanvasClick,
   isCreatingShape,
   unlockShape,
-}: Omit<InteractionHandlingProps, 'selectedTool'>) => {
+}: InteractionHandlingProps) => {
   const {
     stagePosition,
     stageScale,
@@ -162,8 +163,6 @@ export const useInteractionHandling = ({
 
     if (clickedOnEmpty) {
       // Clicked on empty canvas area
-      console.log('🖱️ Canvas clicked - Empty area at:', { x: canvasPoint.x.toFixed(2), y: canvasPoint.y.toFixed(2) });
-
       // Unlock the currently selected shape before deselecting
       if (selectedContentId && unlockShape) {
         unlockShape(selectedContentId);
@@ -172,23 +171,14 @@ export const useInteractionHandling = ({
       // Always deselect current shape when clicking empty canvas or placing new shape
       selectShape(null);
 
-      // If creating a shape, trigger the shape creation
-      if (isCreatingShape && onCanvasClick) {
+      // If creating a shape or using grid tool, trigger the canvas click callback
+      if ((isCreatingShape || selectedTool === 'grid') && onCanvasClick) {
         onCanvasClick({ x: canvasPoint.x, y: canvasPoint.y });
         return;
       }
     } else {
       // Clicked on a shape - the shape's onSelect handler will be called via ShapeFactory
       // The shape's onClick handler will call onSelect which handles switching selection
-      // Just log the click for debugging
-      const shapeId = e.target.id() || 'unknown';
-      const shapeName = e.target.name() || e.target.className;
-      console.log('🖱️ Canvas clicked - Shape:', {
-        type: shapeName,
-        id: shapeId,
-        x: canvasPoint.x.toFixed(2),
-        y: canvasPoint.y.toFixed(2)
-      });
     }
   };
 

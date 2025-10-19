@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { useFirestoreSync } from './firestore/useFirestoreSync';
 import { useContentOperations } from './firestore/useContentOperations';
@@ -8,7 +7,7 @@ import { useCanvasStore } from '../store/canvasStore';
 export const useContent = () => {
   const { user } = useAuth();
   const { content: firestoreContent, setContent, loading, error, activelyEditingRef, isCreatingContent } = useFirestoreSync(user?.uid);
-  const { createContent, updateContent, deleteContent, clearAllContent, startEditingContent, stopEditingContent } = useContentOperations(
+  const { createContent, updateContent, deleteContent, clearAllContent, startEditingContent, stopEditingContent, createContentBatch, updateContentBatch, deleteContentBatch } = useContentOperations(
     firestoreContent,
     setContent,
     activelyEditingRef,
@@ -17,14 +16,6 @@ export const useContent = () => {
   );
   // Get content directly from Zustand store for immediate UI updates
   const storeContent = useCanvasStore((state) => state.content);
-
-  // Debug logging
-  useEffect(() => {
-    console.log('🎨 useContent: Store content updated', {
-      count: storeContent.length,
-      ids: storeContent.map(c => c.id)
-    });
-  }, [storeContent]);
 
   const { lockContent, unlockContent } = useContentLocking(storeContent);
 
@@ -35,8 +26,11 @@ export const useContent = () => {
   return {
     content: storeContent, // Use store content for immediate UI updates
     createContent,
+    createContentBatch,
     updateContent,
+    updateContentBatch,
     deleteContent,
+    deleteContentBatch,
     clearAllContent,
     loading,
     error,
@@ -48,8 +42,11 @@ export const useContent = () => {
     // Legacy exports for backward compatibility during migration
     shapes: storeContent,
     createShape: createContent,
+    createShapeBatch: createContentBatch,
     updateShape: updateContent,
+    updateShapeBatch: updateContentBatch,
     deleteShape: deleteContent,
+    deleteShapeBatch: deleteContentBatch,
     clearAllShapes: clearAllContent,
     lockShape: lockContent,
     unlockShape: unlockContent,

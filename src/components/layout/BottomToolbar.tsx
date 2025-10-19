@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import {
@@ -49,7 +49,9 @@ interface BottomToolbarProps {
     strokeWidth: number
   }) => void
   onCreateContent?: (contentData: Omit<Content, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
+  onCreateContentBatch?: (contentDataArray: Omit<Content, 'id' | 'createdAt' | 'updatedAt'>[]) => Promise<void>
   onUpdateContent?: (id: string, updates: Partial<Content>) => Promise<void>
+  onUpdateContentBatch?: (updatesList: Array<{ id: string; updates: Partial<Content> }>) => Promise<void>
   onTextOptionsChange?: (options: {
     text: string
     fontSize: number
@@ -59,10 +61,17 @@ interface BottomToolbarProps {
   onImageUrlChange?: (url: string) => void
   onCreateText?: () => void
   onOpenAIAgent: () => void
-  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
-  onToolSelect: (tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null) => void
+  selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null
+  onToolSelect: (tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null) => void
   onResetCanvas: () => void
   canEdit?: boolean
+  canvasViewport?: {
+    position: { x: number; y: number }
+    scale: number
+    width: number
+    height: number
+  }
+  onGridPositionClick?: (handler: (x: number, y: number) => void) => void
 }
 
 type ToolType = 'pan' | 'shapes' | 'text' | 'image' | 'ai' | 'agent' | 'grid'
@@ -70,14 +79,18 @@ type ToolType = 'pan' | 'shapes' | 'text' | 'image' | 'ai' | 'agent' | 'grid'
 const BottomToolbar: React.FC<BottomToolbarProps> = ({
   onCreateShapeWithOptions,
   onCreateContent,
+  onCreateContentBatch,
   onUpdateContent,
+  onUpdateContentBatch,
   onTextOptionsChange,
   onImageUrlChange,
   // onCreateText is not used yet but reserved for future use
   onOpenAIAgent,
   onToolSelect,
   onResetCanvas,
-  canEdit = true
+  canEdit = true,
+  canvasViewport,
+  onGridPositionClick
 }) => {
 
   // Get selected content from canvas store
@@ -117,9 +130,46 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   const [gridColorMode, setGridColorMode] = useState<'random' | 'palette'>('random')
   const [gridCustomColors, setGridCustomColors] = useState<string[]>(['#FF6B6B', '#4ECDC4', '#45B7D1'])
 
+  // Track previous tool to detect when switching TO grid tool
+  const prevToolRef = useRef<ToolType | null>(null)
+
+  // Set initial grid position to canvas viewport center ONLY when grid tool is first selected
+  useEffect(() => {
+    // Only set position when transitioning TO grid from another tool
+    if (activeTool === 'grid' && prevToolRef.current !== 'grid' && canvasViewport) {
+      // Calculate the center of the viewport in canvas coordinates
+      // The viewport center in screen coordinates is (width/2, height/2)
+      // Convert to canvas coordinates by accounting for stage position and scale
+      const centerX = Math.round((-canvasViewport.position.x + canvasViewport.width / 2) / canvasViewport.scale)
+      const centerY = Math.round((-canvasViewport.position.y + canvasViewport.height / 2) / canvasViewport.scale)
+
+      setGridStartX(centerX)
+      setGridStartY(centerY)
+    }
+
+    // Update the previous tool reference
+    prevToolRef.current = activeTool
+  }, [activeTool, canvasViewport])
+
+  // Handle grid position update when canvas is clicked
+  const handleGridPositionUpdate = useCallback((x: number, y: number) => {
+    // Only update if grid tool is currently active
+    if (activeTool !== 'grid') return
+
+    setGridStartX(Math.round(x))
+    setGridStartY(Math.round(y))
+  }, [activeTool])
+
+  // Expose grid position update handler to parent via callback prop
+  useEffect(() => {
+    if (onGridPositionClick) {
+      onGridPositionClick(handleGridPositionUpdate)
+    }
+  }, [onGridPositionClick, handleGridPositionUpdate])
+
   // Handle grid generation
   const handleGenerateGrid = async () => {
-    if (!onCreateContent) return
+    if (!onCreateContentBatch && !onCreateContent) return
 
     const colors = gridColorMode === 'random' ? 'random' : gridCustomColors
     const commands = buildGrid({
@@ -133,20 +183,30 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
       colors
     })
 
-    // Create each cell as content
-    for (const command of commands) {
-      if (command.type === 'rectangle') {
-        await onCreateContent({
-          type: ContentType.RECTANGLE,
-          version: ContentVersion.V2,
-          x: command.x || 0,
-          y: command.y || 0,
-          width: command.width || 100,
-          height: command.height || 100,
-          fill: command.fill || '#000000',
-          stroke: command.stroke || '#000000',
-          strokeWidth: command.strokeWidth || 1
-        } as any)
+    // Convert commands to content data
+    const contentDataArray = commands
+      .filter(command => command.type === 'rectangle')
+      .map(command => ({
+        type: ContentType.RECTANGLE,
+        version: ContentVersion.V2,
+        x: command.x || 0,
+        y: command.y || 0,
+        width: command.width || 100,
+        height: command.height || 100,
+        fill: command.fill || '#000000',
+        stroke: command.stroke || '#000000',
+        strokeWidth: command.strokeWidth || 1,
+        rotation: 0
+      } as any))
+
+    // Use batch creation if available, otherwise fall back to sequential
+    if (onCreateContentBatch) {
+      console.log(`🚀 [GRID] Creating ${contentDataArray.length} items using batch operation`)
+      await onCreateContentBatch(contentDataArray)
+    } else {
+      console.log(`⚠️ [GRID] Falling back to sequential creation for ${contentDataArray.length} items`)
+      for (const contentData of contentDataArray) {
+        await onCreateContent!(contentData)
       }
     }
   }
@@ -156,11 +216,14 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     const savedTool = localStorage.getItem('collabcanvas-active-tool') as ToolType
     if (savedTool) {
       setActiveTool(savedTool)
-      // Skip onToolSelect for grid tool
-      if (savedTool === 'grid') {
-        return
+      // Map tool types when calling onToolSelect
+      if (savedTool === 'shapes') {
+        onToolSelect('rectangle')
+      } else if (savedTool === 'grid') {
+        onToolSelect('grid')
+      } else {
+        onToolSelect(savedTool as any)
       }
-      onToolSelect(savedTool === 'shapes' ? 'rectangle' : (savedTool as any))
     }
   }, [onToolSelect])
 
@@ -218,11 +281,6 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     setActiveTool(tool)
     localStorage.setItem('collabcanvas-active-tool', tool)
 
-    // Grid tool doesn't need to call onToolSelect
-    if (tool === 'grid') {
-      return
-    }
-
     // Map internal tool types to external tool types
     if (tool === 'shapes') {
       onToolSelect(selectedShape)
@@ -240,6 +298,9 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
       onOpenAIAgent()
     } else if (tool === 'pan') {
       onToolSelect('pan')
+    } else if (tool === 'grid') {
+      onToolSelect('grid')
+      // Grid tool selected
     } else {
       onToolSelect(tool as any)
     }
@@ -340,136 +401,175 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
       if (response.success && response.data?.commands) {
         console.log('[Agent Toolbar] Processing', response.data.commands.length, 'commands')
 
-        // Execute each command from the AI
-        for (const command of response.data.commands) {
-          console.log('[Agent Toolbar] Processing command:', command)
+        // Separate edit and create commands for optimized batch processing
+        const editCommands = response.data.commands.filter((cmd: any) => cmd.action === 'edit')
+        const createCommands = response.data.commands.filter((cmd: any) => cmd.action === 'create')
 
-          if (command.action === 'edit') {
-            // Handle edit action - update existing content
-            if (!selectedContent) {
-              console.warn('[Agent Toolbar] Edit action but no content selected')
-              continue
-            }
+        // Process edit commands - batch them for performance
+        const updatesToApply: Array<{ id: string; updates: Partial<Content> }> = []
 
-            console.log('[Agent Toolbar] Editing content:', selectedContent.id)
-            const updates: any = {}
+        for (const command of editCommands) {
+          console.log('[Agent Toolbar] Processing edit command:', command)
 
-            // Build updates object from command properties
-            if (command.x !== undefined) updates.x = command.x
-            if (command.y !== undefined) updates.y = command.y
-            if (command.width !== undefined) updates.width = command.width
-            if (command.height !== undefined) updates.height = command.height
-            if (command.radius !== undefined) updates.radius = command.radius
-            if (command.fill !== undefined) updates.fill = command.fill
-            if (command.stroke !== undefined) updates.stroke = command.stroke
-            if (command.strokeWidth !== undefined) updates.strokeWidth = command.strokeWidth
-            if (command.rotation !== undefined) updates.rotation = command.rotation
-            if (command.text !== undefined) updates.text = command.text
-            if (command.fontSize !== undefined) updates.fontSize = command.fontSize
-            if (command.fontFamily !== undefined) updates.fontFamily = command.fontFamily
-            if (command.fontStyle !== undefined) updates.fontStyle = command.fontStyle
+          // Use command.shapeId if specified, otherwise use selectedContent.id
+          const targetId = command.shapeId || selectedContent?.id
 
-            await onUpdateContent!(selectedContent.id, updates as Partial<Content>)
-            console.log('[Agent Toolbar] Content updated successfully')
+          if (!targetId) {
+            console.warn('[Agent Toolbar] Edit action but no target ID or selected content')
+            continue
+          }
 
-          } else if (command.action === 'create') {
-            if (command.type === 'rectangle') {
-              // Validate required properties for rectangle
-              if (
-                typeof command.x === 'number' &&
-                typeof command.y === 'number' &&
-                typeof command.width === 'number' &&
-                typeof command.height === 'number' &&
-                typeof command.fill === 'string'
-              ) {
-                console.log('[Agent Toolbar] Creating rectangle:', command)
-                console.log('[Agent Toolbar] onCreateContent exists?', !!onCreateContent)
-                try {
-                  await onCreateContent!({
-                    type: ContentType.RECTANGLE,
-                    version: ContentVersion.V2,
-                    x: command.x,
-                    y: command.y,
-                    width: command.width,
-                    height: command.height,
-                    rotation: command.rotation || 0,
-                    fill: command.fill,
-                    stroke: command.stroke || '#000000',
-                    strokeWidth: command.strokeWidth || 1
-                  } as any)
-                  console.log('[Agent Toolbar] onCreateContent call completed')
-                } catch (err) {
-                  console.error('[Agent Toolbar] Error calling onCreateContent:', err)
-                }
-              } else {
-                console.warn('[Agent Toolbar] Invalid rectangle command properties:', command)
-              }
-            } else if (command.type === 'circle') {
-              // Validate required properties for circle
-              if (
-                typeof command.x === 'number' &&
-                typeof command.y === 'number' &&
-                (typeof command.width === 'number' || typeof command.radius === 'number') &&
-                typeof command.fill === 'string'
-              ) {
-                // Calculate radius from width/height or use radius directly
-                const radius = command.radius || ((command.width || 0) / 2)
-                console.log('[Agent Toolbar] Creating circle:', command)
-                try {
-                  await onCreateContent!({
-                    type: ContentType.CIRCLE,
-                    version: ContentVersion.V2,
-                    x: command.x,
-                    y: command.y,
-                    radius: radius,
-                    fill: command.fill,
-                    stroke: command.stroke || '#000000',
-                    strokeWidth: command.strokeWidth || 1
-                  } as any)
-                  console.log('[Agent Toolbar] Circle created successfully')
-                } catch (err) {
-                  console.error('[Agent Toolbar] Error creating circle:', err)
-                }
-              } else {
-                console.warn('[Agent Toolbar] Invalid circle command properties:', command)
-              }
-            } else if (command.type === 'text') {
-              // Validate required properties for text
-              if (
-                typeof command.x === 'number' &&
-                typeof command.y === 'number' &&
-                typeof command.text === 'string'
-              ) {
-                console.log('[Agent Toolbar] Creating text:', command)
-                try {
-                  const textContent: any = {
-                    type: ContentType.TEXT,
-                    version: ContentVersion.V2,
-                    x: command.x,
-                    y: command.y,
-                    text: command.text,
-                    fontSize: command.fontSize || 16,
-                    fontFamily: (command.fontFamily as FontFamily) || FontFamily.ARIAL,
-                    fontStyle: (command.fontStyle as FontStyle) || FontStyle.NORMAL,
-                    fill: command.fill || '#000000'
-                  }
-                  // Only add width/height if they're defined
-                  if (typeof command.width === 'number') textContent.width = command.width
-                  if (typeof command.height === 'number') textContent.height = command.height
+          console.log('[Agent Toolbar] Preparing edit for content:', targetId)
+          const updates: any = {}
 
-                  await onCreateContent!(textContent)
-                  console.log('[Agent Toolbar] Text created successfully')
-                } catch (err) {
-                  console.error('[Agent Toolbar] Error creating text:', err)
-                }
-              } else {
-                console.warn('[Agent Toolbar] Invalid text command properties:', command)
-              }
-            } else {
-              console.warn('[Agent Toolbar] Unknown content type:', command.type)
+          // Build updates object from command properties
+          if (command.x !== undefined) updates.x = command.x
+          if (command.y !== undefined) updates.y = command.y
+          if (command.width !== undefined) updates.width = command.width
+          if (command.height !== undefined) updates.height = command.height
+          if (command.radius !== undefined) updates.radius = command.radius
+          if (command.fill !== undefined) updates.fill = command.fill
+          if (command.stroke !== undefined) updates.stroke = command.stroke
+          if (command.strokeWidth !== undefined) updates.strokeWidth = command.strokeWidth
+          if (command.rotation !== undefined) updates.rotation = command.rotation
+          if (command.text !== undefined) updates.text = command.text
+          if (command.fontSize !== undefined) updates.fontSize = command.fontSize
+          if (command.fontFamily !== undefined) updates.fontFamily = command.fontFamily
+          if (command.fontStyle !== undefined) updates.fontStyle = command.fontStyle
+
+          // Check if we already have updates for this ID, if so merge them
+          const existingUpdate = updatesToApply.find(u => u.id === targetId)
+          if (existingUpdate) {
+            Object.assign(existingUpdate.updates, updates)
+          } else {
+            updatesToApply.push({ id: targetId, updates: updates as Partial<Content> })
+          }
+        }
+
+        // Apply all edits in a single batch
+        if (updatesToApply.length > 0) {
+          if (onUpdateContentBatch && updatesToApply.length > 1) {
+            console.log(`🚀 [AI AGENT] Updating ${updatesToApply.length} items using batch operation`)
+            try {
+              await onUpdateContentBatch(updatesToApply)
+              console.log('[Agent Toolbar] All edits applied successfully via batch')
+            } catch (err) {
+              console.error('[Agent Toolbar] Error in batch update:', err)
             }
           } else {
-            console.warn('[Agent Toolbar] Unknown command action:', command.action)
+            // Fall back to sequential updates if only one item or batch not available
+            for (const { id, updates } of updatesToApply) {
+              try {
+                await onUpdateContent!(id, updates)
+                console.log('[Agent Toolbar] Content updated successfully:', id)
+              } catch (err) {
+                console.error('[Agent Toolbar] Error updating content:', err)
+              }
+            }
+          }
+        }
+
+        // Process create commands - batch them for performance
+        const contentToCreate: any[] = []
+
+        for (const command of createCommands) {
+          if (command.type === 'rectangle') {
+            // Validate required properties for rectangle
+            if (
+              typeof command.x === 'number' &&
+              typeof command.y === 'number' &&
+              typeof command.width === 'number' &&
+              typeof command.height === 'number' &&
+              typeof command.fill === 'string'
+            ) {
+              contentToCreate.push({
+                type: ContentType.RECTANGLE,
+                version: ContentVersion.V2,
+                x: command.x,
+                y: command.y,
+                width: command.width,
+                height: command.height,
+                rotation: command.rotation || 0,
+                fill: command.fill,
+                stroke: command.stroke || '#000000',
+                strokeWidth: command.strokeWidth || 1
+              })
+            } else {
+              console.warn('[Agent Toolbar] Invalid rectangle command properties:', command)
+            }
+          } else if (command.type === 'circle') {
+            // Validate required properties for circle
+            if (
+              typeof command.x === 'number' &&
+              typeof command.y === 'number' &&
+              (typeof command.width === 'number' || typeof command.radius === 'number') &&
+              typeof command.fill === 'string'
+            ) {
+              // Calculate radius from width/height or use radius directly
+              const radius = command.radius || ((command.width || 0) / 2)
+              contentToCreate.push({
+                type: ContentType.CIRCLE,
+                version: ContentVersion.V2,
+                x: command.x,
+                y: command.y,
+                radius: radius,
+                fill: command.fill,
+                stroke: command.stroke || '#000000',
+                strokeWidth: command.strokeWidth || 1
+              })
+            } else {
+              console.warn('[Agent Toolbar] Invalid circle command properties:', command)
+            }
+          } else if (command.type === 'text') {
+            // Validate required properties for text
+            if (
+              typeof command.x === 'number' &&
+              typeof command.y === 'number' &&
+              typeof command.text === 'string'
+            ) {
+              const textContent: any = {
+                type: ContentType.TEXT,
+                version: ContentVersion.V2,
+                x: command.x,
+                y: command.y,
+                text: command.text,
+                fontSize: command.fontSize || 16,
+                fontFamily: (command.fontFamily as FontFamily) || FontFamily.ARIAL,
+                fontStyle: (command.fontStyle as FontStyle) || FontStyle.NORMAL,
+                fill: command.fill || '#000000'
+              }
+              // Only add width/height if they're defined
+              if (typeof command.width === 'number') textContent.width = command.width
+              if (typeof command.height === 'number') textContent.height = command.height
+
+              contentToCreate.push(textContent)
+            } else {
+              console.warn('[Agent Toolbar] Invalid text command properties:', command)
+            }
+          } else {
+            console.warn('[Agent Toolbar] Unknown content type:', command.type)
+          }
+        }
+
+        // Batch create all content items at once
+        if (contentToCreate.length > 0) {
+          if (onCreateContentBatch) {
+            console.log(`🚀 [AI AGENT] Creating ${contentToCreate.length} items using batch operation`)
+            try {
+              await onCreateContentBatch(contentToCreate)
+              console.log('[Agent Toolbar] All content created successfully via batch')
+            } catch (err) {
+              console.error('[Agent Toolbar] Error in batch creation:', err)
+            }
+          } else {
+            console.log(`⚠️ [AI AGENT] Falling back to sequential creation for ${contentToCreate.length} items`)
+            for (const contentData of contentToCreate) {
+              try {
+                await onCreateContent!(contentData)
+              } catch (err) {
+                console.error('[Agent Toolbar] Error creating content:', err)
+              }
+            }
           }
         }
 
@@ -795,127 +895,144 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
         }
 
         return (
-          <div className="mb-2 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-4 py-2 space-y-2 w-fit">
-            {/* First row: Position and dimensions */}
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                <label className="text-xs text-gray-600">X:</label>
-                <input
-                  type="number"
-                  value={gridStartX}
-                  onChange={(e) => setGridStartX(parseInt(e.target.value) || 0)}
-                  className="h-7 w-12 text-xs border border-gray-300 rounded px-1"
-                />
+          <div className="mb-2 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-3 py-2.5 space-y-2">
+            {/* Row 1: Position and Grid */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-500 w-12">Position</span>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    value={gridStartX}
+                    onChange={(e) => setGridStartX(parseInt(e.target.value) || 0)}
+                    className="h-7 w-20 text-xs"
+                    placeholder="X"
+                  />
+                  <Input
+                    type="number"
+                    value={gridStartY}
+                    onChange={(e) => setGridStartY(parseInt(e.target.value) || 0)}
+                    className="h-7 w-20 text-xs"
+                    placeholder="Y"
+                  />
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <label className="text-xs text-gray-600">Y:</label>
-                <input
-                  type="number"
-                  value={gridStartY}
-                  onChange={(e) => setGridStartY(parseInt(e.target.value) || 0)}
-                  className="h-7 w-12 text-xs border border-gray-300 rounded px-1"
-                />
-              </div>
-              <div className="flex items-center gap-1">
-                <label className="text-xs text-gray-600">Rows:</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={gridRows}
-                  onChange={(e) => setGridRows(parseInt(e.target.value) || 5)}
-                  className="h-7 w-12 text-xs border border-gray-300 rounded px-1"
-                />
-              </div>
-              <div className="flex items-center gap-1">
-                <label className="text-xs text-gray-600">Cols:</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={gridCols}
-                  onChange={(e) => setGridCols(parseInt(e.target.value) || 5)}
-                  className="h-7 w-12 text-xs border border-gray-300 rounded px-1"
-                />
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-500 w-12">Grid</span>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={gridRows}
+                    onChange={(e) => setGridRows(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
+                    className="h-7 w-16 text-xs"
+                    placeholder="Rows"
+                  />
+                  <span className="text-xs text-gray-400">×</span>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={gridCols}
+                    onChange={(e) => setGridCols(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
+                    className="h-7 w-16 text-xs"
+                    placeholder="Cols"
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Second row: Cell size and gap */}
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                <label className="text-xs text-gray-600">W:</label>
-                <input
-                  type="number"
-                  min="10"
-                  max="500"
-                  value={gridCellWidth}
-                  onChange={(e) => setGridCellWidth(parseInt(e.target.value) || 100)}
-                  className="h-7 w-14 text-xs border border-gray-300 rounded px-1"
-                />
+            {/* Row 2: Cell Size and Gap */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-500 w-12">Cell</span>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    min="10"
+                    max="1000"
+                    value={gridCellWidth}
+                    onChange={(e) => setGridCellWidth(Math.min(1000, Math.max(10, parseInt(e.target.value) || 10)))}
+                    className="h-7 w-20 text-xs"
+                    placeholder="Width"
+                  />
+                  <span className="text-xs text-gray-400">×</span>
+                  <Input
+                    type="number"
+                    min="10"
+                    max="1000"
+                    value={gridCellHeight}
+                    onChange={(e) => setGridCellHeight(Math.min(1000, Math.max(10, parseInt(e.target.value) || 10)))}
+                    className="h-7 w-20 text-xs"
+                    placeholder="Height"
+                  />
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <label className="text-xs text-gray-600">H:</label>
-                <input
-                  type="number"
-                  min="10"
-                  max="500"
-                  value={gridCellHeight}
-                  onChange={(e) => setGridCellHeight(parseInt(e.target.value) || 100)}
-                  className="h-7 w-14 text-xs border border-gray-300 rounded px-1"
-                />
-              </div>
-              <div className="flex items-center gap-1">
-                <label className="text-xs text-gray-600">Gap:</label>
-                <input
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-500 w-12">Gap</span>
+                <Input
                   type="number"
                   min="0"
                   max="100"
                   value={gridGap}
-                  onChange={(e) => setGridGap(parseInt(e.target.value) || 10)}
-                  className="h-7 w-12 text-xs border border-gray-300 rounded px-1"
+                  onChange={(e) => setGridGap(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                  className="h-7 w-20 text-xs"
+                  placeholder="Gap"
                 />
               </div>
-              <Select value={gridColorMode} onValueChange={(value: any) => setGridColorMode(value)}>
-                <SelectTrigger className="h-7 w-24 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  <SelectItem value="random">Random</SelectItem>
-                  <SelectItem value="palette">Palette</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
-            {/* Third row: Custom colors (only if palette mode) */}
-            {gridColorMode === 'palette' && (
-              <div className="flex items-center gap-1 flex-wrap">
-                <label className="text-xs text-gray-600 w-full">Colors ({gridCustomColors.length}/5):</label>
-                {gridCustomColors.map((color, index) => (
-                  <div key={index} className="flex items-center gap-1">
-                    <input
-                      type="color"
-                      value={color}
-                      onChange={(e) => handleColorChange(index, e.target.value)}
-                      className="h-7 w-8 border border-gray-300 rounded cursor-pointer"
-                    />
-                    <button
-                      onClick={() => handleRemoveColor(index)}
-                      className="px-1 py-0 text-xs bg-red-500 text-white rounded hover:bg-red-600"
-                    >
-                      -
-                    </button>
-                  </div>
-                ))}
-                {gridCustomColors.length < 5 && (
-                  <button
-                    onClick={handleAddColor}
-                    className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600"
-                  >
-                    + Add
-                  </button>
-                )}
+            {/* Row 3: Color Mode and Palette */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-500 w-12">Color</span>
+                <Select value={gridColorMode} onValueChange={(value: any) => setGridColorMode(value)}>
+                  <SelectTrigger className="h-7 w-28 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="random">Random</SelectItem>
+                    <SelectItem value="palette">Palette</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            )}
+
+              {gridColorMode === 'palette' && (
+                <div className="flex items-center gap-1.5">
+                  {gridCustomColors.map((color, index) => (
+                    <div key={index} className="relative group">
+                      <input
+                        type="color"
+                        value={color}
+                        onChange={(e) => handleColorChange(index, e.target.value)}
+                        className="h-7 w-7 border border-gray-300 rounded cursor-pointer"
+                        title={color}
+                      />
+                      <button
+                        onClick={() => handleRemoveColor(index)}
+                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {gridCustomColors.length < 5 && (
+                    <Button
+                      onClick={handleAddColor}
+                      variant="outline"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-xs"
+                      title="Add color"
+                    >
+                      +
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )
       })()}

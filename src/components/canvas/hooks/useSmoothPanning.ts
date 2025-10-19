@@ -8,6 +8,7 @@ interface UseSmoothPanningProps {
   duration?: number; // milliseconds
   isUserDragging?: boolean; // True when user is actively dragging/panning
   isZooming?: boolean; // True when user is actively zooming
+  shouldAnimate?: boolean; // True when the pan should be animated
 }
 
 const ANIMATION_DURATION = 300; // Default 300ms for smooth panning
@@ -23,6 +24,7 @@ export const useSmoothPanning = ({
   duration = ANIMATION_DURATION,
   isUserDragging = false,
   isZooming = false,
+  shouldAnimate = false,
 }: UseSmoothPanningProps) => {
   const animationFrameRef = useRef<number | null>(null);
   const lastTargetRef = useRef<{ x: number; y: number }>({ x: targetX, y: targetY });
@@ -46,8 +48,8 @@ export const useSmoothPanning = ({
       return;
     }
 
+    // Cancel animation if user starts dragging or zooming
     if (isUserDragging || isZooming) {
-      // Cancel animation if user starts dragging or zooming
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -65,7 +67,7 @@ export const useSmoothPanning = ({
       return;
     }
 
-    // Only animate if position actually changed and target is different
+    // Only animate if position actually changed, target is different, AND shouldAnimate is true
     if (currentX !== targetX || currentY !== targetY ||
         lastTargetRef.current.x !== targetX || lastTargetRef.current.y !== targetY) {
       // Cancel any ongoing animation
@@ -73,6 +75,16 @@ export const useSmoothPanning = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
 
+      // If shouldAnimate is false, jump directly to target position
+      if (!shouldAnimate) {
+        stage.x(targetX);
+        stage.y(targetY);
+        stage.draw();
+        lastTargetRef.current = { x: targetX, y: targetY };
+        return;
+      }
+
+      // Animate to target position
       const startX = currentX;
       const startY = currentY;
       const startTime = performance.now();
@@ -109,5 +121,5 @@ export const useSmoothPanning = ({
     return () => {
       // Cleanup is handled by the dependency array changes
     };
-  }, [stageRef, targetX, targetY, isUserDragging, isZooming, duration]);
+  }, [stageRef, targetX, targetY, isUserDragging, isZooming, shouldAnimate, duration]);
 };

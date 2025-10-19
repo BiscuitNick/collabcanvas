@@ -60,7 +60,7 @@ const Canvas: React.FC<CanvasProps> = ({
   isCreatingShape = false,
 }) => {
   const stageRef = useRef<Konva.Stage>(null);
-  const { stagePosition, stageScale, isZooming, isDraggingShape, isPanning, selectedContentId, setDraggingShape } = useCanvasStore();
+  const { stagePosition, stageScale, isZooming, isDraggingShape, isPanning, shouldAnimatePan, selectedContentId, setDraggingShape } = useCanvasStore();
   // Use selectedContentId directly instead of the getter selectedShapeId for proper reactivity
   const selectedShapeId = selectedContentId;
 
@@ -110,6 +110,7 @@ const Canvas: React.FC<CanvasProps> = ({
     duration: 300,
     isUserDragging: isPanning, // Disable animation during user dragging
     isZooming: isZooming, // Disable animation during user zooming
+    shouldAnimate: shouldAnimatePan, // Only animate when explicitly requested
   });
 
   const renderedShapes = useMemo(() => {
@@ -138,8 +139,6 @@ const Canvas: React.FC<CanvasProps> = ({
           ref={stageRef}
           width={width}
           height={height}
-          x={stagePosition.x}
-          y={stagePosition.y}
           scaleX={stageScale}
           scaleY={stageScale}
           draggable={!isZooming && !isDraggingShape && !selectedShapeId}

@@ -6,26 +6,28 @@ interface CanvasState {
   // Stage position and scale
   stagePosition: { x: number; y: number }
   stageScale: number
-  
+
   // Content array
   content: Content[]
-  
+
   // Interaction states
   isPanning: boolean
   isZooming: boolean
   isDraggingContent: boolean
-  
+  shouldAnimatePan: boolean
+
   // Selected content
   selectedContentId: string | null
-  
+
   // Sync status for each content
   contentSyncStatus: Record<string, SyncStatus>
-  
+
   // Pending updates queue for offline operations
   pendingUpdates: Map<string, Partial<Content>>
-  
+
   // Actions
   updatePosition: (x: number, y: number) => void
+  updatePositionAnimated: (x: number, y: number) => void
   updateScale: (scale: number) => void
   setPanning: (isPanning: boolean) => void
   setZooming: (isZooming: boolean) => void
@@ -65,13 +67,18 @@ export const useCanvasStore = create<CanvasState>()(
   isPanning: false,
   isZooming: false,
   isDraggingContent: false,
+  shouldAnimatePan: false,
   selectedContentId: null,
   contentSyncStatus: {},
   pendingUpdates: new Map(),
-  
+
   // Actions
   updatePosition: (x: number, y: number) => {
-    set({ stagePosition: { x, y } })
+    set({ stagePosition: { x, y }, shouldAnimatePan: false })
+  },
+
+  updatePositionAnimated: (x: number, y: number) => {
+    set({ stagePosition: { x, y }, shouldAnimatePan: true })
   },
   
   updateScale: (scale: number) => {

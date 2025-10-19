@@ -75,7 +75,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 }) => {
   useKeyboardShortcuts()
   const { user } = useAuth()
-  const { selectShape, resetView, selectedContentId, updatePosition, stageScale } = useCanvasStore()
+  const { selectShape, resetView, selectedContentId, updatePositionAnimated, stageScale } = useCanvasStore()
 
   // Convert presence array to a Map for efficient user lookup
   const usersMap = React.useMemo(() => {
@@ -257,8 +257,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     // accounting for current zoom level
     const desiredX = (canvasSize.width / 2) - (x * stageScale)
     const desiredY = (canvasSize.height / 2) - (y * stageScale)
-    updatePosition(desiredX, desiredY)
-  }, [canvasSize.width, canvasSize.height, stageScale, updatePosition])
+    updatePositionAnimated(desiredX, desiredY) // Use animated pan when clicking layers
+  }, [canvasSize.width, canvasSize.height, stageScale, updatePositionAnimated])
 
   // Reopen properties pane
   const reopenPropertiesPane = useCallback(() => {

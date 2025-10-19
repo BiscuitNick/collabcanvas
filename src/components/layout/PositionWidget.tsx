@@ -13,7 +13,7 @@ interface PositionWidgetProps {
 
 const PositionWidget: React.FC<PositionWidgetProps> = ({ className }) => {
   const [isVisible, setIsVisible] = useState(true)
-  const { stagePosition, stageScale, updatePosition, updateScale, selectedContentId, content } = useCanvasStore()
+  const { stagePosition, stageScale, updatePosition, updatePositionAnimated, updateScale, selectedContentId, content } = useCanvasStore()
   
   // Calculate viewport center coordinates in canvas space (where canvas center is 0,0)
   const getViewportCenter = useCallback(() => {
@@ -90,7 +90,7 @@ const PositionWidget: React.FC<PositionWidgetProps> = ({ className }) => {
     const viewportHeight = window.innerHeight
     const centerX = viewportWidth / 2
     const centerY = viewportHeight / 2
-    updatePosition(centerX, centerY)
+    updatePositionAnimated(centerX, centerY) // Use animated pan for reset
     updateScale(1) // Reset zoom to 100%
     setXValue(0)
     setYValue(0)

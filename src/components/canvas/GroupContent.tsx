@@ -7,6 +7,12 @@ import { clamp } from '../../lib/utils'
 import { CANVAS_HALF, MIN_SHAPE_SIZE, MAX_SHAPE_SIZE } from '../../lib/constants'
 import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS, LOCK_INDICATOR_STROKE_WIDTH } from '../../lib/config'
 
+interface LockInfo {
+  userId: string
+  userName: string
+  lockedItemId: string | null
+}
+
 interface GroupContentProps {
   content: GroupContent
   isSelected: boolean
@@ -20,6 +26,8 @@ interface GroupContentProps {
   selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null
   canEdit?: boolean
   enableGroupCaching?: boolean
+  isLockedByOther?: boolean
+  lockInfo?: LockInfo | null
 }
 
 const GroupContentComponent: React.FC<GroupContentProps> = memo(({
@@ -31,19 +39,18 @@ const GroupContentComponent: React.FC<GroupContentProps> = memo(({
   onDragEnd,
   onDragStart,
   onDragEndCallback,
-  currentUserId,
+  currentUserId: _currentUserId,
   selectedTool,
   canEdit = true,
   enableGroupCaching = false,
+  isLockedByOther = false,
+  lockInfo: _lockInfo = null,
 }) => {
   const groupRef = useRef<Konva.Group>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
   const lastUpdateRef = useRef<number>(0)
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingUpdateRef = useRef<{ x: number; y: number } | null>(null)
-
-  // Check if content is locked by another user
-  const isLockedByOther = content.lockedByUserId && content.lockedByUserId !== currentUserId
 
   // Throttled drag move function
   const throttledDragMove = useCallback((x: number, y: number) => {
@@ -370,7 +377,7 @@ const GroupContentComponent: React.FC<GroupContentProps> = memo(({
           width={content.width}
           height={content.height}
           fill="transparent"
-          stroke={isLockedByOther ? (content.lockedByUserColor || '#FF0000') : (isSelected ? '#007AFF' : 'transparent')}
+          stroke={isLockedByOther ? '#FF0000' : (isSelected ? '#007AFF' : 'transparent')}
           strokeWidth={isLockedByOther ? LOCK_INDICATOR_STROKE_WIDTH : (isSelected ? 2 : 0)}
           listening={true}
         />

@@ -52,7 +52,6 @@ export const useRTDBCursors = (canvasId: string | null) => {
           await set(cursorRef, cursorData)
           lastUpdateRef.current = Date.now()
         } catch (error) {
-          console.error('Error updating cursor:', error)
         }
       }
 
@@ -88,11 +87,9 @@ export const useRTDBCursors = (canvasId: string | null) => {
     // Check if RTDB is enabled (via localStorage)
     const enableRTDB = localStorage.getItem('enableRTDB')
     if (enableRTDB === 'false') {
-      console.log('🚫 [RTDB Cursors] RTDB disabled via localStorage')
       return
     }
 
-    console.log('✅ [RTDB Cursors] Listening for cursor updates')
 
     const paths = getRTDBPaths(canvasId)
     const cursorsRef = ref(database, paths.cursors)

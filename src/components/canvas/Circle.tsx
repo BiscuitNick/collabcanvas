@@ -6,6 +6,12 @@ import { clamp } from '../../lib/utils'
 import { CANVAS_HALF, MIN_SHAPE_SIZE, MAX_SHAPE_SIZE } from '../../lib/constants'
 import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS, LOCK_INDICATOR_STROKE_WIDTH } from '../../lib/config'
 
+interface LockInfo {
+  userId: string
+  userName: string
+  lockedItemId: string | null
+}
+
 interface CircleProps {
   shape: Circle
   isSelected: boolean
@@ -18,6 +24,8 @@ interface CircleProps {
   currentUserId?: string
   selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null
   canEdit?: boolean
+  isLockedByOther?: boolean
+  lockInfo?: LockInfo | null
 }
 
 const CircleComponent: React.FC<CircleProps> = memo(({
@@ -29,18 +37,17 @@ const CircleComponent: React.FC<CircleProps> = memo(({
   onDragEnd,
   onDragStart,
   onDragEndCallback,
-  currentUserId,
+  currentUserId: _currentUserId,
   selectedTool,
   canEdit = true,
+  isLockedByOther = false,
+  lockInfo: _lockInfo = null,
 }) => {
   const circleRef = useRef<Konva.Circle>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
   const lastUpdateRef = useRef<number>(0)
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingUpdateRef = useRef<{ x: number; y: number } | null>(null)
-
-  // Check if shape is locked by another user
-  const isLockedByOther = shape.lockedByUserId && shape.lockedByUserId !== currentUserId
   
   // Implement radius fallback
   const effectiveRadius = shape.radius || 50 // Fallback to 50 if radius is undefined/null
@@ -224,7 +231,7 @@ const CircleComponent: React.FC<CircleProps> = memo(({
         y={shape.y}
         radius={effectiveRadius}
         fill={shape.fill}
-        stroke={isLockedByOther ? (shape.lockedByUserColor || '#FF0000') : (shape.stroke || 'transparent')}
+        stroke={isLockedByOther ? '#FF0000' : (shape.stroke || 'transparent')}
         strokeWidth={isLockedByOther ? LOCK_INDICATOR_STROKE_WIDTH : (shape.strokeWidth || 0)}
         shadowColor="rgba(0, 0, 0, 0.1)"
         shadowBlur={4}
@@ -284,7 +291,7 @@ const CircleComponent: React.FC<CircleProps> = memo(({
           anchorStroke="#007AFF"
           anchorFill="#FFFFFF"
           anchorStrokeWidth={2}
-          borderStroke={isLockedByOther ? (shape.lockedByUserColor || '#FF0000') : '#007AFF'}
+          borderStroke={isLockedByOther ? '#FF0000' : '#007AFF'}
           borderStrokeWidth={2}
           borderDash={[5, 5]}
           rotateEnabled={false} // No rotation for circles as per requirements

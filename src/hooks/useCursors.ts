@@ -21,7 +21,7 @@ interface UseCursorsReturn {
   error: string | null
 }
 
-export const useCursors = (userId: string, userName: string, stagePosition?: { x: number; y: number }, viewportWidth?: number, viewportHeight?: number, stageScale?: number): UseCursorsReturn => {
+export const useCursors = (userId: string, userName: string): UseCursorsReturn => {
   const canvasId = useCanvasId()
   const [cursors, setCursors] = useState<Cursor[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -119,19 +119,12 @@ export const useCursors = (userId: string, userName: string, stagePosition?: { x
               lastUpdated: lastUpdated
             }
             
-            // Check if cursor is within viewport for performance
-            // Cursors are stored in canvas coordinates, so check against canvas viewport bounds
-            const isInViewport = stagePosition && viewportWidth && viewportHeight && stageScale
-              ? cursor.x >= -stagePosition.x / stageScale &&
-                cursor.x <= (-stagePosition.x + viewportWidth) / stageScale &&
-                cursor.y >= -stagePosition.y / stageScale &&
-                cursor.y <= (-stagePosition.y + viewportHeight) / stageScale
-              : true // Include all if viewport info not available
-            
-            // Include cursor with visibility info
+            // Don't do viewport culling for cursors - there are very few of them
+            // and the complexity of getting the viewport calculation right isn't worth it
+            // Cursors are already filtered by time (30 second threshold above)
             cursorsData.push({
               ...cursor,
-              isVisible: isInViewport,
+              isVisible: true, // Always visible
               isCurrentUser: cursor.userId === userId
             })
           })
@@ -155,7 +148,7 @@ export const useCursors = (userId: string, userName: string, stagePosition?: { x
     )
 
     return () => unsubscribe()
-  }, [userId, stagePosition, stageScale, viewportHeight, viewportWidth, canvasId])
+  }, [userId, canvasId])
 
   // Clean up on unmount
   useEffect(() => {

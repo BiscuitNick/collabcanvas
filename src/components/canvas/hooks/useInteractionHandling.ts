@@ -164,17 +164,17 @@ export const useInteractionHandling = ({
     const canvasPoint = transform.point({ x: pointerPosition.x, y: pointerPosition.y });
 
     if (clickedOnEmpty) {
-      // Clicked on empty canvas area
-      // Use setSelection for RTDB-based deselection and unlocking
+      // Clicked on empty canvas area - deselect and unlock
+      // Always deselect current shape first (updates local state immediately)
+      selectShape(null);
+
+      // Use setSelection for RTDB-based unlocking
       if (setSelection) {
         setSelection(null);  // This will handle unlocking and clearing selection in RTDB
       } else if (selectedContentId && unlockShape) {
         // Fallback to old unlocking mechanism
         unlockShape(selectedContentId);
       }
-
-      // Always deselect current shape when clicking empty canvas or placing new shape
-      selectShape(null);
 
       // If creating a shape or using grid tool, trigger the canvas click callback
       if ((isCreatingShape || selectedTool === 'grid') && onCanvasClick) {

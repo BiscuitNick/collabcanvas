@@ -181,6 +181,8 @@ export const useCanvasStore = create<CanvasState>()(
   },
   
   resetView: () => {
+    // Note: This resets to origin (0, 0) at top-left
+    // The actual centering happens in useSmoothPanning when the canvas size is known
     set({
       stagePosition: { x: 0, y: 0 },
       stageScale: 1,

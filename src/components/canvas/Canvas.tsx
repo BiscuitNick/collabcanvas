@@ -11,6 +11,8 @@ import { useInteractionHandling } from './hooks/useInteractionHandling';
 import { useShapeHandling } from './hooks/useShapeHandling';
 import { useViewportCulling } from './hooks/useViewportCulling';
 import { useSmoothPanning } from './hooks/useSmoothPanning';
+import { useRTDBUserLocks } from '../../hooks/rtdb/useRTDBUserLocks';
+import { useCanvasId } from '../../contexts/CanvasContext';
 
 export interface CanvasProps {
   width: number;
@@ -68,9 +70,13 @@ const Canvas: React.FC<CanvasProps> = ({
   enableGroupCaching = false,
 }) => {
   const stageRef = useRef<Konva.Stage>(null);
+  const canvasId = useCanvasId();
   const { stagePosition, stageScale, isZooming, isDraggingShape, isPanning, shouldAnimatePan, selectedContentId, setDraggingShape } = useCanvasStore();
   // Use selectedContentId directly instead of the getter selectedShapeId for proper reactivity
   const selectedShapeId = selectedContentId;
+
+  // Get lock info from presence data only
+  const { getItemLock } = useRTDBUserLocks(canvasId);
 
   useCursorContext({
     selectedTool: selectedTool || null,
@@ -80,8 +86,6 @@ const Canvas: React.FC<CanvasProps> = ({
   });
 
   const { handleShapeSelect, handleShapeUpdate, handleShapeDragStart, handleShapeDragMove, handleShapeDragEnd } = useShapeHandling({
-    content,
-    currentUserId,
     updateShape,
     lockShape,
     unlockShape,
@@ -126,24 +130,28 @@ const Canvas: React.FC<CanvasProps> = ({
   });
 
   const renderedShapes = useMemo(() => {
-    return visibleShapes.map((shape) => (
-      <ShapeFactory
-        key={shape.id}
-        shape={shape}
-        isSelected={selectedShapeId === shape.id}
-        onSelect={() => handleShapeSelect(shape.id)}
-        onUpdate={(updates) => handleShapeUpdate(shape.id, updates)}
-        onDragMove={(x, y) => handleShapeDragMove(shape.id, x, y)}
-        onDragEnd={(x, y) => handleShapeDragEnd(shape.id, x, y)}
-        onDragStart={() => handleShapeDragStart(shape.id)}
-        onDragEndCallback={() => setDraggingShape(false)}
-        currentUserId={currentUserId}
-        selectedTool={selectedTool}
-        canEdit={canEdit}
-        enableGroupCaching={enableGroupCaching}
-      />
-    ));
-  }, [visibleShapes, selectedShapeId, handleShapeSelect, handleShapeUpdate, handleShapeDragMove, handleShapeDragEnd, handleShapeDragStart, setDraggingShape, currentUserId, selectedTool, canEdit, enableGroupCaching]);
+    return visibleShapes.map((shape) => {
+      const lockInfo = getItemLock(shape.id);
+      return (
+        <ShapeFactory
+          key={shape.id}
+          shape={shape}
+          isSelected={selectedShapeId === shape.id}
+          onSelect={() => handleShapeSelect(shape.id)}
+          onUpdate={(updates) => handleShapeUpdate(shape.id, updates)}
+          onDragMove={(x, y) => handleShapeDragMove(shape.id, x, y)}
+          onDragEnd={(x, y) => handleShapeDragEnd(shape.id, x, y)}
+          onDragStart={() => handleShapeDragStart(shape.id)}
+          onDragEndCallback={() => setDraggingShape(false)}
+          currentUserId={currentUserId}
+          selectedTool={selectedTool}
+          canEdit={canEdit}
+          enableGroupCaching={enableGroupCaching}
+          lockInfo={lockInfo}
+        />
+      );
+    });
+  }, [visibleShapes, selectedShapeId, handleShapeSelect, handleShapeUpdate, handleShapeDragMove, handleShapeDragEnd, handleShapeDragStart, setDraggingShape, currentUserId, selectedTool, canEdit, enableGroupCaching, getItemLock]);
 
 
   return (

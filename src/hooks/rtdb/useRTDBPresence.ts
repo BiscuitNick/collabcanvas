@@ -12,6 +12,7 @@ interface PresenceData {
   photoURL: string | null
   joinedAt: number
   lastSeen: number
+  lockedItemId: string | null  // Track which single item this user has locked
 }
 
 export const useRTDBPresence = (canvasId: string | null) => {
@@ -27,11 +28,9 @@ export const useRTDBPresence = (canvasId: string | null) => {
     // Check if RTDB is enabled (via localStorage)
     const enableRTDB = localStorage.getItem('enableRTDB')
     if (enableRTDB === 'false') {
-      console.log('🚫 [RTDB Presence] RTDB disabled via localStorage')
       return
     }
 
-    console.log('✅ [RTDB Presence] Initializing presence for user:', user.uid)
 
     const paths = getRTDBPaths(canvasId, user.uid)
     const presenceRef = ref(database, paths.userPresence)
@@ -45,6 +44,7 @@ export const useRTDBPresence = (canvasId: string | null) => {
       photoURL: user.photoURL || null,
       joinedAt: Date.now(),
       lastSeen: Date.now(),
+      lockedItemId: null,  // No item locked initially
     }
 
     const updatePresence = async () => {
@@ -55,7 +55,6 @@ export const useRTDBPresence = (canvasId: string | null) => {
           lastSeen: Date.now(),
         })
       } catch (error) {
-        console.error('Error updating presence:', error)
       }
     }
 
@@ -68,7 +67,6 @@ export const useRTDBPresence = (canvasId: string | null) => {
         const disconnectRef = onDisconnect(presenceRef)
         await disconnectRef.remove()
       } catch (error) {
-        console.error('Error initializing presence:', error)
       }
     }
 

@@ -13,7 +13,7 @@ export const useContent = () => {
     isCreatingContent,
     user?.uid
   );
-  const { lockContent, unlockContent } = useContentLocking(content);
+  const { lockContent, unlockContent } = useContentLocking();
 
   const retry = () => {
     // This needs to be implemented to re-trigger the firestore sync

@@ -4,8 +4,6 @@ import { useCanvasStore } from '../../../store/canvasStore';
 import type { Content } from '../../../types';
 
 interface ShapeHandlingProps {
-  content: Content[];
-  currentUserId?: string;
   updateShape: (id: string, updates: Partial<Content>, immediate?: boolean) => Promise<void>;
   lockShape?: (id: string) => Promise<void>;
   unlockShape?: (id: string) => Promise<void>;
@@ -18,8 +16,6 @@ interface ShapeHandlingProps {
 }
 
 export const useShapeHandling = ({
-  content,
-  currentUserId,
   updateShape,
   lockShape,
   unlockShape,
@@ -36,15 +32,8 @@ export const useShapeHandling = ({
 
   const handleShapeSelect = useCallback(
     async (shapeId: string) => {
-      const shape = content.find((s) => s.id === shapeId);
-      const isLockedByOther = shape?.lockedByUserId && shape.lockedByUserId !== currentUserId;
-
-      // Don't allow selection if locked by another user
-      if (isLockedByOther) {
-        console.log('🔒 [Lock] Cannot select - locked by:', shape?.lockedByUserName || shape?.lockedByUserId);
-        // Don't update selection state if locked
-        return;
-      }
+      // Lock checking is now handled by components via lockInfo prop
+      // Components will prevent selection of locked items
 
       // Clear previous selection if different
       if (selectedShapeId && selectedShapeId !== shapeId) {
@@ -62,73 +51,43 @@ export const useShapeHandling = ({
       // Acquire lock for the new selection
       if (setSelection) {
         await setSelection(shapeId);
-        console.log('✅ [Lock] Selection set for:', shapeId);
       } else if (lockShape) {
         // Fallback to old locking mechanism
         await lockShape(shapeId);
       }
     },
-    [selectShape, lockShape, unlockShape, setSelection, selectedShapeId, content, currentUserId]
+    [selectShape, lockShape, unlockShape, setSelection, selectedShapeId]
   );
 
   const handleShapeUpdate = useCallback(
     (shapeId: string, updates: Partial<Content>) => {
-      // Check if shape is locked by another user
-      const shape = content.find((s) => s.id === shapeId);
-      const isLockedByOther = shape?.lockedByUserId && shape.lockedByUserId !== currentUserId;
-
-      if (isLockedByOther) {
-        console.log('🔒 [Lock] Cannot update - locked by:', shape?.lockedByUserName || shape?.lockedByUserId);
-        return;
-      }
-
+      // Lock checking is now handled by components via lockInfo prop
       updateShape(shapeId, updates);
     },
-    [updateShape, content, currentUserId]
+    [updateShape]
   );
 
   const handleShapeDragStart = useCallback(
     (shapeId: string) => {
-      // Check if shape is locked by another user
-      const shape = content.find((s) => s.id === shapeId);
-      const isLockedByOther = shape?.lockedByUserId && shape.lockedByUserId !== currentUserId;
-
-      if (isLockedByOther) {
-        console.log('🔒 [Lock] Cannot drag - locked by:', shape?.lockedByUserName || shape?.lockedByUserId);
-        return;
-      }
-
+      // Lock checking is now handled by components via lockInfo prop
       setDraggingShape(true);
       startEditingShape?.(shapeId);
       onDragStart?.();
     },
-    [startEditingShape, onDragStart, setDraggingShape, content, currentUserId]
+    [startEditingShape, onDragStart, setDraggingShape]
   );
 
   const handleShapeDragMove = useCallback(
     (shapeId: string, x: number, y: number) => {
-      // Check if shape is locked by another user
-      const shape = content.find((s) => s.id === shapeId);
-      const isLockedByOther = shape?.lockedByUserId && shape.lockedByUserId !== currentUserId;
-
-      if (isLockedByOther) {
-        return;
-      }
-
+      // Lock checking is now handled by components via lockInfo prop
       updateShape(shapeId, { x, y });
     },
-    [updateShape, content, currentUserId]
+    [updateShape]
   );
 
   const handleShapeDragEnd = useCallback(
     async (shapeId: string, x: number, y: number) => {
-      // Check if shape is locked by another user
-      const shape = content.find((s) => s.id === shapeId);
-      const isLockedByOther = shape?.lockedByUserId && shape.lockedByUserId !== currentUserId;
-
-      if (isLockedByOther) {
-        return;
-      }
+      // Lock checking is now handled by components via lockInfo prop
 
       // Update position with immediate flag to sync RTDB immediately
       await updateShape(shapeId, { x, y }, true);
@@ -141,7 +100,7 @@ export const useShapeHandling = ({
 
       onDragEnd?.();
     },
-    [updateShape, stopEditingShape, onDragEnd, flushToFirestore, content, currentUserId]
+    [updateShape, stopEditingShape, onDragEnd, flushToFirestore]
   );
 
   return {

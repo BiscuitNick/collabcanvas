@@ -6,6 +6,12 @@ import { clamp } from '../../lib/utils'
 import { CANVAS_HALF, MIN_SHAPE_SIZE, MAX_SHAPE_SIZE } from '../../lib/constants'
 import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS, LOCK_INDICATOR_STROKE_WIDTH } from '../../lib/config'
 
+interface LockInfo {
+  userId: string
+  userName: string
+  lockedItemId: string | null
+}
+
 interface RectangleProps {
   shape: Rectangle
   isSelected: boolean
@@ -18,6 +24,8 @@ interface RectangleProps {
   currentUserId?: string
   selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null
   canEdit?: boolean
+  isLockedByOther?: boolean
+  lockInfo?: LockInfo | null
 }
 
 const RectangleComponent: React.FC<RectangleProps> = memo(({
@@ -29,18 +37,17 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   onDragEnd,
   onDragStart,
   onDragEndCallback,
-  currentUserId,
+  currentUserId: _currentUserId,
   selectedTool,
   canEdit = true,
+  isLockedByOther = false,
+  lockInfo = null,
 }) => {
   const rectRef = useRef<Konva.Rect>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
   const lastUpdateRef = useRef<number>(0)
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingUpdateRef = useRef<{ x: number; y: number } | null>(null)
-
-  // Check if shape is locked by another user
-  const isLockedByOther = shape.lockedByUserId && shape.lockedByUserId !== currentUserId
 
   // Canvas bounds - 64000x64000 with center at (0,0) for infinite feel
   // Moved to src/lib/constants.ts
@@ -102,19 +109,8 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   }, [])
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    // Log shape click
-    console.log('🖱️ Canvas clicked - Shape:', {
-      type: 'rectangle',
-      id: shape.id,
-      x: shape.x.toFixed(2),
-      y: shape.y.toFixed(2),
-      lockedBy: shape.lockedByUserId || 'none',
-      currentUser: currentUserId
-    })
-
     // Prevent selection if locked by another user
     if (isLockedByOther) {
-      console.log('🔒 Cannot select - locked by', shape.lockedByUserName || shape.lockedByUserId)
       // IMPORTANT: Must stop propagation to prevent canvas panning!
       e.cancelBubble = true
       e.evt.stopPropagation()
@@ -126,7 +122,6 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
 
     if (!allowSelection) {
       // Don't stop propagation - let the tool action happen
-      console.log('🔧 Tool active - passing click through to canvas')
       return
     }
 
@@ -255,7 +250,7 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
         offsetY={shape.height / 2}
         rotation={shape.rotation}
         fill={shape.fill}
-        stroke={isLockedByOther ? (shape.lockedByUserColor || '#FF0000') : (isSelected ? '#007AFF' : 'transparent')}
+        stroke={isLockedByOther ? '#FF0000' : (isSelected ? '#007AFF' : 'transparent')}
         strokeWidth={isLockedByOther ? LOCK_INDICATOR_STROKE_WIDTH : (isSelected ? 2 : 0)}
         shadowColor="rgba(0, 0, 0, 0.1)"
         shadowBlur={4}
@@ -322,11 +317,11 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
               fill="white"
             />
             {/* Lock owner label */}
-            {shape.lockedByUserName && (
+            {lockInfo?.userName && (
               <Text
                 x={shape.width / 2 - 50}
                 y={-25}
-                text={`Locked by ${shape.lockedByUserName}`}
+                text={`Locked by ${lockInfo.userName}`}
                 fontSize={12}
                 fill="#FF4444"
                 stroke="white"

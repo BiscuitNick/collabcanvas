@@ -11,11 +11,6 @@ export interface BaseContent {
   // Visual properties
   opacity?: number; // 0-1, default 1
   rotation?: number; // degrees, default 0
-  // Collaborative locking (optional)
-  lockedByUserId?: string | null;
-  lockedByUserName?: string | null;
-  lockedByUserColor?: string | null;
-  lockedAt?: number | Date | null;
   // Last edited tracking for collaborative features
   lastEditedBy?: string | null;
   lastEditedAt?: number | Date | null;

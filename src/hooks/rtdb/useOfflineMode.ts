@@ -56,9 +56,6 @@ export const useOfflineMode = (
       setQueuedUpdates((prev) => {
         // Check if we've hit the queue size limit
         if (prev.length >= maxQueueSize) {
-          console.warn(
-            `Offline queue is full (${maxQueueSize} items). Dropping oldest update.`
-          )
           // Drop the oldest update
           prev = prev.slice(1)
         }
@@ -103,8 +100,6 @@ export const useOfflineMode = (
     isSyncingRef.current = true
 
     try {
-      console.log(`Syncing ${queuedUpdates.length} queued updates to Firestore...`)
-
       // Sort by timestamp (oldest first)
       const sorted = [...queuedUpdates].sort((a, b) => a.timestamp - b.timestamp)
 
@@ -113,17 +108,15 @@ export const useOfflineMode = (
         try {
           await updateContentInFirestore(itemId, updates)
         } catch (error) {
-          console.error(`Error syncing update for ${itemId}:`, error)
+          // Silently fail
         }
       }
 
       // Clear queue
       setQueuedUpdates([])
       onQueueSynced?.(sorted.length)
-
-      console.log('Queue synced successfully')
     } catch (error) {
-      console.error('Error syncing queued updates:', error)
+      // Silently fail
     } finally {
       isSyncingRef.current = false
     }
@@ -150,11 +143,8 @@ export const useOfflineMode = (
       onConnectionChange?.(connected)
 
       if (connected) {
-        console.log('RTDB connection established')
         // Sync queued updates when connection is restored
         syncQueuedUpdates()
-      } else {
-        console.log('RTDB connection lost - entering offline mode')
       }
     })
 

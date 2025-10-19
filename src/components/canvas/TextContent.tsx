@@ -6,6 +6,12 @@ import { clamp } from '../../lib/utils'
 import { CANVAS_HALF } from '../../lib/constants'
 import { LOCK_INDICATOR_STROKE_WIDTH } from '../../lib/config'
 
+interface LockInfo {
+  userId: string
+  userName: string
+  lockedItemId: string | null
+}
+
 interface TextContentProps {
   content: TextContent
   isSelected: boolean
@@ -18,6 +24,8 @@ interface TextContentProps {
   currentUserId?: string
   selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null
   canEdit?: boolean
+  isLockedByOther?: boolean
+  lockInfo?: LockInfo | null
 }
 
 const TextContentComponent: React.FC<TextContentProps> = memo(({
@@ -29,18 +37,17 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
   onDragEnd,
   onDragStart,
   onDragEndCallback,
-  currentUserId,
+  currentUserId: _currentUserId,
   selectedTool,
   canEdit = true,
+  isLockedByOther = false,
+  lockInfo: _lockInfo = null,
 }) => {
   const textRef = useRef<Konva.Text>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
   const lastUpdateRef = useRef<number>(0)
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingUpdateRef = useRef<{ x: number; y: number } | null>(null)
-
-  // Check if content is locked by another user
-  const isLockedByOther = content.lockedByUserId && content.lockedByUserId !== currentUserId
 
   // Throttled drag move function
   const throttledDragMove = useCallback((x: number, y: number) => {
@@ -239,7 +246,7 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
         fontFamily={content.fontFamily}
         fontStyle={content.fontStyle}
         fill={content.fill}
-        stroke={isLockedByOther ? (content.lockedByUserColor || '#FF0000') : undefined}
+        stroke={isLockedByOther ? '#FF0000' : undefined}
         strokeWidth={isLockedByOther ? LOCK_INDICATOR_STROKE_WIDTH : 0}
         rotation={content.rotation || 0}
         align={content.textAlign || 'left'}

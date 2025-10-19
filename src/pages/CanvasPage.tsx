@@ -69,12 +69,22 @@ const CanvasPageContent: React.FC = () => {
   const stopEditingShape = stopEditingContent
   const setVisibleShapesCount = setVisibleContentCount
 
-  const { stagePosition, stageScale, updatePosition } = useCanvasStore()
-  
+  const { stageScale, updatePosition } = useCanvasStore()
+
+  // Reset view when switching to a different canvas
+  // Center world (0, 0) at the screen center
+  useEffect(() => {
+    if (canvasSize.width > 0 && canvasSize.height > 0) {
+      // To show world coordinate (0, 0) at the center of the screen,
+      // set stage position to (width/2, height/2)
+      updatePosition(canvasSize.width / 2, canvasSize.height / 2)
+    }
+  }, [canvasId, canvasSize.width, canvasSize.height, updatePosition])
+
   const {
     cursors,
     updateCursor
-  } = useCursors(user?.uid || '', user?.displayName || 'Anonymous', stagePosition, canvasSize.width, canvasSize.height, stageScale)
+  } = useCursors(user?.uid || '', user?.displayName || 'Anonymous')
 
   const {
     presenceUsers

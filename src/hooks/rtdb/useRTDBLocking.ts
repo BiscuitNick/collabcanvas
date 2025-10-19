@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { ref, set, get, remove, onValue } from 'firebase/database'
 import { database } from '../../lib/firebase'
-import { getRTDBPaths, LOCK_TIMEOUT_MS, LOCK_HEARTBEAT_INTERVAL } from '../../lib/rtdb-config'
+import { getRTDBPaths, LOCK_HEARTBEAT_INTERVAL, PRESENCE_OFFLINE_THRESHOLD, LOCK_TIMEOUT_MS } from '../../lib/rtdb-config'
 import { useAuth } from '../useAuth'
 
 interface LockData {
@@ -43,48 +43,54 @@ export const useRTDBLocking = (
       if (!canvasId || !user) return false
 
       const paths = getRTDBPaths(canvasId)
-      const lockRef = ref(database, paths.itemLock(itemId))
+      const presenceRef = ref(database, `${paths.presence}/${user.uid}`)
 
       try {
-        // Check if lock exists
-        const lockSnapshot = await get(lockRef)
-        const existingLock = lockSnapshot.val() as LockData | null
+        // Check if another user has this item locked via presence
+        const allPresenceRef = ref(database, paths.presence)
+        const presenceSnapshot = await get(allPresenceRef)
+        const allPresence = presenceSnapshot.val() as Record<string, {
+          userId: string
+          userName: string
+          lockedItemId: string | null
+          lastSeen: number
+        }> | null
 
         const now = Date.now()
 
-        // If lock exists and is not stale and not owned by current user
-        if (existingLock) {
-          const isStale = now - existingLock.lastHeartbeat > LOCK_TIMEOUT_MS
-          const isOwnedByCurrentUser = existingLock.userId === user.uid
-
-          if (!isStale && !isOwnedByCurrentUser) {
-            // Lock is held by another user
-            callbacks?.onLockFailed?.(itemId, existingLock)
-            return false
+        // Check if someone else has this item locked
+        if (allPresence) {
+          for (const [userId, presence] of Object.entries(allPresence)) {
+            if (userId === user.uid) continue  // Skip self
+            if (presence.lockedItemId === itemId) {
+              // Check if they're still active
+              if (now - presence.lastSeen <= PRESENCE_OFFLINE_THRESHOLD) {
+                // Item is locked by active user
+                return false
+              }
+            }
           }
         }
 
-        // Acquire lock
-        const lockData: LockData = {
+        // Acquire lock by updating presence with locked item ID
+        await set(presenceRef, {
           userId: user.uid,
           userName: user.displayName || 'Anonymous',
           color: '#' + Math.floor(Math.random()*16777215).toString(16),
-          lockedAt: now,
-          lastHeartbeat: now,
-        }
+          photoURL: user.photoURL || null,
+          joinedAt: now,
+          lastSeen: now,
+          lockedItemId: itemId,  // Single source of truth for locked item
+        })
 
-        await set(lockRef, lockData)
         lockedItemsRef.current.add(itemId)
 
-        // Start heartbeat to keep lock alive
+        // Start heartbeat to keep presence alive (which keeps lock alive)
         const heartbeatInterval = setInterval(async () => {
           try {
-            await set(lockRef, {
-              ...lockData,
-              lastHeartbeat: Date.now(),
-            })
+            const presenceUpdateRef = ref(database, `${paths.presence}/${user.uid}/lastSeen`)
+            await set(presenceUpdateRef, Date.now())
           } catch (error) {
-            console.error('Error updating lock heartbeat:', error)
           }
         }, LOCK_HEARTBEAT_INTERVAL)
 
@@ -93,7 +99,6 @@ export const useRTDBLocking = (
         callbacks?.onLockAcquired?.(itemId)
         return true
       } catch (error) {
-        console.error('Error acquiring lock:', error)
         return false
       }
     },
@@ -108,28 +113,23 @@ export const useRTDBLocking = (
       if (!canvasId || !user) return
 
       const paths = getRTDBPaths(canvasId)
-      const lockRef = ref(database, paths.itemLock(itemId))
 
       try {
-        // Verify we own the lock before releasing
-        const lockSnapshot = await get(lockRef)
-        const existingLock = lockSnapshot.val() as LockData | null
+        // Clear locked item from presence
+        const presenceRef = ref(database, `${paths.presence}/${user.uid}/lockedItemId`)
+        await remove(presenceRef)
 
-        if (existingLock && existingLock.userId === user.uid) {
-          await remove(lockRef)
-          lockedItemsRef.current.delete(itemId)
+        lockedItemsRef.current.delete(itemId)
 
-          // Clear heartbeat interval
-          const heartbeatInterval = heartbeatIntervalsRef.current.get(itemId)
-          if (heartbeatInterval) {
-            clearInterval(heartbeatInterval)
-            heartbeatIntervalsRef.current.delete(itemId)
-          }
-
-          callbacks?.onLockReleased?.(itemId)
+        // Clear heartbeat interval
+        const heartbeatInterval = heartbeatIntervalsRef.current.get(itemId)
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval)
+          heartbeatIntervalsRef.current.delete(itemId)
         }
+
+        callbacks?.onLockReleased?.(itemId)
       } catch (error) {
-        console.error('Error releasing lock:', error)
       }
     },
     [canvasId, user, callbacks]
@@ -162,7 +162,6 @@ export const useRTDBLocking = (
 
         return { locked: true, lockData }
       } catch (error) {
-        console.error('Error checking lock:', error)
         return { locked: false }
       }
     },
@@ -215,11 +214,25 @@ export const useRTDBLocking = (
 
   /**
    * Release all locks held by current user
+   * Since we now use presence for locks, we just clear the lockedItemId from presence
    */
   const releaseAllLocks = useCallback(async () => {
-    const itemIds = Array.from(lockedItemsRef.current)
-    await Promise.all(itemIds.map((itemId) => releaseLock(itemId)))
-  }, [releaseLock])
+    if (!canvasId || !user) return
+
+    const paths = getRTDBPaths(canvasId)
+
+    try {
+      // Clear locked item from presence (single source of truth)
+      const presenceRef = ref(database, `${paths.presence}/${user.uid}/lockedItemId`)
+      await remove(presenceRef)
+
+      // Clear local tracking
+      lockedItemsRef.current.clear()
+      heartbeatIntervalsRef.current.forEach(interval => clearInterval(interval))
+      heartbeatIntervalsRef.current.clear()
+    } catch (error) {
+    }
+  }, [canvasId, user])
 
   /**
    * Track selection in RTDB (selection acquires lock, deselection releases it)
@@ -241,15 +254,13 @@ export const useRTDBLocking = (
 
           // Acquire lock for selected item
           const lockAcquired = await acquireLock(itemId)
-          if (!lockAcquired) {
-            console.warn('⚠️ [RTDB] Could not acquire lock for selected item:', itemId)
+          if (lockAcquired) {
           }
         } else {
           // Clear selection
           await remove(selectionsRef)
         }
       } catch (error) {
-        console.error('Error setting selection:', error)
       }
     },
     [canvasId, user, acquireLock, releaseAllLocks]

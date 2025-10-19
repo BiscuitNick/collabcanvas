@@ -36,8 +36,6 @@ export const useContent = () => {
   // Initialize RTDB locking for selection-based locks
   const {
     setSelection: setSelectionRTDB,
-    acquireLock: acquireLockRTDB,
-    releaseLock: releaseLockRTDB,
   } = useRTDBLocking(canvasId);
 
   // Get Firestore ordering operations (for syncing to Firestore when enabled)
@@ -170,30 +168,31 @@ export const useContent = () => {
     return ordered;
   }, [storeContent, storeContentIds]);
 
-  const { lockContent: lockContentFS, unlockContent: unlockContentFS } = useContentLocking(orderedContent);
+  const { lockContent: lockContentFS, unlockContent: unlockContentFS } = useContentLocking();
 
   // Wrap locking to use RTDB when enabled
   const lockContent = React.useCallback(async (id: string) => {
     const enableRTDB = localStorage.getItem('enableRTDB');
     if (enableRTDB !== 'false') {
-      // RTDB enabled: Use RTDB locking
-      await acquireLockRTDB(id);
+      // RTDB enabled: Use setSelection to ensure only one lock at a time
+      // setSelection automatically releases all previous locks before acquiring new one
+      await setSelectionRTDB(id);
     } else {
       // RTDB disabled: Fall back to Firestore locking
       await lockContentFS(id);
     }
-  }, [acquireLockRTDB, lockContentFS]);
+  }, [setSelectionRTDB, lockContentFS]);
 
   const unlockContent = React.useCallback(async (id: string) => {
     const enableRTDB = localStorage.getItem('enableRTDB');
     if (enableRTDB !== 'false') {
-      // RTDB enabled: Use RTDB unlocking
-      await releaseLockRTDB(id);
+      // RTDB enabled: Use setSelection(null) to clear selection and release locks
+      await setSelectionRTDB(null);
     } else {
       // RTDB disabled: Fall back to Firestore unlocking
       await unlockContentFS(id);
     }
-  }, [releaseLockRTDB, unlockContentFS]);
+  }, [setSelectionRTDB, unlockContentFS]);
 
   // Selection-based locking (RTDB only)
   const setSelection = React.useCallback(async (id: string | null) => {

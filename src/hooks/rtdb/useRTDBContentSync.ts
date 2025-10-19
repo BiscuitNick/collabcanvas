@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { ref, set, onValue, remove } from 'firebase/database'
 import { database } from '../../lib/firebase'
-import { getRTDBPaths, CONTENT_THROTTLE_MS, FIRESTORE_DEBOUNCE_MS, LOCK_TIMEOUT_MS } from '../../lib/rtdb-config'
+import { getRTDBPaths, CONTENT_THROTTLE_MS, FIRESTORE_DEBOUNCE_MS } from '../../lib/rtdb-config'
 import { useCanvasStore } from '../../store/canvasStore'
 import { useAuth } from '../useAuth'
 import { useContentOperations } from '../firestore/useContentOperations'
@@ -96,13 +96,6 @@ export const useRTDBContentSync = (
         }
 
         try {
-          console.log('📤 [RTDB] Sending content update to RTDB:', {
-            itemId,
-            updates: updatesWithMetadata,
-            immediate,
-            timestamp: new Date().toISOString()
-          })
-
           await set(contentRef, rtdbData)
           lastRTDBUpdateRef.current.set(itemId, Date.now())
 
@@ -111,7 +104,6 @@ export const useRTDBContentSync = (
             scheduleFirestoreUpdate(itemId, updates)
           }
         } catch (error) {
-          console.error('❌ [RTDB] Error updating content in RTDB:', error)
         }
       }
 
@@ -130,11 +122,10 @@ export const useRTDBContentSync = (
           // Flush immediately
           const content = useCanvasStore.getState().content.find((c) => c.id === itemId)
           if (content) {
-            console.log('💾 [RTDB] Immediate flush to Firestore:', itemId)
             updateContentInFirestore(itemId, updates).then(() => {
               onFirestoreUpdate?.(content)
-            }).catch(error => {
-              console.error('❌ [RTDB] Error in immediate Firestore update:', error)
+            }).catch(() => {
+              // Silently fail
             })
           }
         }
@@ -169,7 +160,6 @@ export const useRTDBContentSync = (
       // Check if Firestore is enabled
       const enableFirestore = localStorage.getItem('enableFirestore')
       if (enableFirestore === 'false') {
-        console.log('🚫 [RTDB] Firestore disabled, skipping Firestore update')
         return
       }
 
@@ -189,11 +179,9 @@ export const useRTDBContentSync = (
         if (!content) return
 
         try {
-          console.log('💾 [RTDB] Flushing to Firestore after debounce:', itemId)
           await updateContentInFirestore(itemId, updates)
           onFirestoreUpdate?.(content)
         } catch (error) {
-          console.error('❌ [RTDB] Error updating Firestore:', error)
         }
 
         firestoreDebounceTimeoutsRef.current.delete(itemId)
@@ -227,7 +215,6 @@ export const useRTDBContentSync = (
         await updateContentInFirestore(itemId, content)
         onFirestoreUpdate?.(content)
       } catch (error) {
-        console.error('Error flushing to Firestore:', error)
       }
     },
     [updateContentInFirestore, onFirestoreUpdate]
@@ -269,7 +256,6 @@ export const useRTDBContentSync = (
           firestoreDebounceTimeoutsRef.current.set('contentIds', timeout)
         }
       } catch (error) {
-        console.error('Error updating contentIds in RTDB:', error)
       }
     },
     [canvasId, user, setContentIds, enableFirestorePersistence]
@@ -303,7 +289,6 @@ export const useRTDBContentSync = (
 
         activeEditingRef.current.delete(itemId)
       } catch (error) {
-        console.error('Error removing content from RTDB:', error)
       }
     },
     [canvasId]
@@ -318,16 +303,12 @@ export const useRTDBContentSync = (
     // Check if RTDB is enabled (via localStorage)
     const enableRTDB = localStorage.getItem('enableRTDB')
     if (enableRTDB === 'false') {
-      console.log('🚫 [RTDB] RTDB sync disabled via localStorage')
       return
     }
 
     const paths = getRTDBPaths(canvasId)
     const contentRef = ref(database, paths.content)
     const contentIdsRef = ref(database, paths.contentIds)
-    const locksRef = ref(database, paths.locks)
-
-    console.log('✅ [RTDB] Listening for RTDB updates and locks on canvas:', canvasId)
 
     // Process and apply pending updates (throttled)
     const applyPendingUpdates = () => {
@@ -339,37 +320,24 @@ export const useRTDBContentSync = (
       pendingUpdatesRef.current.forEach((rtdbData) => {
         // Skip updates from current user (already applied locally)
         if (rtdbData.updatedBy === user.uid) {
-          console.log('⏭️ [RTDB] Skipping own update for', rtdbData.id)
           return
         }
 
         // Skip if actively editing this item
         if (activeEditingRef.current.has(rtdbData.id)) {
-          console.log('✏️ [RTDB] Skipping update while actively editing', rtdbData.id)
           return
         }
 
         // Check if this item exists and was last edited by current user
         const existingItem = currentStoreContent.find(c => c.id === rtdbData.id)
         if (existingItem && existingItem.lastEditedBy === user.uid) {
-          console.log('👤 [RTDB] Skipping - current user was last editor for', rtdbData.id)
           return
         }
 
         // Apply remote updates to local store
-        console.log('📥 [RTDB] Received content update from RTDB:', {
-          itemId: rtdbData.id,
-          updatedBy: rtdbData.updatedBy,
-          data: rtdbData.data,
-          timestamp: new Date(rtdbData.updatedAt).toISOString()
-        })
         updateContentInStore(rtdbData.id, rtdbData.data)
         updatesReceived++
       })
-
-      if (updatesReceived > 0) {
-        console.log(`📊 [RTDB] Applied ${updatesReceived} content update(s) from RTDB`)
-      }
 
       // Clear pending updates
       pendingUpdatesRef.current.clear()
@@ -409,79 +377,14 @@ export const useRTDBContentSync = (
       // Skip updates from current user
       if (data.updatedBy === user.uid) return
 
-      console.log('📥 [RTDB] Received contentIds update from RTDB:', {
-        idsCount: data.ids.length,
-        updatedBy: data.updatedBy,
-        timestamp: new Date(data.updatedAt).toISOString()
-      })
-
       // Apply remote contentIds to local store
       setContentIds(data.ids)
-    })
-
-    // Listen for lock changes
-    const unsubscribeLocks = onValue(locksRef, (snapshot) => {
-      const locks = snapshot.val() as Record<string, {
-        userId: string
-        userName: string
-        color: string
-        lockedAt: number
-        lastHeartbeat: number
-      }> | null
-
-      if (!locks) {
-        // No locks, clear all lock states in store
-        const currentContent = useCanvasStore.getState().content
-        currentContent.forEach(item => {
-          if (item.lockedByUserId) {
-            updateContentInStore(item.id, {
-              lockedByUserId: undefined,
-              lockedByUserName: undefined
-            })
-          }
-        })
-        return
-      }
-
-      // Update lock states in store
-      const currentContent = useCanvasStore.getState().content
-      const now = Date.now()
-
-      // First, clear stale locks and locks that no longer exist
-      currentContent.forEach(item => {
-        const lock = locks[item.id]
-        if (!lock || (now - lock.lastHeartbeat > LOCK_TIMEOUT_MS)) {
-          // Lock doesn't exist or is stale
-          if (item.lockedByUserId) {
-            updateContentInStore(item.id, {
-              lockedByUserId: undefined,
-              lockedByUserName: undefined
-            })
-          }
-        }
-      })
-
-      // Then apply current locks
-      Object.entries(locks).forEach(([itemId, lock]) => {
-        // Skip stale locks
-        if (now - lock.lastHeartbeat > LOCK_TIMEOUT_MS) return
-
-        const item = currentContent.find(c => c.id === itemId)
-        if (item && item.lockedByUserId !== lock.userId) {
-          console.log('🔒 [RTDB] Lock acquired on', itemId, 'by', lock.userName)
-          updateContentInStore(itemId, {
-            lockedByUserId: lock.userId,
-            lockedByUserName: lock.userName
-          })
-        }
-      })
     })
 
     // Cleanup on unmount
     return () => {
       unsubscribeContent()
       unsubscribeContentIds()
-      unsubscribeLocks()
 
       // Clear all timeouts
       throttleTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout))

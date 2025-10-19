@@ -6,6 +6,12 @@ import { clamp } from '../../lib/utils'
 import { CANVAS_HALF } from '../../lib/constants'
 import { LOCK_INDICATOR_STROKE_WIDTH } from '../../lib/config'
 
+interface LockInfo {
+  userId: string
+  userName: string
+  lockedItemId: string | null
+}
+
 interface ImageComponentProps {
   content: ImageContent
   isSelected: boolean
@@ -18,6 +24,8 @@ interface ImageComponentProps {
   currentUserId?: string
   selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null
   canEdit?: boolean
+  isLockedByOther?: boolean
+  lockInfo?: LockInfo | null
 }
 
 const ImageComponent: React.FC<ImageComponentProps> = memo(({
@@ -29,9 +37,11 @@ const ImageComponent: React.FC<ImageComponentProps> = memo(({
   onDragEnd,
   onDragStart,
   onDragEndCallback,
-  currentUserId,
+  currentUserId: _currentUserId,
   selectedTool,
   canEdit = true,
+  isLockedByOther = false,
+  lockInfo: _lockInfo = null,
 }) => {
   const imageRef = useRef<Konva.Image>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
@@ -39,9 +49,6 @@ const ImageComponent: React.FC<ImageComponentProps> = memo(({
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingUpdateRef = useRef<{ x: number; y: number } | null>(null)
   const imageObjRef = useRef<HTMLImageElement | null>(null)
-
-  // Check if content is locked by another user
-  const isLockedByOther = content.lockedByUserId && content.lockedByUserId !== currentUserId
 
   // Load image from URL
   useEffect(() => {
@@ -256,7 +263,7 @@ const ImageComponent: React.FC<ImageComponentProps> = memo(({
         height={content.height}
         offsetX={content.width / 2}
         offsetY={content.height / 2}
-        stroke={isLockedByOther ? (content.lockedByUserColor || '#FF0000') : undefined}
+        stroke={isLockedByOther ? '#FF0000' : undefined}
         strokeWidth={isLockedByOther ? LOCK_INDICATOR_STROKE_WIDTH : 0}
         rotation={content.rotation || 0}
         draggable={isSelected && !isLockedByOther && canEdit}

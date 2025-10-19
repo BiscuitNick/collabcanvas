@@ -6,13 +6,14 @@ import type { Content } from '../../types'
 import { isTextContent, isRectangleContent, isCircleContent, isGroupContent } from '../../types'
 import { getTextExcerpt } from '../../lib/utils'
 import { Lock, Copy, Trash2, Folder, ChevronRight, ChevronDown } from 'lucide-react'
-import { useCanEdit } from '../../contexts/CanvasContext'
+import { useCanEdit, useCanvasId } from '../../contexts/CanvasContext'
+import { useRTDBUserLocks } from '../../hooks/rtdb/useRTDBUserLocks'
 
 interface DraggablePropertiesPaneProps {
   content: Content[]
   selectedShape: Content | null
   onUpdateShape: (id: string, updates: Partial<Content>) => void
-  onSelectShape: (id: string) => void
+  onSelectShape: (id: string | null) => void
   onPanToContent?: (x: number, y: number) => void
   isVisible: boolean
   onClose: () => void
@@ -35,7 +36,7 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
   isVisible,
   onClose,
   currentUserId,
-  users,
+  users: _users,
   onCopyContent,
   onDeleteContent,
   onBringToFront,
@@ -46,24 +47,41 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
   const selectedItemRef = useRef<HTMLDivElement>(null)
   const selectedNestedItemRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const [expandedItemId, setExpandedItemId] = React.useState<string | null>(null)
   const [selectedNestedItemId, setSelectedNestedItemId] = React.useState<string | null>(null)
   const [groupNestedExpanded, setGroupNestedExpanded] = React.useState<boolean>(false)
   const canEdit = useCanEdit()
+  const canvasId = useCanvasId()
+  const { getItemLock, isLockedByOther } = useRTDBUserLocks(canvasId)
+
+  // Sync expanded state with selectedShape - selection = expansion
+  const expandedItemId = selectedShape?.id || null
 
   // Handle item header click - toggle expand/collapse or select
   const handleHeaderClick = (shapeId: string, e: React.MouseEvent) => {
     e.stopPropagation()
+
+    const shape = content.find(c => c.id === shapeId)
+    if (!shape) return
+
     if (expandedItemId === shapeId) {
-      // Collapse if already expanded
-      setExpandedItemId(null)
+      // Clicking the already-selected item -> deselect and collapse
+      onSelectShape(null)
     } else {
+      // Trying to select a different item
+      if (isLockedByOther(shapeId)) {
+        // Cannot select locked content - but still pan to it for viewing
+        // Pan to the locked content so user can view it
+        if (onPanToContent) {
+          onPanToContent(shape.x, shape.y)
+        }
+        return
+      }
+
       // Select and expand
       onSelectShape(shapeId)
-      setExpandedItemId(shapeId)
+
       // Pan to the content when selected
-      const shape = content.find(c => c.id === shapeId)
-      if (shape && onPanToContent) {
+      if (onPanToContent) {
         onPanToContent(shape.x, shape.y)
       }
     }
@@ -145,8 +163,11 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
   const handleNestedItemClick = (groupId: string, nestedItemId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     setSelectedNestedItemId(nestedItemId)
-    // Keep the group expanded
-    setExpandedItemId(groupId)
+    // Keep the group selected (which keeps it expanded)
+    // Selection = expansion, so selecting the group keeps it expanded
+    if (expandedItemId !== groupId) {
+      onSelectShape(groupId)
+    }
   }
 
   // Render nested items within a group
@@ -246,13 +267,8 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
     })
   }
 
-  // Scroll to selected item and auto-expand when selection changes
-  useEffect(() => {
-    if (selectedShape) {
-      // Auto-expand the selected item
-      setExpandedItemId(selectedShape.id)
-    }
-  }, [selectedShape?.id])
+  // Note: Expansion is now controlled directly by selectedShape prop
+  // No auto-expand effect needed - expandedItemId is derived from selectedShape
 
   // Scroll to show full expanded content in view (for top-level items)
   useEffect(() => {
@@ -292,7 +308,7 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
   const sortedContent = [...content].reverse();
 
   return (
-    <div className="w-64 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg flex flex-col overflow-hidden" style={{ height: '100%', maxHeight: '100%' }}>
+    <div className="w-64 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg flex flex-col max-h-full">
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-gray-200 flex-shrink-0">
         <h3 className="text-xs font-semibold text-gray-700">Layers</h3>
@@ -308,25 +324,15 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
       </div>
 
       {/* Shape List - Scrollable Content */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 p-3 space-y-1.5 w-full">
+      <div ref={scrollContainerRef} className="overflow-y-auto p-3 space-y-1.5 w-full" style={{ maxHeight: 'calc(100vh - 200px)' }}>
         {sortedContent.length > 0 ? (
           sortedContent.map((shape) => {
             const label = getContentLabel(shape)
-
             const isSelected = selectedShape?.id === shape.id
-            const isLockedByOther = shape.lockedByUserId && shape.lockedByUserId !== currentUserId
-            const isLockedBySelf = shape.lockedByUserId && shape.lockedByUserId === currentUserId
-
-            // Get the user who locked this shape
-            let lockedByUserName = ''
-            let lockedByUserColor = ''
-            if (shape.lockedByUserId && users) {
-              const user = users.get(shape.lockedByUserId)
-              lockedByUserName = user?.displayName || user?.email || 'Unknown User'
-              lockedByUserColor = user?.color || '#999'
-            }
-
-
+            const lockInfo = getItemLock(shape.id)
+            const lockedByOtherUser = isLockedByOther(shape.id)
+            const lockedBySelf = lockInfo !== null && lockInfo.userId === currentUserId
+            const lockedByUserName = lockInfo?.userName || ''
             const isExpanded = expandedItemId === shape.id
 
             return (
@@ -335,7 +341,7 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
                 ref={isSelected ? selectedItemRef : null}
                 className={`rounded cursor-pointer transition-colors w-full overflow-hidden ${
                   isExpanded ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 hover:bg-gray-100 border border-transparent'
-                } ${isLockedByOther ? 'opacity-60' : ''}`}
+                } ${lockedByOtherUser ? 'opacity-60' : ''}`}
               >
                 {/* Main content row - clickable header */}
                 <div
@@ -356,17 +362,17 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
                     <div className="flex-shrink-0 text-gray-500" title="View only - no edit permission">
                       <Lock className="h-3.5 w-3.5" />
                     </div>
-                  ) : isLockedBySelf ? (
+                  ) : lockedBySelf ? (
                     <div className="flex-shrink-0 text-blue-500">
                       <Lock className="h-3.5 w-3.5" />
                     </div>
-                  ) : isLockedByOther ? (
+                  ) : lockedByOtherUser ? (
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <Lock className="h-3.5 w-3.5 text-red-500" />
                       <Avatar className="h-5 w-5">
                         <AvatarFallback
                           className="text-xs font-semibold"
-                          style={{ backgroundColor: lockedByUserColor, color: 'white' }}
+                          style={{ backgroundColor: '#FF4444', color: 'white' }}
                         >
                           {getInitials(lockedByUserName)}
                         </AvatarFallback>
@@ -376,7 +382,7 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
                 </div>
 
                 {/* Content properties - show if expanded and not locked by someone else */}
-                {!isLockedByOther && isExpanded && (
+                {!lockedByOtherUser && isExpanded && (
                   <div className="px-2 pb-2 pt-2 border-t border-gray-200">
                     <ContentProperties
                       content={shape}
@@ -420,7 +426,7 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
                 )}
 
                 {/* Action buttons - shown at bottom of properties when expanded */}
-                {canEdit && !isLockedByOther && isExpanded && (
+                {canEdit && !lockedByOtherUser && isExpanded && (
                   <div className="px-2 pb-2 pt-2 border-t border-gray-200 space-y-2">
                     <Button
                       variant="outline"
@@ -446,13 +452,13 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
                 )}
 
                 {/* Locked by other user message */}
-                {isLockedByOther && isExpanded && (
+                {lockedByOtherUser && isExpanded && (
                   <div className="px-2 pb-2 pt-2 border-t border-gray-200">
                     <div className="flex items-center gap-2">
                       <Avatar className="h-5 w-5 flex-shrink-0">
                         <AvatarFallback
                           className="text-xs font-semibold"
-                          style={{ backgroundColor: lockedByUserColor, color: 'white' }}
+                          style={{ backgroundColor: '#FF4444', color: 'white' }}
                         >
                           {getInitials(lockedByUserName)}
                         </AvatarFallback>

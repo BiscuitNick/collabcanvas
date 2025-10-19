@@ -6,6 +6,12 @@ import { clamp } from '../../lib/utils'
 import { CANVAS_HALF } from '../../lib/constants'
 import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS, ENABLE_PERFORMANCE_LOGGING, LOCK_INDICATOR_STROKE_WIDTH } from '../../lib/config'
 
+interface LockInfo {
+  userId: string
+  userName: string
+  lockedItemId: string | null
+}
+
 interface TextShapeProps {
   shape: TextContent
   isSelected: boolean
@@ -17,6 +23,8 @@ interface TextShapeProps {
   onDragEndCallback: () => void
   onStartTextEditing?: (id: string, text: string) => void
   currentUserId?: string
+  isLockedByOther?: boolean
+  lockInfo?: LockInfo | null
 }
 
 const TextShapeComponent: React.FC<TextShapeProps> = memo(({
@@ -29,16 +37,15 @@ const TextShapeComponent: React.FC<TextShapeProps> = memo(({
   onDragStart,
   onDragEndCallback,
   onStartTextEditing,
-  currentUserId,
+  currentUserId: _currentUserId,
+  isLockedByOther = false,
+  lockInfo: _lockInfo = null,
 }) => {
   const textRef = useRef<Konva.Text>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
   const lastUpdateRef = useRef<number>(0)
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingUpdateRef = useRef<{ x: number; y: number } | null>(null)
-
-  // Check if shape is locked by another user
-  const isLockedByOther = shape.lockedByUserId && shape.lockedByUserId !== currentUserId
 
   // Throttled drag move function
   const throttledDragMove = useCallback((x: number, y: number) => {
@@ -267,7 +274,7 @@ const TextShapeComponent: React.FC<TextShapeProps> = memo(({
         fontVariant="normal"
         textDecoration=""
         fill={shape.fill}
-        stroke={isLockedByOther ? (shape.lockedByUserColor || '#FF0000') : undefined}
+        stroke={isLockedByOther ? '#FF0000' : undefined}
         strokeWidth={isLockedByOther ? LOCK_INDICATOR_STROKE_WIDTH : 0}
         align={shape.textAlign || 'left'}
         verticalAlign={shape.verticalAlign || 'top'}

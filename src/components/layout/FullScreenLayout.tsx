@@ -90,7 +90,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   }, [presence]);
   // Use selectedContentId directly instead of the getter selectedShapeId for proper reactivity
   const canvasSelectedShapeId = selectedContentId
-  const { createContent: createContentOriginal, createContentBatch: createContentBatchOriginal, updateContent, updateContentBatch, clearAllContent, deleteContent, bringToFront, sendToBack, moveUp, moveDown } = useContent()
+  const { createContent: createContentOriginal, createContentBatch: createContentBatchOriginal, updateContent, updateContentBatch, clearAllContent, deleteContent, bringToFront, sendToBack, moveUp, moveDown, setSelection } = useContent()
 
   // Firestore state - must be defined before the wrappers that use it
   const [enableFirestore, setEnableFirestore] = useState(() => {
@@ -188,7 +188,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     deleteContent(contentId)
   }, [deleteContent])
   const [uiState, setUIState] = useState<UIState>({
-    propertiesPaneVisible: true,
+    propertiesPaneVisible: false, // Hidden by default on new canvas
     gridlinesVisible: false,
     selectedShapeId: null,
     selectedTool: canEdit ? 'select' : 'pan',
@@ -428,18 +428,23 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   }, [calculateCanvasSize])
 
   // Handle shape selection
-  const handleShapeSelect = useCallback((shapeId: string) => {
+  const handleShapeSelect = useCallback(async (shapeId: string | null) => {
     setUIState(prev => ({ ...prev, selectedShapeId: shapeId }))
     selectShape(shapeId)
 
-    // Track last interaction when selecting a shape
-    if (user?.uid) {
+    // Use setSelection for RTDB-based selection and locking
+    if (setSelection) {
+      await setSelection(shapeId)
+    }
+
+    // Track last interaction when selecting a shape (not when deselecting)
+    if (shapeId && user?.uid) {
       updateContent(shapeId, {
         lastInteractedBy: user.uid,
         lastInteractedAt: new Date()
       })
     }
-  }, [selectShape, user?.uid, updateContent])
+  }, [selectShape, setSelection, user?.uid, updateContent])
 
   // Close properties pane
   const closePropertiesPane = useCallback(() => {
@@ -537,7 +542,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     setUIState(prev => ({
       ...prev,
       debugMode: !prev.debugMode,
-      propertiesPaneVisible: !prev.debugMode ? true : prev.propertiesPaneVisible // Show properties pane when enabling debug
+      // Don't automatically open properties pane when toggling debug
     }))
   }, [])
 

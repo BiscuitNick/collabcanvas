@@ -226,12 +226,10 @@ export const useCanvasStore = create<CanvasState>()(
   },
   
   setContent: (content: Content[]) => {
-    // When setting content, also update contentIds to match
-    const contentIds = content.map(c => c.id)
-    console.log('📝 [CANVAS STORE] Setting content and contentIds')
+    // Only update content, NOT contentIds (contentIds is managed separately via Firestore sync or z-index operations)
+    console.log('📝 [CANVAS STORE] Setting content (contentIds unchanged)')
     console.log('📊 [CANVAS STORE] Content items:', content.length)
-    console.log('🔢 [CANVAS STORE] ContentIds:', contentIds)
-    set({ content, contentIds })
+    set({ content })
   },
   
   clearAllContent: () => {
@@ -367,9 +365,8 @@ export const useCanvasStore = create<CanvasState>()(
     set({ selectedContentId: id })
   },
   setShapes: (shapes: Content[]) => {
-    // When setting shapes, also update contentIds to match
-    const contentIds = shapes.map(s => s.id)
-    set({ content: shapes, contentIds })
+    // Only update content, NOT contentIds (contentIds is managed separately)
+    set({ content: shapes })
   },
   clearAllShapes: () => {
     set({

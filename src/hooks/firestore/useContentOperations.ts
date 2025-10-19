@@ -1,6 +1,6 @@
 
 import { useCallback, useRef, useState, useEffect } from 'react';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, doc, updateDoc, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { firestore } from '../../lib/firebase';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useCanvasId, useCanEdit } from '../../contexts/CanvasContext';
@@ -59,7 +59,8 @@ export const useContentOperations = (
   activelyEditingRef: React.MutableRefObject<Set<string>>,
   isCreatingContent: React.MutableRefObject<boolean>,
   userUid: string | undefined,
-  addToContentIds?: (id: string) => Promise<void>
+  addToContentIds?: (id: string) => Promise<void>,
+  removeFromContentIds?: (id: string) => Promise<void>
 ) => {
   const canvasId = useCanvasId();
   const canEdit = useCanEdit();
@@ -125,27 +126,36 @@ export const useContentOperations = (
     try {
       isCreatingContent.current = true;
 
-      // ALWAYS add to local store first for optimistic updates
-      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      // Generate a unique ID with content type prefix for easier debugging
+      // Format: {type}-{timestamp}-{random}
+      const timestamp = Date.now();
+      const randomSuffix = Math.random().toString(36).substr(2, 9);
+      const contentId = `${contentData.type}-${timestamp}-${randomSuffix}`;
+      const contentRef = collection(firestore, 'canvases', canvasId, 'content');
+      const newDocRef = doc(contentRef, contentId);
+
       const now = new Date();
       const localContent: Content = {
         ...contentData,
-        id: tempId,
+        id: contentId,
         createdAt: now,
         updatedAt: now,
         lastEditedBy: userUid || null,
         lastEditedAt: now,
       } as Content;
 
+      // Add to local store first for optimistic updates
       addStoreContent(localContent);
 
-      // Use local-only mode if skipFirestore is true
-      if (skipFirestore) {
-        // Local-only mode: we're done, content is already in the store
-      } else {
-        // Firestore mode: Also sync to Firestore, but we already have it in the store
-        const contentRef = collection(firestore, 'canvases', canvasId, 'content');
+      // Add to contentIds for z-index ordering
+      if (addToContentIds) {
+        await addToContentIds(contentId);
+      }
+
+      // Sync to Firestore if not in local-only mode
+      if (!skipFirestore) {
         const firestoreTimestamp = serverTimestamp();
+        console.log(`📤 [FIRESTORE] Syncing ${contentData.type} with ID: ${contentId}`);
 
         // Minimize contentData for groups to avoid "too many index entries" error
         const dataToStore = contentData.type === 'group' && 'contentData' in contentData ? {
@@ -160,26 +170,10 @@ export const useContentOperations = (
           lastEditedBy: userUid || null,
           lastEditedAt: firestoreTimestamp
         });
-        const docRef = await addDoc(contentRef, firestoreContent);
 
-        // Update the temp ID to the real Firestore ID in the store
-        const updatedContent = {
-          ...localContent,
-          id: docRef.id,
-        };
-        // Replace temp item with real ID
-        const currentContent = useCanvasStore.getState().content;
-        const newContent = currentContent.map(item =>
-          item.id === tempId ? updatedContent : item
-        );
-        useCanvasStore.setState({ content: newContent });
-
-        setSyncStatus(docRef.id, 'synced');
-
-        // Add to contentIds for z-index ordering
-        if (addToContentIds) {
-          await addToContentIds(docRef.id);
-        }
+        // Use setDoc instead of addDoc to use our pre-generated ID
+        await setDoc(newDocRef, firestoreContent);
+        setSyncStatus(contentId, 'synced');
       }
     } catch (err) {
       console.error('❌ Error creating content:', err);
@@ -188,7 +182,7 @@ export const useContentOperations = (
         isCreatingContent.current = false;
       }, 100);
     }
-  }, [setSyncStatus, isCreatingContent, addStoreContent, canvasId, canEdit, addToContentIds]);
+  }, [setSyncStatus, isCreatingContent, addStoreContent, canvasId, canEdit, addToContentIds, userUid]);
 
   const updateContent = useCallback(async (id: string, updates: Partial<Content>): Promise<void> => {
     // Check edit permission
@@ -236,12 +230,18 @@ export const useContentOperations = (
     }
 
     try {
-      // Remove from local store immediately
+      // Remove from local store immediately (this removes from both content and contentIds in the store)
       deleteStoreContent(id);
+
+      // Remove from Firestore contentIds array
+      if (removeFromContentIds) {
+        await removeFromContentIds(id);
+      }
 
       // Mark as deleted in Firestore (soft delete) instead of removing the document
       // This ensures all connected users receive the delete update via the listener
-      if (enableFirestore && !id.startsWith('local-')) {
+      // Only sync to Firestore if it exists there (check syncStatus or if it has a type-based ID)
+      if (enableFirestore && !id.startsWith('local-') && !id.startsWith('hardcoded-')) {
         const contentRef = doc(firestore, 'canvases', canvasId, 'content', id);
         await updateDoc(contentRef, {
           deleted: true,
@@ -253,7 +253,7 @@ export const useContentOperations = (
     } catch (err) {
       console.error('Error deleting content:', err);
     }
-  }, [deleteStoreContent, enableFirestore, canvasId, canEdit, userUid]);
+  }, [deleteStoreContent, removeFromContentIds, enableFirestore, canvasId, canEdit, userUid]);
 
   const clearAllContent = useCallback(async (): Promise<void> => {
     try {
@@ -262,11 +262,21 @@ export const useContentOperations = (
 
       clearAllContentStore();
 
+      // Clear contentIds array in Firestore
+      if (enableFirestore) {
+        const canvasRef = doc(firestore, 'canvases', canvasId);
+        await updateDoc(canvasRef, {
+          contentIds: [],
+          contentIdsLastEditedBy: userUid || null,
+          contentIdsLastEditedAt: serverTimestamp()
+        });
+      }
+
       // Mark all as deleted in Firestore (soft delete) instead of removing documents
       // This ensures all connected users receive the delete updates via the listener
       if (enableFirestore && allIds.length > 0) {
         const batch = writeBatch(firestore);
-        const firestoreIds = allIds.filter(id => !id.startsWith('local-'));
+        const firestoreIds = allIds.filter(id => !id.startsWith('local-') && !id.startsWith('hardcoded-'));
 
         firestoreIds.forEach(id => {
           const contentRef = doc(firestore, 'canvases', canvasId, 'content', id);
@@ -389,16 +399,23 @@ export const useContentOperations = (
     }
 
     try {
-      // Delete from local store immediately
+      // Delete from local store immediately (this removes from both content and contentIds in the store)
       ids.forEach(id => {
         deleteStoreContent(id);
       });
+
+      // Remove from Firestore contentIds array
+      if (removeFromContentIds) {
+        for (const id of ids) {
+          await removeFromContentIds(id);
+        }
+      }
 
       // Mark as deleted in Firestore (soft delete) instead of removing documents
       // This ensures all connected users receive the delete updates via the listener
       if (enableFirestore) {
         const batch = writeBatch(firestore);
-        const firestoreIds = ids.filter(id => !id.startsWith('local-'));
+        const firestoreIds = ids.filter(id => !id.startsWith('local-') && !id.startsWith('hardcoded-'));
 
         firestoreIds.forEach(id => {
           const contentRef = doc(firestore, 'canvases', canvasId, 'content', id);
@@ -417,7 +434,7 @@ export const useContentOperations = (
     } catch (err) {
       console.error('❌ Error deleting content batch:', err);
     }
-  }, [deleteStoreContent, enableFirestore, canvasId, canEdit, userUid]);
+  }, [deleteStoreContent, removeFromContentIds, enableFirestore, canvasId, canEdit, userUid]);
 
   const createContentBatch = useCallback(async (contentDataArray: Omit<Content, 'id' | 'createdAt' | 'updatedAt'>[], skipFirestore = false): Promise<void> => {
     // Check edit permission
@@ -433,60 +450,70 @@ export const useContentOperations = (
 
     try {
       isCreatingContent.current = true;
+      const contentRef = collection(firestore, 'canvases', canvasId, 'content');
+      const baseTimestamp = Date.now();
 
-      if (skipFirestore) {
-        // Local-only mode: Add all to canvas store with local IDs
-        const localContent: Content[] = contentDataArray.map((contentData) => {
-          const localId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          const now = new Date();
-          return {
+      // Generate IDs upfront for all items with content type prefix
+      const itemsWithIds = contentDataArray.map((contentData, index) => {
+        // Add small increment to timestamp to ensure uniqueness in batch
+        const timestamp = baseTimestamp + index;
+        const randomSuffix = Math.random().toString(36).substr(2, 9);
+        const contentId = `${contentData.type}-${timestamp}-${randomSuffix}`;
+        const newDocRef = doc(contentRef, contentId);
+        const now = new Date();
+
+        return {
+          id: contentId,
+          docRef: newDocRef,
+          content: {
             ...contentData,
-            id: localId,
+            id: contentId,
             createdAt: now,
             updatedAt: now,
             lastEditedBy: userUid || null,
             lastEditedAt: now,
-          } as Content;
-        });
+          } as Content
+        };
+      });
 
-        // Add all items to store at once
-        localContent.forEach(item => addStoreContent(item));
-      } else {
-        // Firestore mode: Use writeBatch for simultaneous writes
+      // Add all items to store first (optimistic update)
+      itemsWithIds.forEach(({ content }) => addStoreContent(content));
+
+      // Add all IDs to contentIds for z-index ordering
+      if (addToContentIds) {
+        await Promise.all(itemsWithIds.map(({ id }) => addToContentIds(id)));
+      }
+
+      // Sync to Firestore if not in local-only mode
+      if (!skipFirestore) {
         const batch = writeBatch(firestore);
-        const contentRef = collection(firestore, 'canvases', canvasId, 'content');
         const now = serverTimestamp();
-        const docRefs: string[] = [];
 
-        contentDataArray.forEach((contentData) => {
-          const newDocRef = doc(contentRef);
-
+        itemsWithIds.forEach(({ docRef, content }) => {
           // Minimize contentData for groups to avoid "too many index entries" error
-          const dataToStore = contentData.type === 'group' ? {
-            ...contentData,
-            contentData: minimizeGroupContentData((contentData as any).contentData)
-          } : contentData;
+          const dataToStore = content.type === 'group' ? {
+            ...content,
+            contentData: minimizeGroupContentData((content as any).contentData)
+          } : content;
 
-          const newContent = removeUndefinedValues({
+          const firestoreContent = removeUndefinedValues({
             ...dataToStore,
             createdAt: now,
             updatedAt: now,
             lastEditedBy: userUid || null,
             lastEditedAt: now
           });
-          batch.set(newDocRef, newContent);
-          docRefs.push(newDocRef.id);
+
+          // Remove the id field as it's in the document path
+          delete (firestoreContent as any).id;
+
+          batch.set(docRef, firestoreContent);
         });
 
         await batch.commit();
 
-        // Set all items to pending sync status
-        docRefs.forEach(id => setSyncStatus(id, 'pending'));
-
-        // Add all IDs to contentIds for z-index ordering
-        if (addToContentIds) {
-          await Promise.all(docRefs.map(id => addToContentIds(id)));
-        }
+        // Set all items to synced status
+        itemsWithIds.forEach(({ id }) => setSyncStatus(id, 'synced'));
       }
     } catch (err) {
       console.error('❌ Error creating content batch:', err);

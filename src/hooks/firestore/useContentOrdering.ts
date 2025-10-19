@@ -1,32 +1,38 @@
 import { useCallback } from 'react'
-import { doc, updateDoc, arrayUnion, arrayRemove, getDoc, setDoc } from 'firebase/firestore'
+import { doc, updateDoc, arrayUnion, arrayRemove, getDoc, setDoc, Timestamp } from 'firebase/firestore'
 import { firestore } from '../../lib/firebase'
 
-export const useContentOrdering = (canvasId: string) => {
+export const useContentOrdering = (canvasId: string, userUid?: string) => {
   // Add content ID to the end of contentIds array (on top)
   const addToContentIds = useCallback(async (contentId: string) => {
     try {
       const canvasRef = doc(firestore, 'canvases', canvasId)
       const canvasDoc = await getDoc(canvasRef)
 
+      // Tracking fields for who last edited contentIds
+      const trackingFields = {
+        contentIdsLastEditedBy: userUid || null,
+        contentIdsLastEditedAt: Timestamp.now()
+      }
+
       if (!canvasDoc.exists()) {
         // Initialize canvas document if it doesn't exist
-        await setDoc(canvasRef, { contentIds: [contentId] }, { merge: true })
+        await setDoc(canvasRef, { contentIds: [contentId], ...trackingFields }, { merge: true })
       } else {
         const data = canvasDoc.data()
         if (!data.contentIds) {
           // Initialize contentIds field if it doesn't exist
-          await updateDoc(canvasRef, { contentIds: [contentId] })
+          await updateDoc(canvasRef, { contentIds: [contentId], ...trackingFields })
         } else {
           // Add to existing array
-          await updateDoc(canvasRef, { contentIds: arrayUnion(contentId) })
+          await updateDoc(canvasRef, { contentIds: arrayUnion(contentId), ...trackingFields })
         }
       }
-      console.log('✅ [Z-INDEX] Added to contentIds:', contentId)
+      console.log('✅ [Z-INDEX] Added to contentIds:', contentId, 'by', userUid)
     } catch (err) {
       console.error('❌ [Z-INDEX] Error adding to contentIds:', err)
     }
-  }, [canvasId])
+  }, [canvasId, userUid])
 
   // Remove content ID from contentIds array
   const removeFromContentIds = useCallback(async (contentId: string) => {
@@ -45,12 +51,18 @@ export const useContentOrdering = (canvasId: string) => {
         return
       }
 
-      await updateDoc(canvasRef, { contentIds: arrayRemove(contentId) })
-      console.log('✅ [Z-INDEX] Removed from contentIds:', contentId)
+      // Tracking fields for who last edited contentIds
+      const trackingFields = {
+        contentIdsLastEditedBy: userUid || null,
+        contentIdsLastEditedAt: Timestamp.now()
+      }
+
+      await updateDoc(canvasRef, { contentIds: arrayRemove(contentId), ...trackingFields })
+      console.log('✅ [Z-INDEX] Removed from contentIds:', contentId, 'by', userUid)
     } catch (err) {
       console.error('❌ [Z-INDEX] Error removing from contentIds:', err)
     }
-  }, [canvasId])
+  }, [canvasId, userUid])
 
   // Bring content to front (move to end of array)
   const bringToFront = useCallback(async (contentId: string) => {
@@ -73,12 +85,18 @@ export const useContentOrdering = (canvasId: string) => {
       newContentIds.push(contentId)
       console.log('📋 [Z-INDEX] New contentIds:', newContentIds)
 
-      await updateDoc(canvasRef, { contentIds: newContentIds })
-      console.log('✅ [Z-INDEX] Brought to front successfully')
+      // Tracking fields for who last edited contentIds
+      const trackingFields = {
+        contentIdsLastEditedBy: userUid || null,
+        contentIdsLastEditedAt: Timestamp.now()
+      }
+
+      await updateDoc(canvasRef, { contentIds: newContentIds, ...trackingFields })
+      console.log('✅ [Z-INDEX] Brought to front successfully by', userUid)
     } catch (err) {
       console.error('❌ [Z-INDEX] Error bringing to front:', err)
     }
-  }, [canvasId])
+  }, [canvasId, userUid])
 
   // Send content to back (move to beginning of array)
   const sendToBack = useCallback(async (contentId: string) => {
@@ -92,11 +110,18 @@ export const useContentOrdering = (canvasId: string) => {
       const newContentIds = contentIds.filter((id: string) => id !== contentId)
       newContentIds.unshift(contentId)
 
-      await updateDoc(canvasRef, { contentIds: newContentIds })
+      // Tracking fields for who last edited contentIds
+      const trackingFields = {
+        contentIdsLastEditedBy: userUid || null,
+        contentIdsLastEditedAt: Timestamp.now()
+      }
+
+      await updateDoc(canvasRef, { contentIds: newContentIds, ...trackingFields })
+      console.log('✅ [Z-INDEX] Sent to back by', userUid)
     } catch (err) {
       console.error('Error sending to back:', err)
     }
-  }, [canvasId])
+  }, [canvasId, userUid])
 
   // Move content up one layer (swap with next item)
   const moveUp = useCallback(async (contentId: string) => {
@@ -113,11 +138,18 @@ export const useContentOrdering = (canvasId: string) => {
       const newContentIds = [...contentIds]
       ;[newContentIds[index], newContentIds[index + 1]] = [newContentIds[index + 1], newContentIds[index]]
 
-      await updateDoc(canvasRef, { contentIds: newContentIds })
+      // Tracking fields for who last edited contentIds
+      const trackingFields = {
+        contentIdsLastEditedBy: userUid || null,
+        contentIdsLastEditedAt: Timestamp.now()
+      }
+
+      await updateDoc(canvasRef, { contentIds: newContentIds, ...trackingFields })
+      console.log('✅ [Z-INDEX] Moved up by', userUid)
     } catch (err) {
       console.error('Error moving up:', err)
     }
-  }, [canvasId])
+  }, [canvasId, userUid])
 
   // Move content down one layer (swap with previous item)
   const moveDown = useCallback(async (contentId: string) => {
@@ -134,11 +166,18 @@ export const useContentOrdering = (canvasId: string) => {
       const newContentIds = [...contentIds]
       ;[newContentIds[index], newContentIds[index - 1]] = [newContentIds[index - 1], newContentIds[index]]
 
-      await updateDoc(canvasRef, { contentIds: newContentIds })
+      // Tracking fields for who last edited contentIds
+      const trackingFields = {
+        contentIdsLastEditedBy: userUid || null,
+        contentIdsLastEditedAt: Timestamp.now()
+      }
+
+      await updateDoc(canvasRef, { contentIds: newContentIds, ...trackingFields })
+      console.log('✅ [Z-INDEX] Moved down by', userUid)
     } catch (err) {
       console.error('Error moving down:', err)
     }
-  }, [canvasId])
+  }, [canvasId, userUid])
 
   return {
     addToContentIds,

@@ -190,10 +190,14 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     console.log('[GRID] Commands from buildGrid:', commands.length, 'gridStart:', gridStartX, gridStartY)
 
     // Convert commands to nested content items for the group
+    const baseTimestamp = Date.now()
     const nestedItems = commands
       .filter(command => command.type === 'rectangle')
       .map((command, index) => {
-        const id = `grid-item-${Date.now()}-${index}`
+        // Use same ID convention as top-level content: {type}-{timestamp}-{random}
+        const timestamp = baseTimestamp + index
+        const randomSuffix = Math.random().toString(36).substr(2, 9)
+        const id = `rectangle-${timestamp}-${randomSuffix}`
 
         // Positions inside the group are relative to (0,0) which is the top-left
         // Since nested rects also use offsets to center, we adjust accordingly

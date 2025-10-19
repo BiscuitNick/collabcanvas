@@ -22,17 +22,27 @@ export const useContent = () => {
   const storeMoveDown = useCanvasStore((state) => state.moveDown);
 
   // Get Firestore ordering operations (for syncing to Firestore when enabled)
-  const { bringToFront: fsBringToFront, sendToBack: fsSendToBack, moveUp: fsMoveUp, moveDown: fsMoveDown } = useContentOrdering(canvasId);
+  const {
+    addToContentIds: fsAddToContentIds,
+    removeFromContentIds: fsRemoveFromContentIds,
+    bringToFront: fsBringToFront,
+    sendToBack: fsSendToBack,
+    moveUp: fsMoveUp,
+    moveDown: fsMoveDown
+  } = useContentOrdering(
+    canvasId,
+    user?.uid
+  );
 
   // Wrapper functions that update store first, then sync to Firestore
   const addToContentIds = async (id: string) => {
     storeAddToContentIds(id);
-    // Sync to Firestore will happen via useFirestoreSync
+    fsAddToContentIds(id); // Sync to Firestore
   };
 
   const removeFromContentIds = async (id: string) => {
     storeRemoveFromContentIds(id);
-    // Sync to Firestore will happen via useFirestoreSync
+    fsRemoveFromContentIds(id); // Sync to Firestore
   };
 
   const bringToFront = (id: string) => {
@@ -55,14 +65,15 @@ export const useContent = () => {
     fsMoveDown(id); // Sync to Firestore
   };
 
-  // Pass addToContentIds to content operations so they can add IDs after creation
+  // Pass addToContentIds and removeFromContentIds to content operations
   const { createContent, updateContent, deleteContent, clearAllContent, startEditingContent, stopEditingContent, createContentBatch, updateContentBatch, deleteContentBatch } = useContentOperations(
     firestoreContent,
     setContent,
     activelyEditingRef,
     isCreatingContent,
     user?.uid,
-    addToContentIds  // Pass this so it can be called with the real Firestore ID
+    addToContentIds,      // Pass this so it can be called with the real Firestore ID
+    removeFromContentIds  // Pass this so it can be called when content is deleted
   );
 
   // Get content and contentIds directly from Zustand store for immediate UI updates

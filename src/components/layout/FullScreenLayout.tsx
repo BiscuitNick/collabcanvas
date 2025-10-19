@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { Bug, Users, Layers } from 'lucide-react'
 import { useCanvasStore } from '../../store/canvasStore'
 import type { Shape, Content, Cursor as CursorType, PresenceUser } from '../../types'
+import { isGroupContent } from '../../types'
 import type { CanvasProps } from '../canvas/Canvas'
 import UserProfileButton from './UserProfileButton'
 import PositionWidget from './PositionWidget'
@@ -130,7 +131,50 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 
     // Remove id, createdAt, updatedAt as they'll be generated
     const { id, createdAt, updatedAt, ...contentToCopy } = itemToCopy as any
-    createContent({ ...contentToCopy, x: newX, y: newY })
+
+    // If copying a group, regenerate all nested item IDs with proper naming convention
+    if (isGroupContent(itemToCopy)) {
+      const baseTimestamp = Date.now()
+      const oldToNewIdMap: Record<string, string> = {}
+
+      // Generate new IDs for all nested items
+      itemToCopy.contentIds.forEach((oldId, index) => {
+        const nestedItem = itemToCopy.contentData[oldId]
+        if (nestedItem) {
+          // Use same naming convention: {type}-{timestamp}-{random}
+          const timestamp = baseTimestamp + index
+          const randomSuffix = Math.random().toString(36).substr(2, 9)
+          const newId = `${nestedItem.type}-${timestamp}-${randomSuffix}`
+          oldToNewIdMap[oldId] = newId
+        }
+      })
+
+      // Create new contentIds array with new IDs
+      const newContentIds = itemToCopy.contentIds.map(oldId => oldToNewIdMap[oldId])
+
+      // Create new contentData object with new IDs as keys
+      const newContentData: any = {}
+      Object.entries(itemToCopy.contentData).forEach(([oldId, nestedItem]) => {
+        const newId = oldToNewIdMap[oldId]
+        if (newId) {
+          newContentData[newId] = {
+            ...nestedItem,
+            id: newId
+          }
+        }
+      })
+
+      createContent({
+        ...contentToCopy,
+        x: newX,
+        y: newY,
+        contentIds: newContentIds,
+        contentData: newContentData
+      })
+    } else {
+      // Not a group, just copy normally
+      createContent({ ...contentToCopy, x: newX, y: newY })
+    }
   }, [createContent])
 
   // Handle deleting content

@@ -68,6 +68,9 @@ export const useFirestoreSync = (userUid: string | undefined) => {
     contentStateRef.current = content;
   }, [content]);
 
+  // Get the setContentIds function from the store
+  const setStoreContentIds = useCanvasStore((state) => state.setContentIds);
+
   // Listen to canvas document for contentIds ordering
   useEffect(() => {
     if (!userUid || !enableFirestore) {
@@ -78,12 +81,20 @@ export const useFirestoreSync = (userUid: string | undefined) => {
     const unsubscribe = onSnapshot(canvasRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        setContentIds(data.contentIds || []);
+        const firestoreContentIds = data.contentIds || [];
+        setContentIds(firestoreContentIds);
+        // Also update the store's contentIds directly from Firestore
+        setStoreContentIds(firestoreContentIds);
+        console.log('📥 [FIRESTORE SYNC] Received canvas document from Firestore:', {
+          contentIds: firestoreContentIds,
+          contentIdsLastEditedBy: data.contentIdsLastEditedBy || null,
+          contentIdsLastEditedAt: data.contentIdsLastEditedAt || null
+        });
       }
     });
 
     return () => unsubscribe();
-  }, [userUid, enableFirestore, canvasId]);
+  }, [userUid, enableFirestore, canvasId, setStoreContentIds]);
 
   // When Firestore is disabled, sync with canvas store
   useEffect(() => {
@@ -211,14 +222,22 @@ export const useFirestoreSync = (userUid: string | undefined) => {
           }
         });
 
-        console.log(`🔥 [FIRESTORE] Content from Firestore:`, contentData.map(c => ({
-          id: c.id,
-          type: c.type,
-          lastEditedBy: c.lastEditedBy,
-          x: Math.round(c.x),
-          y: Math.round(c.y),
-          contentIds: (c as any).contentIds?.length || 0
-        })));
+        console.log(`🔥 [FIRESTORE] Content from Firestore:`, contentData.map(c => {
+          const info: any = {
+            id: c.id,
+            type: c.type,
+            lastEditedBy: c.lastEditedBy,
+            x: Math.round(c.x),
+            y: Math.round(c.y)
+          }
+          // Show contentIds array for groups
+          if (c.type === 'group' && (c as any).contentIds) {
+            info.contentIds = (c as any).contentIds
+            info.nestedCount = (c as any).contentIds.length
+          }
+          return info
+        }));
+        console.log(`🔢 [FIRESTORE] Canvas contentIds (z-index order):`, contentIds);
 
         // Get current store content for comparison from ref
         const currentStoreContent = storeContentRef.current;
@@ -235,40 +254,12 @@ export const useFirestoreSync = (userUid: string | undefined) => {
           const storeItem = storeContentMap.get(remoteContent.id);
           const wasLastEditedByCurrentUser = remoteContent.lastEditedBy === userUid;
 
-          // Look for temp item that might be waiting for ID replacement
-          let tempItem: Content | undefined;
-          if (!storeItem && wasLastEditedByCurrentUser) {
-            // Check if there's a temp item for this content
-            tempItem = Array.from(storeContentMap.values()).find(item =>
-              item.id.startsWith('temp-') &&
-              item.type === remoteContent.type &&
-              Math.abs(item.x - remoteContent.x) < 0.1 && // Same position (accounting for floating point)
-              Math.abs(item.y - remoteContent.y) < 0.1
-            );
-          }
-
           if (isActivelyEditing && storeItem) {
             // User is actively editing this item - keep their local changes
             mergedContent.push(storeItem);
-          } else if (wasLastEditedByCurrentUser && (storeItem || tempItem)) {
-            // Current user was the last to edit - use local version but update ID if needed
-            const localVersion = storeItem || tempItem!;
-            if (tempItem) {
-              // Replace temp ID with real Firestore ID
-              mergedContent.push({
-                ...localVersion,
-                id: remoteContent.id,
-                createdAt: remoteContent.createdAt, // Use Firestore timestamp
-                updatedAt: remoteContent.updatedAt, // Use Firestore timestamp
-              });
-              storeContentMap.delete(tempItem.id); // Remove temp item from map
-            } else {
-              // Keep existing store item, ignore Firestore update
-              mergedContent.push(storeItem!);
-            }
-          } else if (wasLastEditedByCurrentUser && !storeItem && !tempItem) {
-            // We were last to edit but have no local copy - this shouldn't happen, but use remote to be safe
-            mergedContent.push(remoteContent);
+          } else if (wasLastEditedByCurrentUser && storeItem) {
+            // Current user was the last to edit - use local version
+            mergedContent.push(storeItem);
           } else {
             // Not editing and not our edit - use remote content (this updates other users' changes)
             mergedContent.push(remoteContent);

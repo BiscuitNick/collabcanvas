@@ -85,11 +85,6 @@ export const useFirestoreSync = (userUid: string | undefined) => {
         setContentIds(firestoreContentIds);
         // Also update the store's contentIds directly from Firestore
         setStoreContentIds(firestoreContentIds);
-        console.log('📥 [FIRESTORE SYNC] Received canvas document from Firestore:', {
-          contentIds: firestoreContentIds,
-          contentIdsLastEditedBy: data.contentIdsLastEditedBy || null,
-          contentIdsLastEditedAt: data.contentIdsLastEditedAt || null
-        });
       }
     });
 
@@ -125,8 +120,6 @@ export const useFirestoreSync = (userUid: string | undefined) => {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        console.log(`🔥 [FIRESTORE] Received update with ${snapshot.size} documents`);
-
         const contentData: Content[] = [];
         const deletedIds: string[] = [];
 
@@ -221,23 +214,6 @@ export const useFirestoreSync = (userUid: string | undefined) => {
             });
           }
         });
-
-        console.log(`🔥 [FIRESTORE] Content from Firestore:`, contentData.map(c => {
-          const info: any = {
-            id: c.id,
-            type: c.type,
-            lastEditedBy: c.lastEditedBy,
-            x: Math.round(c.x),
-            y: Math.round(c.y)
-          }
-          // Show contentIds array for groups
-          if (c.type === 'group' && (c as any).contentIds) {
-            info.contentIds = (c as any).contentIds
-            info.nestedCount = (c as any).contentIds.length
-          }
-          return info
-        }));
-        console.log(`🔢 [FIRESTORE] Canvas contentIds (z-index order):`, contentIds);
 
         // Get current store content for comparison from ref
         const currentStoreContent = storeContentRef.current;

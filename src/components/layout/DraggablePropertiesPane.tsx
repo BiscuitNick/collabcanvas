@@ -44,6 +44,7 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
   onMoveDown,
 }) => {
   const selectedItemRef = useRef<HTMLDivElement>(null)
+  const selectedNestedItemRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [expandedItemId, setExpandedItemId] = React.useState<string | null>(null)
   const [selectedNestedItemId, setSelectedNestedItemId] = React.useState<string | null>(null)
@@ -76,6 +77,37 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
       .join('')
       .toUpperCase()
       .slice(0, 2)
+  }
+
+  // Helper to generate a descriptive label for content
+  const getContentLabel = (shape: Content): string => {
+    // For text, show excerpt
+    if (isTextContent(shape)) {
+      return getTextExcerpt(shape.text, 20) || 'Text'
+    }
+
+    // Safety check - ensure ID exists
+    if (!shape.id) {
+      return shape.type.charAt(0).toUpperCase() + shape.type.slice(1)
+    }
+
+    // For all other types (including groups), extract a short identifier from the ID
+    // ID format: {type}-{timestamp}-{random}
+    const idParts = shape.id.split('-')
+    if (idParts.length >= 2) {
+      const type = idParts[0].charAt(0).toUpperCase() + idParts[0].slice(1)
+      const shortId = idParts[idParts.length - 1].slice(0, 4) // Last 4 chars of random suffix
+
+      // For groups, also show item count
+      if (isGroupContent(shape)) {
+        return `${type} ${shortId} (${shape.contentIds.length} items)`
+      }
+
+      return `${type} ${shortId}`
+    }
+
+    // Fallback to just the type
+    return shape.type.charAt(0).toUpperCase() + shape.type.slice(1)
   }
 
   // Get the fill color of a shape
@@ -121,25 +153,59 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
   const renderNestedItems = (groupId: string, groupContent: Content) => {
     if (!isGroupContent(groupContent)) return null
 
-    return groupContent.contentIds.map((nestedItemId) => {
+    // Reverse contentIds so top layer (last in array) appears first in list
+    const reversedContentIds = [...groupContent.contentIds].reverse()
+
+    // Helper functions for nested item z-index operations
+    const bringNestedToFront = (nestedId: string) => {
+      const newContentIds = groupContent.contentIds.filter(id => id !== nestedId)
+      newContentIds.push(nestedId)
+      onUpdateShape(groupId, { contentIds: newContentIds })
+    }
+
+    const sendNestedToBack = (nestedId: string) => {
+      const newContentIds = groupContent.contentIds.filter(id => id !== nestedId)
+      newContentIds.unshift(nestedId)
+      onUpdateShape(groupId, { contentIds: newContentIds })
+    }
+
+    const moveNestedUp = (nestedId: string) => {
+      const index = groupContent.contentIds.indexOf(nestedId)
+      if (index === -1 || index === groupContent.contentIds.length - 1) return
+      const newContentIds = [...groupContent.contentIds]
+      ;[newContentIds[index], newContentIds[index + 1]] = [newContentIds[index + 1], newContentIds[index]]
+      onUpdateShape(groupId, { contentIds: newContentIds })
+    }
+
+    const moveNestedDown = (nestedId: string) => {
+      const index = groupContent.contentIds.indexOf(nestedId)
+      if (index === -1 || index === 0) return
+      const newContentIds = [...groupContent.contentIds]
+      ;[newContentIds[index], newContentIds[index - 1]] = [newContentIds[index - 1], newContentIds[index]]
+      onUpdateShape(groupId, { contentIds: newContentIds })
+    }
+
+    return reversedContentIds.map((nestedItemId) => {
       const nestedItem = groupContent.contentData[nestedItemId]
       if (!nestedItem) return null
 
-      const label = isTextContent(nestedItem)
-        ? getTextExcerpt(nestedItem.text, 20)
-        : nestedItem.type
+      const label = getContentLabel(nestedItem)
 
       const isNestedItemSelected = selectedNestedItemId === nestedItemId
 
       return (
-        <div key={nestedItemId} className="pl-6 pr-2 py-2 hover:bg-gray-100 border-l-2 border-gray-300">
+        <div
+          key={nestedItemId}
+          ref={isNestedItemSelected ? selectedNestedItemRef : null}
+          className="hover:bg-gray-100 border-l-2 border-gray-300"
+        >
           <div
             className={`rounded cursor-pointer transition-colors ${
               isNestedItemSelected ? 'bg-blue-50 border border-blue-200 p-2' : 'p-2'
             }`}
             onClick={(e) => handleNestedItemClick(groupId, nestedItemId, e)}
           >
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 pl-4">
               <div className="flex-shrink-0">
                 {renderShapeIcon(nestedItem)}
               </div>
@@ -167,6 +233,10 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
                     }
                   }}
                   readOnly={!canEdit}
+                  onBringToFront={() => bringNestedToFront(nestedItemId)}
+                  onSendToBack={() => sendNestedToBack(nestedItemId)}
+                  onMoveUp={() => moveNestedUp(nestedItemId)}
+                  onMoveDown={() => moveNestedDown(nestedItemId)}
                 />
               </div>
             )}
@@ -184,30 +254,42 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
     }
   }, [selectedShape?.id])
 
-  // Scroll to show full expanded content in view
+  // Scroll to show full expanded content in view (for top-level items)
   useEffect(() => {
     if (selectedShape && expandedItemId === selectedShape.id && selectedItemRef.current && scrollContainerRef.current) {
       // Use requestAnimationFrame to ensure DOM has rendered the expanded content
       requestAnimationFrame(() => {
         selectedItemRef.current?.scrollIntoView({
-          behavior: 'auto',
-          block: 'start',
+          behavior: 'smooth',
+          block: 'nearest',
           inline: 'nearest'
         })
       })
     }
-  }, [expandedItemId, selectedShape?.id])
+  }, [expandedItemId, selectedShape?.id, content]) // Added content dependency for reordering
+
+  // Scroll to show nested item in view when selected or reordered
+  useEffect(() => {
+    if (selectedNestedItemId && selectedNestedItemRef.current && scrollContainerRef.current) {
+      // Use requestAnimationFrame to ensure DOM has rendered
+      requestAnimationFrame(() => {
+        selectedNestedItemRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'nearest'
+        })
+      })
+    }
+  }, [selectedNestedItemId, content]) // Added content dependency for reordering
 
   if (!isVisible) {
     return null
   }
 
-  // Sort content by creation date
-  const sortedContent = [...content].sort((a, b) => {
-    const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt || 0);
-    const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt || 0);
-    return dateA - dateB;
-  });
+  // Reverse content order so top layer (last in contentIds) appears first in list
+  // The content prop is already ordered by z-index (first = bottom, last = top)
+  // We reverse it so the UI shows top layer at the top of the list
+  const sortedContent = [...content].reverse();
 
   return (
     <div className="w-64 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg flex flex-col overflow-hidden" style={{ height: '100%', maxHeight: '100%' }}>
@@ -229,9 +311,7 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 p-3 space-y-1.5 w-full">
         {sortedContent.length > 0 ? (
           sortedContent.map((shape) => {
-            const label = isTextContent(shape)
-              ? getTextExcerpt(shape.text, 20)
-              : shape.type
+            const label = getContentLabel(shape)
 
             const isSelected = selectedShape?.id === shape.id
             const isLockedByOther = shape.lockedByUserId && shape.lockedByUserId !== currentUserId

@@ -153,22 +153,6 @@ export const useCanvasStore = create<CanvasState>()(
       const newContent = [...state.content, content]
       const newContentIds = [...state.contentIds, content.id]
 
-      // Log all content whenever anything is added
-      console.log('➕ [CANVAS STORE] Content added:', content.type, content.id)
-      console.log('📊 [CANVAS STORE] Total content items:', newContent.length)
-      console.log('🔢 [CANVAS STORE] ContentIds:', newContentIds)
-      console.log('📋 [CANVAS STORE] === ALL CONTENT IN STORE ===')
-      newContent.forEach((item, index) => {
-        console.log(`  [${index}] Type: ${item.type}, ID: ${item.id}`)
-        console.log(`      Position: (${item.x}, ${item.y})`)
-        console.log(`      Created by: ${item.createdBy}`)
-        if (item.type === 'group') {
-          console.log(`      Nested items: ${(item as any).contentIds?.length || 0}`)
-        }
-      })
-      console.log('📦 [CANVAS STORE] === NEWLY ADDED ITEM (FULL DATA) ===')
-      console.log(JSON.stringify(content, null, 2))
-
       return { content: newContent, contentIds: newContentIds }
     })
   },
@@ -227,8 +211,6 @@ export const useCanvasStore = create<CanvasState>()(
   
   setContent: (content: Content[]) => {
     // Only update content, NOT contentIds (contentIds is managed separately via Firestore sync or z-index operations)
-    console.log('📝 [CANVAS STORE] Setting content (contentIds unchanged)')
-    console.log('📊 [CANVAS STORE] Content items:', content.length)
     set({ content })
   },
   
@@ -246,12 +228,9 @@ export const useCanvasStore = create<CanvasState>()(
   addToContentIds: (id: string) => {
     set((state) => {
       if (state.contentIds.includes(id)) {
-        console.log('⚠️ [CANVAS STORE] ID already in contentIds:', id)
         return state
       }
       const newContentIds = [...state.contentIds, id]
-      console.log('✅ [CANVAS STORE] Added to contentIds:', id)
-      console.log('🔢 [CANVAS STORE] New contentIds:', newContentIds)
       return { contentIds: newContentIds }
     })
   },
@@ -259,8 +238,6 @@ export const useCanvasStore = create<CanvasState>()(
   removeFromContentIds: (id: string) => {
     set((state) => {
       const newContentIds = state.contentIds.filter(contentId => contentId !== id)
-      console.log('✅ [CANVAS STORE] Removed from contentIds:', id)
-      console.log('🔢 [CANVAS STORE] New contentIds:', newContentIds)
       return { contentIds: newContentIds }
     })
   },
@@ -273,8 +250,6 @@ export const useCanvasStore = create<CanvasState>()(
     set((state) => {
       const newContentIds = state.contentIds.filter(contentId => contentId !== id)
       newContentIds.push(id)
-      console.log('🔼 [CANVAS STORE] Brought to front:', id)
-      console.log('🔢 [CANVAS STORE] New contentIds:', newContentIds)
       return { contentIds: newContentIds }
     })
   },
@@ -283,8 +258,6 @@ export const useCanvasStore = create<CanvasState>()(
     set((state) => {
       const newContentIds = state.contentIds.filter(contentId => contentId !== id)
       newContentIds.unshift(id)
-      console.log('🔽 [CANVAS STORE] Sent to back:', id)
-      console.log('🔢 [CANVAS STORE] New contentIds:', newContentIds)
       return { contentIds: newContentIds }
     })
   },
@@ -293,13 +266,10 @@ export const useCanvasStore = create<CanvasState>()(
     set((state) => {
       const index = state.contentIds.indexOf(id)
       if (index === -1 || index === state.contentIds.length - 1) {
-        console.log('⚠️ [CANVAS STORE] Cannot move up, already at top or not found:', id)
         return state
       }
       const newContentIds = [...state.contentIds]
       ;[newContentIds[index], newContentIds[index + 1]] = [newContentIds[index + 1], newContentIds[index]]
-      console.log('⬆️ [CANVAS STORE] Moved up:', id)
-      console.log('🔢 [CANVAS STORE] New contentIds:', newContentIds)
       return { contentIds: newContentIds }
     })
   },
@@ -308,13 +278,10 @@ export const useCanvasStore = create<CanvasState>()(
     set((state) => {
       const index = state.contentIds.indexOf(id)
       if (index === -1 || index === 0) {
-        console.log('⚠️ [CANVAS STORE] Cannot move down, already at bottom or not found:', id)
         return state
       }
       const newContentIds = [...state.contentIds]
       ;[newContentIds[index], newContentIds[index - 1]] = [newContentIds[index - 1], newContentIds[index]]
-      console.log('⬇️ [CANVAS STORE] Moved down:', id)
-      console.log('🔢 [CANVAS STORE] New contentIds:', newContentIds)
       return { contentIds: newContentIds }
     })
   },
@@ -324,22 +291,6 @@ export const useCanvasStore = create<CanvasState>()(
     set((state) => {
       const newContent = [...state.content, shape]
       const newContentIds = [...state.contentIds, shape.id]
-
-      // Log all content whenever anything is added
-      console.log('➕ [CANVAS STORE - LEGACY] Content added:', shape.type, shape.id)
-      console.log('📊 [CANVAS STORE - LEGACY] Total content items:', newContent.length)
-      console.log('🔢 [CANVAS STORE - LEGACY] ContentIds:', newContentIds)
-      console.log('📋 [CANVAS STORE - LEGACY] === ALL CONTENT IN STORE ===')
-      newContent.forEach((item, index) => {
-        console.log(`  [${index}] Type: ${item.type}, ID: ${item.id}`)
-        console.log(`      Position: (${item.x}, ${item.y})`)
-        console.log(`      Created by: ${item.createdBy}`)
-        if (item.type === 'group') {
-          console.log(`      Nested items: ${(item as any).contentIds?.length || 0}`)
-        }
-      })
-      console.log('📦 [CANVAS STORE - LEGACY] === NEWLY ADDED ITEM (FULL DATA) ===')
-      console.log(JSON.stringify(shape, null, 2))
 
       return { content: newContent, contentIds: newContentIds }
     })

@@ -95,7 +95,7 @@ export function formatTimeAgo(date: number | Date | null | undefined): string {
   if (elapsedMs < 1000) return 'just now'
 
   const elapsedSecs = Math.floor(elapsedMs / 1000)
-  if (elapsedSecs < 60) return `${elapsedSecs}s ago`
+  if (elapsedSecs < 60) return elapsedSecs === 1 ? '1 second ago' : `${elapsedSecs} seconds ago`
 
   const elapsedMins = Math.floor(elapsedSecs / 60)
   if (elapsedMins < 60) return elapsedMins === 1 ? '1 minute ago' : `${elapsedMins} minutes ago`
@@ -104,7 +104,16 @@ export function formatTimeAgo(date: number | Date | null | undefined): string {
   if (elapsedHours < 24) return elapsedHours === 1 ? '1 hour ago' : `${elapsedHours} hours ago`
 
   const elapsedDays = Math.floor(elapsedHours / 24)
-  return elapsedDays === 1 ? '1 day ago' : `${elapsedDays} days ago`
+  if (elapsedDays < 7) return elapsedDays === 1 ? '1 day ago' : `${elapsedDays} days ago`
+
+  const elapsedWeeks = Math.floor(elapsedDays / 7)
+  if (elapsedWeeks < 4) return elapsedWeeks === 1 ? '1 week ago' : `${elapsedWeeks} weeks ago`
+
+  const elapsedMonths = Math.floor(elapsedDays / 30)
+  if (elapsedMonths < 12) return elapsedMonths === 1 ? '1 month ago' : `${elapsedMonths} months ago`
+
+  const elapsedYears = Math.floor(elapsedDays / 365)
+  return elapsedYears === 1 ? '1 year ago' : `${elapsedYears} years ago`
 }
 
 // Import types for factory function

@@ -17,6 +17,7 @@ interface TextContentProps {
   onDragEndCallback: () => void
   currentUserId?: string
   selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
+  canEdit?: boolean
 }
 
 const TextContentComponent: React.FC<TextContentProps> = memo(({
@@ -30,6 +31,7 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
   onDragEndCallback,
   currentUserId,
   selectedTool,
+  canEdit = true,
 }) => {
   const textRef = useRef<Konva.Text>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
@@ -248,17 +250,17 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
         rotation={content.rotation || 0}
         align={content.textAlign || 'left'}
         verticalAlign={content.verticalAlign || 'top'}
-        draggable={isSelected && !isLockedByOther}
+        draggable={isSelected && !isLockedByOther && canEdit}
         onClick={handleClick}
         onTap={handleClick}
         onMouseDown={handleMouseDown}
         onDblClick={handleDblClick}
         onDblTap={handleDblClick}
-        onDragStart={isSelected && !isLockedByOther ? handleDragStart : undefined}
-        onDragMove={isSelected && !isLockedByOther ? handleDragMove : undefined}
-        onDragEnd={isSelected && !isLockedByOther ? handleDragEnd : undefined}
-        onTransformStart={isSelected && !isLockedByOther ? handleTransformStart : undefined}
-        onTransformEnd={isSelected && !isLockedByOther ? handleTransformEnd : undefined}
+        onDragStart={isSelected && !isLockedByOther && canEdit ? handleDragStart : undefined}
+        onDragMove={isSelected && !isLockedByOther && canEdit ? handleDragMove : undefined}
+        onDragEnd={isSelected && !isLockedByOther && canEdit ? handleDragEnd : undefined}
+        onTransformStart={isSelected && !isLockedByOther && canEdit ? handleTransformStart : undefined}
+        onTransformEnd={isSelected && !isLockedByOther && canEdit ? handleTransformEnd : undefined}
         // Hover effects
         onMouseEnter={(e: Konva.KonvaEventObject<MouseEvent>) => {
           try {
@@ -282,7 +284,7 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
         }}
       />
 
-      {isSelected && !isLockedByOther && (
+      {isSelected && !isLockedByOther && canEdit && (
         <Transformer
           ref={transformerRef}
           keepRatio={false}

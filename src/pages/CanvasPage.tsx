@@ -6,7 +6,7 @@ import { useCursors } from '../hooks/useCursors'
 import { usePresence } from '../hooks/usePresence'
 import { useCanvasStore } from '../store/canvasStore'
 import { useCanvasMetadata } from '../hooks/useCanvasMetadata'
-import { CanvasProvider } from '../contexts/CanvasContext'
+import { CanvasProvider, useCanEdit } from '../contexts/CanvasContext'
 import FullScreenLayout from '../components/layout/FullScreenLayout'
 import Canvas from '../components/canvas/Canvas'
 import ErrorBoundary from '../components/ErrorBoundary'
@@ -15,14 +15,18 @@ import { CANVAS_HALF } from '../lib/constants'
 export const CanvasPage: React.FC = () => {
   const [searchParams] = useSearchParams()
   const canvasId = searchParams.get('id')
+  const { user } = useAuth()
 
   // Redirect to canvases list if no canvas ID is provided
   if (!canvasId) {
     return <Navigate to="/canvases" replace />
   }
 
+  // Get edit permission from metadata
+  const { canEdit } = useCanvasMetadata(canvasId, user?.uid)
+
   return (
-    <CanvasProvider canvasId={canvasId}>
+    <CanvasProvider canvasId={canvasId} canEdit={canEdit}>
       <CanvasPageContent />
     </CanvasProvider>
   )
@@ -33,6 +37,7 @@ const CanvasPageContent: React.FC = () => {
   const canvasId = searchParams.get('id')!
   const { user, loading: authLoading } = useAuth()
   const { loading: metadataLoading, error: metadataError, canView } = useCanvasMetadata(canvasId, user?.uid)
+  const canEdit = useCanEdit()
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const [pendingUserClick, setPendingUserClick] = useState<string | null>(null)
   const [showSelfCursor] = useState(true)
@@ -209,6 +214,7 @@ const CanvasPageContent: React.FC = () => {
           unlockShape={unlockShape}
           startEditingShape={startEditingShape}
           stopEditingShape={stopEditingShape}
+          canEdit={canEdit}
         />
       </FullScreenLayout>
     </ErrorBoundary>

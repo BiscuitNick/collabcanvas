@@ -17,6 +17,7 @@ interface ShapeFactoryProps {
   onDragEndCallback: () => void
   currentUserId?: string
   selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
+  canEdit?: boolean
 }
 
 /**
@@ -35,6 +36,7 @@ const ShapeFactory: React.FC<ShapeFactoryProps> = ({
   onDragEndCallback,
   currentUserId,
   selectedTool,
+  canEdit = true,
 }) => {
   // Handle null or undefined shapes
   if (!shape) {
@@ -56,6 +58,7 @@ const ShapeFactory: React.FC<ShapeFactoryProps> = ({
         onDragEndCallback={onDragEndCallback}
         currentUserId={currentUserId}
         selectedTool={selectedTool}
+        canEdit={canEdit}
       />
     )
   }
@@ -74,6 +77,7 @@ const ShapeFactory: React.FC<ShapeFactoryProps> = ({
         onDragEndCallback={onDragEndCallback}
         currentUserId={currentUserId}
         selectedTool={selectedTool}
+        canEdit={canEdit}
       />
     )
   }
@@ -92,6 +96,7 @@ const ShapeFactory: React.FC<ShapeFactoryProps> = ({
         onDragEndCallback={onDragEndCallback}
         currentUserId={currentUserId}
         selectedTool={selectedTool}
+        canEdit={canEdit}
       />
     )
   }
@@ -110,6 +115,7 @@ const ShapeFactory: React.FC<ShapeFactoryProps> = ({
         onDragEndCallback={onDragEndCallback}
         currentUserId={currentUserId}
         selectedTool={selectedTool}
+        canEdit={canEdit}
       />
     )
   }

@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuItem
 } from '../ui/dropdown-menu'
-import { LogOut, LayoutGrid } from 'lucide-react'
+import { LogOut, LayoutGrid, LogIn } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
 interface UserProfileButtonProps {
@@ -21,8 +21,19 @@ const UserProfileButton: React.FC<UserProfileButtonProps> = () => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
+  // Show login button if not logged in
   if (!user) {
-    return null
+    return (
+      <Button
+        variant="ghost"
+        className="rounded-lg px-4 py-2 hover:bg-gray-200"
+        onClick={() => navigate('/login')}
+        title="Login"
+      >
+        <LogIn className="h-4 w-4 mr-2" />
+        <span className="text-sm font-medium">Login</span>
+      </Button>
+    )
   }
 
   // Generate initials from displayName or email

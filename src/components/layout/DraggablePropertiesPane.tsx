@@ -6,6 +6,7 @@ import type { Content } from '../../types'
 import { isTextContent, isRectangleContent, isCircleContent } from '../../types'
 import { getTextExcerpt } from '../../lib/utils'
 import { Lock, Copy, Trash2 } from 'lucide-react'
+import { useCanEdit } from '../../contexts/CanvasContext'
 
 interface DraggablePropertiesPaneProps {
   content: Content[]
@@ -37,6 +38,7 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
   const selectedItemRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [expandedItemId, setExpandedItemId] = React.useState<string | null>(null)
+  const canEdit = useCanEdit()
 
   // Handle item header click - toggle expand/collapse or select
   const handleHeaderClick = (shapeId: string, e: React.MouseEvent) => {
@@ -189,7 +191,12 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
                   </div>
 
                   {/* Right side: lock icon, lock avatar, or empty space */}
-                  {isLockedBySelf ? (
+                  {!canEdit ? (
+                    // View-only mode: show lock for all items
+                    <div className="flex-shrink-0 text-gray-500" title="View only - no edit permission">
+                      <Lock className="h-3.5 w-3.5" />
+                    </div>
+                  ) : isLockedBySelf ? (
                     <div className="flex-shrink-0 text-blue-500">
                       <Lock className="h-3.5 w-3.5" />
                     </div>
@@ -208,18 +215,19 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
                   ) : null}
                 </div>
 
-                {/* Content properties - only show if expanded and not locked by someone else */}
+                {/* Content properties - show if expanded and not locked by someone else */}
                 {!isLockedByOther && isExpanded && (
                   <div className="px-2 pb-2 pt-2 border-t border-gray-200">
                     <ContentProperties
                       content={shape}
                       onUpdate={(updates) => onUpdateShape(shape.id, updates)}
+                      readOnly={!canEdit}
                     />
                   </div>
                 )}
 
                 {/* Action buttons - shown at bottom of properties when expanded */}
-                {!isLockedByOther && isExpanded && (
+                {canEdit && !isLockedByOther && isExpanded && (
                   <div className="px-2 pb-2 pt-2 border-t border-gray-200 space-y-2">
                     <Button
                       variant="outline"

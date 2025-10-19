@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { firestore } from '../../lib/firebase';
 import { useCanvasStore } from '../../store/canvasStore';
-import { useCanvasId } from '../../contexts/CanvasContext';
+import { useCanvasId, useCanEdit } from '../../contexts/CanvasContext';
 import { LOCK_TTL_MS } from '../../lib/config';
 import { useAuth } from '../useAuth';
 import { getUserColor } from '../../lib/utils';
@@ -11,12 +11,19 @@ import type { Content } from '../../types';
 
 export const useContentLocking = (content: Content[]) => {
   const canvasId = useCanvasId();
+  const canEdit = useCanEdit();
   const { user } = useAuth();
   const { updateContent: updateStoreContent } = useCanvasStore();
   const lockCleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const lockContent = useCallback(async (id: string): Promise<void> => {
     if (!user) return;
+
+    // Check edit permission
+    if (!canEdit) {
+      console.warn('⛔ Cannot lock content: No edit permission');
+      return;
+    }
     try {
       const userColor = getUserColor(user.uid);
       updateStoreContent(id, {
@@ -35,7 +42,7 @@ export const useContentLocking = (content: Content[]) => {
     } catch (err) {
       console.error('Error locking content:', err);
     }
-  }, [user, updateStoreContent, canvasId]);
+  }, [user, updateStoreContent, canvasId, canEdit]);
 
   const unlockContent = useCallback(async (id: string): Promise<void> => {
     try {

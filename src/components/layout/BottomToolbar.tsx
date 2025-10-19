@@ -62,6 +62,7 @@ interface BottomToolbarProps {
   selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
   onToolSelect: (tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null) => void
   onResetCanvas: () => void
+  canEdit?: boolean
 }
 
 type ToolType = 'pan' | 'shapes' | 'text' | 'image' | 'ai' | 'agent' | 'grid'
@@ -75,7 +76,8 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   // onCreateText is not used yet but reserved for future use
   onOpenAIAgent,
   onToolSelect,
-  onResetCanvas
+  onResetCanvas,
+  canEdit = true
 }) => {
 
   // Get selected content from canvas store
@@ -706,8 +708,18 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
   return (
     <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center">
+      {/* View-Only Mode Notice */}
+      {!canEdit && (
+        <div className="mb-2 bg-amber-50 border border-amber-300 text-amber-800 rounded-lg shadow-lg px-4 py-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">📖 View-Only Mode</span>
+            <span className="text-xs">You can view updates but cannot edit this canvas</span>
+          </div>
+        </div>
+      )}
+
       {/* Agent Input Field - Appears above toolbar when agent tool is active */}
-      {activeTool === 'agent' && (
+      {canEdit && activeTool === 'agent' && (
         <div className="mb-2 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-4 py-2 space-y-2 w-fit">
           <div className="flex items-center gap-2">
             <Input
@@ -739,7 +751,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
       )}
 
       {/* Text Input Field - Appears above toolbar when text tool is active */}
-      {activeTool === 'text' && (
+      {canEdit && activeTool === 'text' && (
         <div className="mb-2 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-4 py-2">
           <Input
             type="text"
@@ -908,43 +920,45 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
         )
       })()}
 
-      {/* Main Toolbar */}
-      <div className="bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-4 py-2 flex items-center space-x-4">
-        {/* Left Tool Selection Dropdown */}
-        <div className="flex items-center">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8">
-                {getCurrentTool() && (() => {
-                  const Icon = getCurrentTool()!.icon
-                  return <Icon className="h-4 w-4" />
-                })()}
-                <ChevronDown className="h-4 w-4 ml-2" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-white">
-              {tools.map((tool) => {
-                const Icon = tool.icon
-                return (
-                  <DropdownMenuItem
-                    key={tool.id}
-                    onClick={() => handleToolSelect(tool.id)}
-                    className="flex items-center"
-                  >
-                    <Icon className="h-4 w-4 mr-2" />
-                    {tool.label}
-                  </DropdownMenuItem>
-                )
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+      {/* Main Toolbar - Only show for users with edit permission */}
+      {canEdit && (
+        <div className="bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-4 py-2 flex items-center space-x-4">
+          {/* Left Tool Selection Dropdown */}
+          <div className="flex items-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8">
+                  {getCurrentTool() && (() => {
+                    const Icon = getCurrentTool()!.icon
+                    return <Icon className="h-4 w-4" />
+                  })()}
+                  <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-white">
+                {tools.map((tool) => {
+                  const Icon = tool.icon
+                  return (
+                    <DropdownMenuItem
+                      key={tool.id}
+                      onClick={() => handleToolSelect(tool.id)}
+                      className="flex items-center"
+                    >
+                      <Icon className="h-4 w-4 mr-2" />
+                      {tool.label}
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
-        {/* Right Dynamic Content */}
-        <div className="flex items-center">
-          {renderDynamicContent()}
+          {/* Right Dynamic Content */}
+          <div className="flex items-center">
+            {renderDynamicContent()}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

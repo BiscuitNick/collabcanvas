@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { collection, getDocs, addDoc, Timestamp, query, where, or } from 'firebase/firestore'
+import { collection, getDocs, addDoc, deleteDoc, doc, Timestamp, query, where, or } from 'firebase/firestore'
 import { firestore } from '../lib/firebase'
 
 export type CanvasVisibility = 'public' | 'private' | 'unlisted'
@@ -145,12 +145,35 @@ export function useCanvases(userId?: string) {
     }
   }
 
+  const deleteCanvas = async (
+    canvasId: string,
+    userId: string,
+    createdBy: string
+  ): Promise<void> => {
+    try {
+      // Security check: Only allow creator to delete
+      if (userId !== createdBy) {
+        throw new Error('You do not have permission to delete this canvas')
+      }
+
+      const canvasRef = doc(firestore, 'canvases', canvasId)
+      await deleteDoc(canvasRef)
+
+      // Refresh the list
+      await fetchCanvases(userId)
+    } catch (err) {
+      console.error('Error deleting canvas:', err)
+      throw err
+    }
+  }
+
   return {
     canvases,
     publicCanvases,
     loading,
     error,
     createCanvas,
+    deleteCanvas,
     refresh: () => userId && fetchCanvases(userId)
   }
 }

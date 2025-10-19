@@ -3,7 +3,7 @@ import { useCallback, useRef, useState, useEffect } from 'react';
 import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { firestore } from '../../lib/firebase';
 import { useCanvasStore } from '../../store/canvasStore';
-import { useCanvasId } from '../../contexts/CanvasContext';
+import { useCanvasId, useCanEdit } from '../../contexts/CanvasContext';
 import { SHAPE_RETRY_DELAY_MS, SHAPE_MAX_RETRIES, ENABLE_PERFORMANCE_LOGGING } from '../../lib/config';
 import type { Content } from '../../types';
 
@@ -25,6 +25,7 @@ export const useContentOperations = (
   isCreatingContent: React.MutableRefObject<boolean>
 ) => {
   const canvasId = useCanvasId();
+  const canEdit = useCanEdit();
   const { addContent: addStoreContent, updateContent: updateStoreContent, deleteContent: deleteStoreContent, setSyncStatus, clearAllContent: clearAllContentStore } = useCanvasStore();
   const retryCount = useRef(0);
 
@@ -71,6 +72,12 @@ export const useContentOperations = (
   }, [setSyncStatus, canvasId]);
 
   const createContent = useCallback(async (contentData: Omit<Content, 'id' | 'createdAt' | 'updatedAt'>, skipFirestore = false): Promise<void> => {
+    // Check edit permission
+    if (!canEdit) {
+      console.warn('⛔ Cannot create content: No edit permission');
+      return;
+    }
+
     try {
       isCreatingContent.current = true;
 
@@ -110,9 +117,15 @@ export const useContentOperations = (
         isCreatingContent.current = false;
       }, 100);
     }
-  }, [setSyncStatus, isCreatingContent, addStoreContent, canvasId]);
+  }, [setSyncStatus, isCreatingContent, addStoreContent, canvasId, canEdit]);
 
   const updateContent = useCallback(async (id: string, updates: Partial<Content>): Promise<void> => {
+    // Check edit permission
+    if (!canEdit) {
+      console.warn('⛔ Cannot update content: No edit permission');
+      return;
+    }
+
     try {
       // Mark as actively editing and refresh the timeout
       activelyEditingRef.current.add(id);
@@ -145,9 +158,15 @@ export const useContentOperations = (
         setSyncStatus(id, 'error');
       }
     }
-  }, [updateStoreContent, setSyncStatus, throttledUpdate, activelyEditingRef, enableFirestore]);
+  }, [updateStoreContent, setSyncStatus, throttledUpdate, activelyEditingRef, enableFirestore, canEdit]);
 
   const deleteContent = useCallback(async (id: string): Promise<void> => {
+    // Check edit permission
+    if (!canEdit) {
+      console.warn('⛔ Cannot delete content: No edit permission');
+      return;
+    }
+
     try {
       deleteStoreContent(id);
 
@@ -162,7 +181,7 @@ export const useContentOperations = (
     } catch (err) {
       console.error('Error deleting content:', err);
     }
-  }, [deleteStoreContent, enableFirestore, canvasId]);
+  }, [deleteStoreContent, enableFirestore, canvasId, canEdit]);
 
   const clearAllContent = useCallback(async (): Promise<void> => {
     try {

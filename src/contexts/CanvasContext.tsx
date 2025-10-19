@@ -3,18 +3,20 @@ import type { ReactNode } from 'react'
 
 interface CanvasContextType {
   canvasId: string
+  canEdit: boolean
 }
 
 const CanvasContext = createContext<CanvasContextType | null>(null)
 
 interface CanvasProviderProps {
   canvasId: string
+  canEdit?: boolean
   children: ReactNode
 }
 
-export function CanvasProvider({ canvasId, children }: CanvasProviderProps) {
+export function CanvasProvider({ canvasId, canEdit = true, children }: CanvasProviderProps) {
   return (
-    <CanvasContext.Provider value={{ canvasId }}>
+    <CanvasContext.Provider value={{ canvasId, canEdit }}>
       {children}
     </CanvasContext.Provider>
   )
@@ -28,4 +30,10 @@ export function useCanvasId(): string {
     return envCanvasId
   }
   return context.canvasId
+}
+
+export function useCanEdit(): boolean {
+  const context = useContext(CanvasContext)
+  // Default to true for backward compatibility
+  return context?.canEdit ?? true
 }

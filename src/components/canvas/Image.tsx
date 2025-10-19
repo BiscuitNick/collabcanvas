@@ -17,6 +17,7 @@ interface ImageComponentProps {
   onDragEndCallback: () => void
   currentUserId?: string
   selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
+  canEdit?: boolean
 }
 
 const ImageComponent: React.FC<ImageComponentProps> = memo(({
@@ -30,6 +31,7 @@ const ImageComponent: React.FC<ImageComponentProps> = memo(({
   onDragEndCallback,
   currentUserId,
   selectedTool,
+  canEdit = true,
 }) => {
   const imageRef = useRef<Konva.Image>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
@@ -257,14 +259,14 @@ const ImageComponent: React.FC<ImageComponentProps> = memo(({
         stroke={isLockedByOther ? (content.lockedByUserColor || '#FF0000') : undefined}
         strokeWidth={isLockedByOther ? LOCK_INDICATOR_STROKE_WIDTH : 0}
         rotation={content.rotation || 0}
-        draggable={isSelected && !isLockedByOther}
+        draggable={isSelected && !isLockedByOther && canEdit}
         onClick={handleClick}
         onTap={handleClick}
         onMouseDown={handleMouseDown}
-        onDragStart={isSelected && !isLockedByOther ? handleDragStart : undefined}
-        onDragMove={isSelected && !isLockedByOther ? handleDragMove : undefined}
-        onDragEnd={isSelected && !isLockedByOther ? handleDragEnd : undefined}
-        onTransformEnd={isSelected && !isLockedByOther ? handleTransformEnd : undefined}
+        onDragStart={isSelected && !isLockedByOther && canEdit ? handleDragStart : undefined}
+        onDragMove={isSelected && !isLockedByOther && canEdit ? handleDragMove : undefined}
+        onDragEnd={isSelected && !isLockedByOther && canEdit ? handleDragEnd : undefined}
+        onTransformEnd={isSelected && !isLockedByOther && canEdit ? handleTransformEnd : undefined}
         // Hover effects
         onMouseEnter={(e: Konva.KonvaEventObject<MouseEvent>) => {
           try {
@@ -288,7 +290,7 @@ const ImageComponent: React.FC<ImageComponentProps> = memo(({
         }}
       />
 
-      {isSelected && !isLockedByOther && (
+      {isSelected && !isLockedByOther && canEdit && (
         <Transformer
           ref={transformerRef}
           keepRatio={true}

@@ -17,6 +17,7 @@ interface RectangleProps {
   onDragEndCallback: () => void
   currentUserId?: string
   selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
+  canEdit?: boolean
 }
 
 const RectangleComponent: React.FC<RectangleProps> = memo(({
@@ -30,6 +31,7 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   onDragEndCallback,
   currentUserId,
   selectedTool,
+  canEdit = true,
 }) => {
   const rectRef = useRef<Konva.Rect>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
@@ -251,15 +253,15 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
         shadowBlur={4}
         shadowOffset={{ x: 2, y: 2 }}
         shadowOpacity={0.3}
-        draggable={isSelected && !isLockedByOther}
+        draggable={isSelected && !isLockedByOther && canEdit}
         onClick={handleClick}
         onTap={handleClick}
         onMouseDown={handleMouseDown}
-        onDragStart={isSelected && !isLockedByOther ? handleDragStart : undefined}
-        onDragMove={isSelected && !isLockedByOther ? handleDragMove : undefined}
-        onDragEnd={isSelected && !isLockedByOther ? handleDragEnd : undefined}
-        onTransformStart={isSelected && !isLockedByOther ? handleTransformStart : undefined}
-        onTransformEnd={isSelected && !isLockedByOther ? handleTransformEnd : undefined}
+        onDragStart={isSelected && !isLockedByOther && canEdit ? handleDragStart : undefined}
+        onDragMove={isSelected && !isLockedByOther && canEdit ? handleDragMove : undefined}
+        onDragEnd={isSelected && !isLockedByOther && canEdit ? handleDragEnd : undefined}
+        onTransformStart={isSelected && !isLockedByOther && canEdit ? handleTransformStart : undefined}
+        onTransformEnd={isSelected && !isLockedByOther && canEdit ? handleTransformEnd : undefined}
         // Hover effects
         onMouseEnter={(e: Konva.KonvaEventObject<MouseEvent>) => {
           try {
@@ -282,7 +284,7 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
           }
         }}
       />
-      {isSelected && !isLockedByOther && (
+      {isSelected && !isLockedByOther && canEdit && (
         <Transformer
           ref={transformerRef}
           boundBoxFunc={(oldBox, newBox) => {

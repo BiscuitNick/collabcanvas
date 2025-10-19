@@ -2,16 +2,20 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useCanvases, type CanvasVisibility, type Canvas } from '../hooks/useCanvases'
 import { useAuth } from '../hooks/useAuth'
-import { Globe, Lock, Link2, Edit } from 'lucide-react'
+import { Globe, Lock, Link2, Edit, Trash2 } from 'lucide-react'
+import { formatTimeAgo } from '../lib/utils'
+import UserProfileButton from '../components/layout/UserProfileButton'
 
 export function CanvasesListPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { canvases, publicCanvases, loading, error, createCanvas } = useCanvases(user?.uid)
+  const { canvases, publicCanvases, loading, error, createCanvas, deleteCanvas } = useCanvases(user?.uid)
   const [isCreating, setIsCreating] = useState(false)
   const [newCanvasName, setNewCanvasName] = useState('')
   const [visibility, setVisibility] = useState<CanvasVisibility>('private')
   const [activeTab, setActiveTab] = useState<'my' | 'public'>('my')
+  const [canvasToDelete, setCanvasToDelete] = useState<Canvas | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const handleCreateCanvas = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,6 +48,30 @@ export function CanvasesListPage() {
     navigate(`/canvas?id=${canvasId}`)
   }
 
+  const handleDeleteClick = (canvas: Canvas, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent navigation
+    setCanvasToDelete(canvas)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!canvasToDelete || !user?.uid) return
+
+    try {
+      setIsDeleting(true)
+      await deleteCanvas(canvasToDelete.id, user.uid, canvasToDelete.createdBy)
+      setCanvasToDelete(null)
+    } catch (err) {
+      console.error('Failed to delete canvas:', err)
+      alert('Failed to delete canvas. Please try again.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleCancelDelete = () => {
+    setCanvasToDelete(null)
+  }
+
   const getVisibilityIcon = (vis: CanvasVisibility) => {
     switch (vis) {
       case 'public':
@@ -66,51 +94,85 @@ export function CanvasesListPage() {
     }
   }
 
-  const renderCanvas = (canvas: Canvas, showCreator = false) => (
-    <div
-      key={canvas.id}
-      onClick={() => handleCanvasClick(canvas.id)}
-      style={{
-        background: '#2a2a2a',
-        border: '1px solid #3a3a3a',
-        borderRadius: '12px',
-        padding: '24px',
-        cursor: 'pointer',
-        transition: 'all 0.2s'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = '#4a9eff'
-        e.currentTarget.style.transform = 'translateY(-2px)'
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = '#3a3a3a'
-        e.currentTarget.style.transform = 'translateY(0)'
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <h3 style={{
-          fontSize: '18px',
-          fontWeight: '500',
-          color: '#fff',
-          flex: 1
-        }}>
-          {canvas.name}
-        </h3>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          padding: '4px 8px',
-          background: getVisibilityColor(canvas.visibility) + '20',
-          color: getVisibilityColor(canvas.visibility),
-          borderRadius: '6px',
-          fontSize: '12px',
-          fontWeight: '500'
-        }}>
-          {getVisibilityIcon(canvas.visibility)}
-          <span style={{ textTransform: 'capitalize' }}>{canvas.visibility}</span>
+  const renderCanvas = (canvas: Canvas, showCreator = false) => {
+    const isCreator = user?.uid === canvas.createdBy
+
+    return (
+      <div
+        key={canvas.id}
+        onClick={() => handleCanvasClick(canvas.id)}
+        style={{
+          background: '#2a2a2a',
+          border: '1px solid #3a3a3a',
+          borderRadius: '12px',
+          padding: '24px',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+          position: 'relative'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = '#4a9eff'
+          e.currentTarget.style.transform = 'translateY(-2px)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = '#3a3a3a'
+          e.currentTarget.style.transform = 'translateY(0)'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <h3 style={{
+            fontSize: '18px',
+            fontWeight: '500',
+            color: '#fff',
+            flex: 1
+          }}>
+            {canvas.name}
+          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px 8px',
+              background: getVisibilityColor(canvas.visibility) + '20',
+              color: getVisibilityColor(canvas.visibility),
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: '500'
+            }}>
+              {getVisibilityIcon(canvas.visibility)}
+              <span style={{ textTransform: 'capitalize' }}>{canvas.visibility}</span>
+            </div>
+            {isCreator && (
+              <button
+                onClick={(e) => handleDeleteClick(canvas, e)}
+                style={{
+                  padding: '6px',
+                  background: 'transparent',
+                  border: '1px solid #3a3a3a',
+                  borderRadius: '6px',
+                  color: '#ff6b6b',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#ff6b6b20'
+                  e.currentTarget.style.borderColor = '#ff6b6b'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.borderColor = '#3a3a3a'
+                }}
+                title="Delete canvas"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
-      </div>
 
       {showCreator && canvas.createdByName && (
         <p style={{
@@ -141,14 +203,15 @@ export function CanvasesListPage() {
         color: '#888'
       }}>
         <p style={{ marginBottom: '4px' }}>
-          Created: {canvas.createdAt.toLocaleDateString()}
+          Created: {formatTimeAgo(canvas.createdAt)}
         </p>
         <p>
-          Updated: {canvas.updatedAt.toLocaleDateString()}
+          Updated: {formatTimeAgo(canvas.updatedAt)}
         </p>
       </div>
     </div>
-  )
+    )
+  }
 
   if (loading) {
     return (
@@ -186,10 +249,116 @@ export function CanvasesListPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#1a1a1a',
-      color: '#fff',
+    <>
+      {/* Delete Confirmation Dialog */}
+      {canvasToDelete && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.75)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '24px'
+        }}>
+          <div style={{
+            background: '#2a2a2a',
+            borderRadius: '12px',
+            padding: '32px',
+            maxWidth: '400px',
+            width: '100%',
+            border: '1px solid #3a3a3a'
+          }}>
+            <h3 style={{
+              fontSize: '20px',
+              fontWeight: '600',
+              marginBottom: '16px',
+              color: '#fff'
+            }}>
+              Delete Canvas
+            </h3>
+            <p style={{
+              fontSize: '14px',
+              color: '#888',
+              marginBottom: '24px',
+              lineHeight: '1.5'
+            }}>
+              Are you sure you want to delete <strong style={{ color: '#fff' }}>"{canvasToDelete.name}"</strong>? This action cannot be undone.
+            </p>
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={handleCancelDelete}
+                disabled={isDeleting}
+                style={{
+                  padding: '10px 20px',
+                  background: '#3a3a3a',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  transition: 'background 0.2s',
+                  opacity: isDeleting ? 0.5 : 1
+                }}
+                onMouseEnter={(e) => {
+                  if (!isDeleting) {
+                    e.currentTarget.style.background = '#4a4a4a'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isDeleting) {
+                    e.currentTarget.style.background = '#3a3a3a'
+                  }
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                style={{
+                  padding: '10px 20px',
+                  background: isDeleting ? '#ff4444' : '#ff6b6b',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  transition: 'background 0.2s',
+                  opacity: isDeleting ? 0.7 : 1
+                }}
+                onMouseEnter={(e) => {
+                  if (!isDeleting) {
+                    e.currentTarget.style.background = '#ff5555'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isDeleting) {
+                    e.currentTarget.style.background = '#ff6b6b'
+                  }
+                }}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{
+        minHeight: '100vh',
+        background: '#1a1a1a',
+        color: '#fff',
       fontFamily: 'system-ui, -apple-system, sans-serif',
       padding: '48px 24px'
     }}>
@@ -197,13 +366,22 @@ export function CanvasesListPage() {
         maxWidth: '1200px',
         margin: '0 auto'
       }}>
-        <h1 style={{
-          fontSize: '32px',
-          fontWeight: '600',
+        {/* Header with title and user profile */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           marginBottom: '32px'
         }}>
-          Canvases
-        </h1>
+          <h1 style={{
+            fontSize: '32px',
+            fontWeight: '600',
+            margin: 0
+          }}>
+            Canvases
+          </h1>
+          <UserProfileButton />
+        </div>
 
         {/* Create New Canvas Form */}
         <form onSubmit={handleCreateCanvas} style={{
@@ -397,5 +575,6 @@ export function CanvasesListPage() {
         )}
       </div>
     </div>
+    </>
   )
 }

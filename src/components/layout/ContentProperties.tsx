@@ -17,9 +17,10 @@ import { isRectangleContent, isCircleContent, isTextContent, isImageContent, Fon
 interface ContentPropertiesProps {
   content: Content
   onUpdate: (updates: Partial<Content>) => void
+  readOnly?: boolean
 }
 
-const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate }) => {
+const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate, readOnly = false }) => {
   const handleInputChange = (field: string, value: string | number) => {
     onUpdate({ [field]: value } as Partial<Content>)
   }
@@ -41,6 +42,7 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
             value={Math.round(content.x)}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('x', parseInt(e.target.value) || 0)}
             className="h-7 text-xs"
+            disabled={readOnly}
           />
         </div>
         <div>
@@ -52,6 +54,7 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
             value={Math.round(content.y)}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('y', parseInt(e.target.value) || 0)}
             className="h-7 text-xs"
+            disabled={readOnly}
           />
         </div>
       </div>
@@ -66,6 +69,7 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleInputChange('text', e.target.value)}
             className="h-16 text-xs resize-none"
             placeholder="Enter text..."
+            disabled={readOnly}
           />
         </div>
       )}
@@ -87,6 +91,7 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
                 className="h-7 text-xs"
                 min="8"
                 placeholder="24 px"
+                disabled={readOnly}
               />
             </div>
 
@@ -101,6 +106,7 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('rotation', parseInt(e.target.value) || 0)}
                 className="h-7 text-xs"
                 placeholder="0°"
+                disabled={readOnly}
               />
             </div>
           </div>
@@ -111,6 +117,7 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
             <Select
               value={content.fontFamily}
               onValueChange={(value) => handleInputChange('fontFamily', value)}
+              disabled={readOnly}
             >
               <SelectTrigger className="h-7 text-xs">
                 <SelectValue />
@@ -140,6 +147,7 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
                   handleInputChange('fontStyle', newStyle)
                 }}
                 className={`h-7 flex-1 ${((content.fontStyle as string) === FontStyle.BOLD || (content.fontStyle as string) === FontStyle.BOLD_ITALIC) ? 'bg-gray-200' : ''}`}
+                disabled={readOnly}
               >
                 <Bold className="h-3 w-3" />
               </Button>
@@ -154,6 +162,7 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
                   handleInputChange('fontStyle', newStyle)
                 }}
                 className={`h-7 flex-1 ${((content.fontStyle as string) === FontStyle.ITALIC || (content.fontStyle as string) === FontStyle.BOLD_ITALIC) ? 'bg-gray-200' : ''}`}
+                disabled={readOnly}
               >
                 <Italic className="h-3 w-3" />
               </Button>
@@ -164,30 +173,47 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
 
       {/* Dimensions */}
       {isRectangleContent(content) && (
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <Label htmlFor={`${content.id}-width`} className="text-xs">Width</Label>
-            <Input
-              key={`width-${content.id}`}
-              id={`${content.id}-width`}
-              type="number"
-              value={Math.round(content.width)}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('width', parseInt(e.target.value) || 0)}
-              className="h-7 text-xs"
-            />
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label htmlFor={`${content.id}-width`} className="text-xs">Width</Label>
+              <Input
+                key={`width-${content.id}`}
+                id={`${content.id}-width`}
+                type="number"
+                value={Math.round(content.width)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('width', parseInt(e.target.value) || 0)}
+                className="h-7 text-xs"
+                disabled={readOnly}
+              />
+            </div>
+            <div>
+              <Label htmlFor={`${content.id}-height`} className="text-xs">Height</Label>
+              <Input
+                key={`height-${content.id}`}
+                id={`${content.id}-height`}
+                type="number"
+                value={Math.round(content.height)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('height', parseInt(e.target.value) || 0)}
+                className="h-7 text-xs"
+                disabled={readOnly}
+              />
+            </div>
           </div>
           <div>
-            <Label htmlFor={`${content.id}-height`} className="text-xs">Height</Label>
+            <Label htmlFor={`${content.id}-rotation`} className="text-xs">Rotation</Label>
             <Input
-              key={`height-${content.id}`}
-              id={`${content.id}-height`}
+              key={`rotation-${content.id}`}
+              id={`${content.id}-rotation`}
               type="number"
-              value={Math.round(content.height)}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('height', parseInt(e.target.value) || 0)}
+              value={Math.round(content.rotation || 0)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('rotation', parseInt(e.target.value) || 0)}
               className="h-7 text-xs"
+              placeholder="0°"
+              disabled={readOnly}
             />
           </div>
-        </div>
+        </>
       )}
       {isCircleContent(content) && (
         <div>
@@ -199,6 +225,7 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
             value={Math.round(content.radius)}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('radius', parseInt(e.target.value) || 0)}
             className="h-7 text-xs"
+            disabled={readOnly}
           />
         </div>
       )}
@@ -216,6 +243,7 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('src', e.target.value)}
               className="h-7 text-xs"
               placeholder="https://example.com/image.jpg"
+              disabled={readOnly}
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -228,6 +256,7 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
                 value={Math.round(content.width)}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('width', parseInt(e.target.value) || 100)}
                 className="h-7 text-xs"
+                disabled={readOnly}
               />
             </div>
             <div>
@@ -239,6 +268,7 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
                 value={Math.round(content.height)}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('height', parseInt(e.target.value) || 100)}
                 className="h-7 text-xs"
+                disabled={readOnly}
               />
             </div>
           </div>
@@ -252,6 +282,7 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('rotation', parseInt(e.target.value) || 0)}
               className="h-7 text-xs"
               placeholder="0°"
+              disabled={readOnly}
             />
           </div>
         </div>
@@ -266,6 +297,7 @@ const ContentProperties: React.FC<ContentPropertiesProps> = ({ content, onUpdate
           value={'fill' in content ? content.fill : '#000000'}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleColorChange('fill', e.target.value)}
           className="h-10 w-full p-0 border-0 rounded cursor-pointer"
+          disabled={readOnly}
         />
       </div>
 

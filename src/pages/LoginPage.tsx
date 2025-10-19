@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { GoogleSignIn } from '../components/auth/GoogleSignIn'
 import { EmailSignIn } from '../components/auth/EmailSignIn'
+import UserProfileButton from '../components/layout/UserProfileButton'
 
 export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
@@ -12,6 +13,11 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-100 flex items-center justify-center p-4">
+      {/* User Profile Button - Top Right */}
+      <div className="fixed top-4 right-4 z-50">
+        <UserProfileButton />
+      </div>
+
       <div className="max-w-md w-full space-y-8">
         {/* Header */}
         <div className="text-center">

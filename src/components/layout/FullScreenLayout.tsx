@@ -12,6 +12,7 @@ import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
 import { useCursorContext } from '../../hooks/useCursorContext'
 import { useContent } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
+import { useCanEdit } from '../../contexts/CanvasContext'
 import DraggableDebugWidget from './DraggableDebugWidget'
 import OnlineUsersWidget from './OnlineUsersWidget'
 
@@ -75,6 +76,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 }) => {
   useKeyboardShortcuts()
   const { user } = useAuth()
+  const canEdit = useCanEdit()
   const { selectShape, resetView, selectedContentId, updatePositionAnimated, stageScale } = useCanvasStore()
 
   // Convert presence array to a Map for efficient user lookup
@@ -115,7 +117,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     propertiesPaneVisible: true,
     gridlinesVisible: false,
     selectedShapeId: null,
-    selectedTool: 'select',
+    selectedTool: canEdit ? 'select' : 'pan',
     aiAgentActive: false,
     isDragging: false,
     isPanning: false,
@@ -129,6 +131,13 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     shapeCreationOptions: undefined,
     isCreatingShape: false
   })
+
+  // Force pan tool for view-only users
+  useEffect(() => {
+    if (!canEdit && uiState.selectedTool !== 'pan') {
+      setUIState(prev => ({ ...prev, selectedTool: 'pan' }))
+    }
+  }, [canEdit, uiState.selectedTool])
 
   // Track previous selection ID to detect when a new item is selected
   const prevSelectionRef = useRef<string | null>(null)
@@ -564,6 +573,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           selectedTool={uiState.selectedTool}
           onToolSelect={handleToolSelect}
           onResetCanvas={handleResetCanvas}
+          canEdit={canEdit}
         />
 
       {/* Tool Button - Bottom Left (Layers Panel) */}

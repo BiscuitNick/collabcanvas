@@ -34,6 +34,7 @@ export interface CanvasProps {
   selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null;
   onCanvasClick?: (event: { x: number; y: number }) => void;
   isCreatingShape?: boolean;
+  canEdit?: boolean;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -58,6 +59,7 @@ const Canvas: React.FC<CanvasProps> = ({
   selectedTool,
   onCanvasClick,
   isCreatingShape = false,
+  canEdit = true,
 }) => {
   const stageRef = useRef<Konva.Stage>(null);
   const { stagePosition, stageScale, isZooming, isDraggingShape, isPanning, shouldAnimatePan, selectedContentId, setDraggingShape } = useCanvasStore();
@@ -127,9 +129,10 @@ const Canvas: React.FC<CanvasProps> = ({
         onDragEndCallback={() => setDraggingShape(false)}
         currentUserId={currentUserId}
         selectedTool={selectedTool}
+        canEdit={canEdit}
       />
     ));
-  }, [visibleShapes, selectedShapeId, handleShapeSelect, handleShapeUpdate, handleShapeDragMove, handleShapeDragEnd, handleShapeDragStart, setDraggingShape, currentUserId, selectedTool]);
+  }, [visibleShapes, selectedShapeId, handleShapeSelect, handleShapeUpdate, handleShapeDragMove, handleShapeDragEnd, handleShapeDragStart, setDraggingShape, currentUserId, selectedTool, canEdit]);
 
 
   return (

@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import { Button } from '../ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar'
-import { Users, Settings } from 'lucide-react'
+import { Users, Settings, Crown, Edit, Eye } from 'lucide-react'
 import { CanvasSettings } from '../canvas/CanvasSettings'
 import { useCanvasId } from '../../contexts/CanvasContext'
 import { useAuth } from '../../hooks/useAuth'
+import { useCanvasMetadata } from '../../hooks/useCanvasMetadata'
 import type { PresenceUser } from '../../types'
 
 interface OnlineUsersWidgetProps {
@@ -16,6 +17,7 @@ const OnlineUsersWidget: React.FC<OnlineUsersWidgetProps> = ({ presence, onClose
   const [activeTab, setActiveTab] = useState<'users' | 'settings'>('users')
   const canvasId = useCanvasId()
   const { user } = useAuth()
+  const { canvas } = useCanvasMetadata(canvasId, user?.uid)
 
   // Generate initials from user name
   const getInitials = (userName: string): string => {
@@ -25,6 +27,47 @@ const OnlineUsersWidget: React.FC<OnlineUsersWidgetProps> = ({ presence, onClose
       .join('')
       .toUpperCase()
       .slice(0, 2)
+  }
+
+  // Determine user permission level
+  const getUserPermission = (userId: string): 'owner' | 'edit' | 'view' => {
+    if (!canvas) return 'view'
+
+    // Check if user is the owner
+    if (canvas.createdBy === userId) return 'owner'
+
+    // Check if user has edit permission based on publicCanEdit
+    if (canvas.publicCanEdit) return 'edit'
+
+    // Otherwise, they have view-only access
+    return 'view'
+  }
+
+  // Get permission badge component
+  const getPermissionBadge = (permission: 'owner' | 'edit' | 'view') => {
+    switch (permission) {
+      case 'owner':
+        return (
+          <div className="flex items-center gap-1 px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] font-semibold">
+            <Crown className="h-2.5 w-2.5" />
+            Owner
+          </div>
+        )
+      case 'edit':
+        return (
+          <div className="flex items-center gap-1 px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-semibold">
+            <Edit className="h-2.5 w-2.5" />
+            Edit
+          </div>
+        )
+      case 'view':
+        return (
+          <div className="flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-semibold">
+            <Eye className="h-2.5 w-2.5" />
+            View
+          </div>
+        )
+    }
   }
 
   return (
@@ -79,25 +122,29 @@ const OnlineUsersWidget: React.FC<OnlineUsersWidgetProps> = ({ presence, onClose
             {presence.length === 0 ? (
               <div className="text-xs text-gray-400 text-center py-4">No users online</div>
             ) : (
-              presence.map(presenceUser => (
-                <div
-                  key={presenceUser.userId}
-                  className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded"
-                  style={{ borderWidth: '2px', borderStyle: 'solid', borderColor: presenceUser.color }}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Avatar className="h-6 w-6 flex-shrink-0">
-                      {presenceUser.photoURL && (
-                        <AvatarImage src={presenceUser.photoURL} alt={presenceUser.userName} />
-                      )}
-                      <AvatarFallback className="text-xs font-semibold bg-gray-300 text-gray-700">
-                        {getInitials(presenceUser.userName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs font-medium text-gray-700 truncate">{presenceUser.userName}</span>
+              presence.map(presenceUser => {
+                const permission = getUserPermission(presenceUser.userId)
+                return (
+                  <div
+                    key={presenceUser.userId}
+                    className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded"
+                    style={{ borderWidth: '2px', borderStyle: 'solid', borderColor: presenceUser.color }}
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <Avatar className="h-6 w-6 flex-shrink-0">
+                        {presenceUser.photoURL && (
+                          <AvatarImage src={presenceUser.photoURL} alt={presenceUser.userName} />
+                        )}
+                        <AvatarFallback className="text-xs font-semibold bg-gray-300 text-gray-700">
+                          {getInitials(presenceUser.userName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-xs font-medium text-gray-700 truncate">{presenceUser.userName}</span>
+                    </div>
+                    {getPermissionBadge(permission)}
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         ) : (

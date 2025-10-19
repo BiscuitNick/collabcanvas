@@ -37,6 +37,7 @@ export const ContentType = {
   CIRCLE: 'circle',
   TEXT: 'text',
   IMAGE: 'image',
+  GROUP: 'group',
 } as const;
 
 export type ContentType = (typeof ContentType)[keyof typeof ContentType];
@@ -138,9 +139,21 @@ export interface ImageContent extends BaseContent {
   // Future: crop, filters, etc.
 }
 
+// Group content type - container for nesting other content types
+export interface GroupContent extends BaseContent {
+  type: typeof ContentType.GROUP;
+  width: number; // Used for clipping boundary
+  height: number; // Used for clipping boundary
+  scaleX?: number; // Scaling factor for X axis (default 1)
+  scaleY?: number; // Scaling factor for Y axis (default 1)
+  contentIds: string[]; // Array of content IDs (order matters - last is on top)
+  contentData: {
+    [contentId: string]: RectangleContent | CircleContent | TextContent | ImageContent;
+  }; // Map of content ID to content data (positions are relative to group)
+}
 
 // Union type for all content
-export type Content = RectangleContent | CircleContent | TextContent | ImageContent;
+export type Content = RectangleContent | CircleContent | TextContent | ImageContent | GroupContent;
 
 // Type guards for content type checking
 export const isRectangleContent = (content: Content): content is RectangleContent => content.type === ContentType.RECTANGLE;
@@ -150,6 +163,8 @@ export const isCircleContent = (content: Content): content is CircleContent => c
 export const isTextContent = (content: Content): content is TextContent => content.type === ContentType.TEXT;
 
 export const isImageContent = (content: Content): content is ImageContent => content.type === ContentType.IMAGE;
+
+export const isGroupContent = (content: Content): content is GroupContent => content.type === ContentType.GROUP;
 
 
 // Enhanced content properties for properties panel
@@ -250,6 +265,16 @@ export interface ContentCreationOptions {
     height: number;
     alt?: string;
   };
+  group?: {
+    width: number;
+    height: number;
+    scaleX?: number;
+    scaleY?: number;
+    contentIds: string[];
+    contentData: {
+      [contentId: string]: RectangleContent | CircleContent | TextContent | ImageContent;
+    };
+  };
 }
 
 
@@ -288,6 +313,16 @@ export const DEFAULT_CONTENT_VALUES = {
     width: 100,
     height: 100,
     alt: 'Image',
+  },
+  group: {
+    width: 200,
+    height: 200,
+    scaleX: 1,
+    scaleY: 1,
+    opacity: 1,
+    rotation: 0,
+    contentIds: [],
+    contentData: {},
   },
 } as const;
 

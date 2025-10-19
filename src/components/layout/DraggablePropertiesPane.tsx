@@ -3,9 +3,9 @@ import { Button } from '../ui/button'
 import { Avatar, AvatarFallback } from '../ui/avatar'
 import ContentProperties from './ContentProperties'
 import type { Content } from '../../types'
-import { isTextContent, isRectangleContent, isCircleContent } from '../../types'
+import { isTextContent, isRectangleContent, isCircleContent, isGroupContent } from '../../types'
 import { getTextExcerpt } from '../../lib/utils'
-import { Lock, Copy, Trash2 } from 'lucide-react'
+import { Lock, Copy, Trash2, Folder, ChevronRight, ChevronDown } from 'lucide-react'
 import { useCanEdit } from '../../contexts/CanvasContext'
 
 interface DraggablePropertiesPaneProps {
@@ -38,6 +38,8 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
   const selectedItemRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [expandedItemId, setExpandedItemId] = React.useState<string | null>(null)
+  const [selectedNestedItemId, setSelectedNestedItemId] = React.useState<string | null>(null)
+  const [groupNestedExpanded, setGroupNestedExpanded] = React.useState<boolean>(false)
   const canEdit = useCanEdit()
 
   // Handle item header click - toggle expand/collapse or select
@@ -93,7 +95,77 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
     if (isCircleContent(shape)) {
       return <div className={`${iconSize} rounded-full`} style={{ backgroundColor: fillColor }}></div>
     }
+    if (isGroupContent(shape)) {
+      return <Folder className={`${iconSize} text-purple-600`} />
+    }
     return null
+  }
+
+  // Handle nested item click - select the nested item for editing
+  const handleNestedItemClick = (groupId: string, nestedItemId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedNestedItemId(nestedItemId)
+    // Keep the group expanded
+    setExpandedItemId(groupId)
+  }
+
+  // Render nested items within a group
+  const renderNestedItems = (groupId: string, groupContent: Content) => {
+    if (!isGroupContent(groupContent)) return null
+
+    return groupContent.contentIds.map((nestedItemId) => {
+      const nestedItem = groupContent.contentData[nestedItemId]
+      if (!nestedItem) return null
+
+      const label = isTextContent(nestedItem)
+        ? getTextExcerpt(nestedItem.text, 20)
+        : nestedItem.type
+
+      const isNestedItemSelected = selectedNestedItemId === nestedItemId
+
+      return (
+        <div key={nestedItemId} className="pl-6 pr-2 py-2 hover:bg-gray-100 border-l-2 border-gray-300">
+          <div
+            className={`rounded cursor-pointer transition-colors ${
+              isNestedItemSelected ? 'bg-blue-50 border border-blue-200 p-2' : 'p-2'
+            }`}
+            onClick={(e) => handleNestedItemClick(groupId, nestedItemId, e)}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="flex-shrink-0">
+                {renderShapeIcon(nestedItem)}
+              </div>
+              <span className="text-xs font-medium text-gray-700 truncate">{label}</span>
+            </div>
+
+            {/* Show properties for selected nested item */}
+            {isNestedItemSelected && (
+              <div className="mt-2 pt-2 border-t border-gray-200">
+                <ContentProperties
+                  content={nestedItem}
+                  onUpdate={(updates) => {
+                    // Update the nested item within the group
+                    if (isGroupContent(groupContent)) {
+                      const updatedContentData: typeof groupContent.contentData = {
+                        ...groupContent.contentData,
+                        [nestedItemId]: {
+                          ...nestedItem,
+                          ...updates
+                        } as any
+                      }
+                      onUpdateShape(groupId, {
+                        contentData: updatedContentData
+                      })
+                    }
+                  }}
+                  readOnly={!canEdit}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )
+    })
   }
 
   // Scroll to selected item and auto-expand when selection changes
@@ -223,6 +295,35 @@ const DraggablePropertiesPane: React.FC<DraggablePropertiesPaneProps> = ({
                       onUpdate={(updates) => onUpdateShape(shape.id, updates)}
                       readOnly={!canEdit}
                     />
+                  </div>
+                )}
+
+                {/* Nested items - show if expanded and is a group */}
+                {isExpanded && isGroupContent(shape) && (
+                  <div className="border-t border-gray-200">
+                    {/* Collapsible header for nested items */}
+                    <div
+                      className="px-2 py-2 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+                      onClick={() => setGroupNestedExpanded(!groupNestedExpanded)}
+                    >
+                      <div className="flex items-center gap-2">
+                        {groupNestedExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-gray-500" />
+                        )}
+                        <span className="text-xs font-medium text-gray-700">
+                          Nested Content ({shape.contentIds.length} items)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Nested items list - only show when expanded */}
+                    {groupNestedExpanded && (
+                      <div className="border-t border-gray-200">
+                        {renderNestedItems(shape.id, shape)}
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -36,6 +36,7 @@ import type { Content } from '../../types'
 import { callAITest, generateImage, type AIProvider, type GPT5Model, type ImageModel } from '../../lib/aiApi'
 import { buildGrid } from '../../lib/utils'
 import { useCanvasStore } from '../../store/canvasStore'
+import { useAuth } from '../../hooks/useAuth'
 
 interface BottomToolbarProps {
   onCreateShape: (type: 'rectangle' | 'circle' | 'image') => void
@@ -96,6 +97,9 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   // Get selected content from canvas store
   const { selectedContentId, content } = useCanvasStore()
   const selectedContent = content.find(c => c.id === selectedContentId)
+
+  // Get current user for createdBy field
+  const { user } = useAuth()
 
   // Local state for toolbar
   const [activeTool, setActiveTool] = useState<ToolType>('pan')
@@ -183,32 +187,70 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
       colors
     })
 
-    // Convert commands to content data
-    const contentDataArray = commands
-      .filter(command => command.type === 'rectangle')
-      .map(command => ({
-        type: ContentType.RECTANGLE,
-        version: ContentVersion.V2,
-        x: command.x || 0,
-        y: command.y || 0,
-        width: command.width || 100,
-        height: command.height || 100,
-        fill: command.fill || '#000000',
-        stroke: command.stroke || '#000000',
-        strokeWidth: command.strokeWidth || 1,
-        rotation: 0
-      } as any))
+    console.log('[GRID] Commands from buildGrid:', commands.length, 'gridStart:', gridStartX, gridStartY)
 
-    // Use batch creation if available, otherwise fall back to sequential
-    if (onCreateContentBatch) {
-      console.log(`🚀 [GRID] Creating ${contentDataArray.length} items using batch operation`)
-      await onCreateContentBatch(contentDataArray)
-    } else {
-      console.log(`⚠️ [GRID] Falling back to sequential creation for ${contentDataArray.length} items`)
-      for (const contentData of contentDataArray) {
-        await onCreateContent!(contentData)
-      }
-    }
+    // Convert commands to nested content items for the group
+    const nestedItems = commands
+      .filter(command => command.type === 'rectangle')
+      .map((command, index) => {
+        const id = `grid-item-${Date.now()}-${index}`
+
+        // Positions inside the group are relative to (0,0) which is the top-left
+        // Since nested rects also use offsets to center, we adjust accordingly
+        const relativeX = (command.x || 0) - gridStartX + (command.width || gridCellWidth) / 2
+        const relativeY = (command.y || 0) - gridStartY + (command.height || gridCellHeight) / 2
+
+        return {
+          id,
+          content: {
+            id,
+            type: ContentType.RECTANGLE,
+            version: ContentVersion.V2,
+            x: relativeX,
+            y: relativeY,
+            width: command.width || 100,
+            height: command.height || 100,
+            fill: command.fill || '#000000',
+            stroke: command.stroke || '#000000',
+            strokeWidth: command.strokeWidth || 1,
+            rotation: 0,
+            createdBy: 'system',
+            createdAt: 0, // Will be set by Firestore
+            updatedAt: 0  // Will be set by Firestore
+          }
+        }
+      })
+
+    // Calculate group dimensions based on grid
+    const totalWidth = gridCols * gridCellWidth + (gridCols - 1) * gridGap
+    const totalHeight = gridRows * gridCellHeight + (gridRows - 1) * gridGap
+
+    console.log('[GRID] Group dimensions:', totalWidth, 'x', totalHeight)
+    console.log('[GRID] Nested items:', nestedItems.length)
+    console.log('[GRID] First nested item:', nestedItems[0])
+
+    // Create a group containing all the grid items
+    const groupData = {
+      type: ContentType.GROUP,
+      version: ContentVersion.V2,
+      x: gridStartX + totalWidth / 2, // Center of the group
+      y: gridStartY + totalHeight / 2, // Center of the group
+      width: totalWidth,
+      height: totalHeight,
+      scaleX: 1,
+      scaleY: 1,
+      rotation: 0,
+      createdBy: user?.uid || 'anonymous',
+      contentIds: nestedItems.map(item => item.id),
+      contentData: Object.fromEntries(
+        nestedItems.map(item => [item.id, item.content])
+      )
+    } as any
+
+    // Create the group
+    console.log(`🚀 [GRID] Creating group at (${groupData.x}, ${groupData.y}) with ${nestedItems.length} items`, groupData)
+    await onCreateContent!(groupData)
+    console.log('✅ [GRID] Group creation completed')
   }
 
   // Persist tool selection in localStorage
@@ -283,7 +325,9 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
     // Map internal tool types to external tool types
     if (tool === 'shapes') {
-      onToolSelect(selectedShape)
+      // Filter out 'group' as it's not a creation tool
+      const shapeType = selectedShape === 'group' ? 'rectangle' : selectedShape
+      onToolSelect(shapeType as any)
     } else if (tool === 'text') {
       onToolSelect('text')
       // Text creation will be triggered by clicking on canvas
@@ -307,10 +351,13 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   }
 
   const handleShapeSelect = (shape: ShapeType) => {
+    // Filter out 'group' as it's not a creation tool
+    if (shape === 'group') return
+
     setSelectedShape(shape)
     localStorage.setItem('collabcanvas-selected-shape', shape)
     // Update the tool selection to the new shape type
-    onToolSelect(shape)
+    onToolSelect(shape as any)
   }
 
   const handleAgentGo = async () => {
@@ -551,9 +598,74 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
           }
         }
 
-        // Batch create all content items at once
+        // Batch create all content items at once - create as a group
         if (contentToCreate.length > 0) {
-          if (onCreateContentBatch) {
+          // When creating multiple items, group them together
+          if (contentToCreate.length > 1) {
+            // Calculate bounding box for all items
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+
+            for (const item of contentToCreate) {
+              const itemMinX = item.x - (item.width || item.radius || 0) / 2
+              const itemMinY = item.y - (item.height || item.radius || 0) / 2
+              const itemMaxX = item.x + (item.width || item.radius || 0) / 2
+              const itemMaxY = item.y + (item.height || item.radius || 0) / 2
+
+              minX = Math.min(minX, itemMinX)
+              minY = Math.min(minY, itemMinY)
+              maxX = Math.max(maxX, itemMaxX)
+              maxY = Math.max(maxY, itemMaxY)
+            }
+
+            const groupWidth = maxX - minX
+            const groupHeight = maxY - minY
+            const groupCenterX = (minX + maxX) / 2
+            const groupCenterY = (minY + maxY) / 2
+
+            // Create nested items with positions relative to group
+            const nestedItems = contentToCreate.map((item, index) => {
+              const id = `agent-item-${Date.now()}-${index}`
+              return {
+                id,
+                content: {
+                  ...item,
+                  id,
+                  x: item.x - minX,
+                  y: item.y - minY,
+                  createdBy: 'system',
+                  createdAt: 0, // Will be set by Firestore
+                  updatedAt: 0  // Will be set by Firestore
+                }
+              }
+            })
+
+            // Create a group containing all items
+            const groupData = {
+              type: ContentType.GROUP,
+              version: ContentVersion.V2,
+              x: groupCenterX,
+              y: groupCenterY,
+              width: groupWidth,
+              height: groupHeight,
+              scaleX: 1,
+              scaleY: 1,
+              rotation: 0,
+              createdBy: user?.uid || 'anonymous',
+              contentIds: nestedItems.map(item => item.id),
+              contentData: Object.fromEntries(
+                nestedItems.map(item => [item.id, item.content])
+              )
+            } as any
+
+            console.log(`🚀 [AI AGENT] Creating group with ${nestedItems.length} items`)
+            try {
+              await onCreateContent!(groupData)
+              console.log('[Agent Toolbar] Group created successfully')
+            } catch (err) {
+              console.error('[Agent Toolbar] Error creating group:', err)
+            }
+          } else if (onCreateContentBatch) {
+            // Single item - create normally
             console.log(`🚀 [AI AGENT] Creating ${contentToCreate.length} items using batch operation`)
             try {
               await onCreateContentBatch(contentToCreate)
@@ -924,9 +1036,9 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
                   <Input
                     type="number"
                     min="1"
-                    max="100"
+                    max="64"
                     value={gridRows}
-                    onChange={(e) => setGridRows(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
+                    onChange={(e) => setGridRows(Math.min(64, Math.max(1, parseInt(e.target.value) || 1)))}
                     className="h-7 w-16 text-xs"
                     placeholder="Rows"
                   />
@@ -934,9 +1046,9 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
                   <Input
                     type="number"
                     min="1"
-                    max="100"
+                    max="64"
                     value={gridCols}
-                    onChange={(e) => setGridCols(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
+                    onChange={(e) => setGridCols(Math.min(64, Math.max(1, parseInt(e.target.value) || 1)))}
                     className="h-7 w-16 text-xs"
                     placeholder="Cols"
                   />

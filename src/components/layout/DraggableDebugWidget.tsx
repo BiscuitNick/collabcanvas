@@ -18,6 +18,8 @@ interface DraggableDebugWidgetProps {
   onClose: () => void
   enableFirestore?: boolean
   onToggleFirestore?: (enable: boolean) => void
+  enableGroupCaching?: boolean
+  onToggleGroupCaching?: (enable: boolean) => void
   canvasWidth: number
   canvasHeight: number
   onCanvasWidthChange?: (width: number) => void
@@ -29,6 +31,7 @@ interface DraggableDebugWidgetProps {
     canvasX?: number
     canvasY?: number
     target: string
+    contentTarget?: string
     tool: string
     timestamp: number
   } | null
@@ -49,6 +52,8 @@ const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
   onClose,
   enableFirestore,
   onToggleFirestore,
+  enableGroupCaching,
+  onToggleGroupCaching,
   canvasWidth,
   canvasHeight,
   onCanvasWidthChange,
@@ -162,6 +167,8 @@ const DraggableDebugWidget: React.FC<DraggableDebugWidgetProps> = ({
             fps={fps}
             enableFirestore={enableFirestore}
             onToggleFirestore={onToggleFirestore}
+            enableGroupCaching={enableGroupCaching}
+            onToggleGroupCaching={onToggleGroupCaching}
             canvasWidth={canvasWidth}
             canvasHeight={canvasHeight}
             onCanvasWidthChange={onCanvasWidthChange}

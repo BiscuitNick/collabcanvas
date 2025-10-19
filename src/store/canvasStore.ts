@@ -2,6 +2,32 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Content, SyncStatus } from '../types'
 
+// Helper function to log all canvas store content - accessible from browser console
+// Usage: window.logCanvasStore()
+if (typeof window !== 'undefined') {
+  (window as any).logCanvasStore = () => {
+    const store = (window as any).__canvasStoreRef
+    if (store) {
+      const state = store.getState()
+      console.log('🔍 [CANVAS STORE DEBUG] === COMPLETE STORE DUMP ===')
+      console.log('📊 Total content items:', state.content.length)
+      console.log('📋 All content items:')
+      state.content.forEach((item: Content, index: number) => {
+        console.log(`  [${index}] Type: ${item.type}, ID: ${item.id}`)
+        console.log(`      Position: (${item.x}, ${item.y})`)
+        console.log(`      Created by: ${item.createdBy}`)
+        if (item.type === 'group') {
+          console.log(`      Nested items: ${(item as any).contentIds?.length || 0}`)
+        }
+      })
+      console.log('📦 [CANVAS STORE DEBUG] === FULL JSON DATA ===')
+      console.log(JSON.stringify(state.content, null, 2))
+    } else {
+      console.warn('Canvas store not initialized yet')
+    }
+  }
+}
+
 interface CanvasState {
   // Stage position and scale
   stagePosition: { x: number; y: number }
@@ -100,9 +126,26 @@ export const useCanvasStore = create<CanvasState>()(
   },
   
   addContent: (content: Content) => {
-    set((state) => ({
-      content: [...state.content, content]
-    }))
+    set((state) => {
+      const newContent = [...state.content, content]
+
+      // Log all content whenever anything is added
+      console.log('➕ [CANVAS STORE] Content added:', content.type, content.id)
+      console.log('📊 [CANVAS STORE] Total content items:', newContent.length)
+      console.log('📋 [CANVAS STORE] === ALL CONTENT IN STORE ===')
+      newContent.forEach((item, index) => {
+        console.log(`  [${index}] Type: ${item.type}, ID: ${item.id}`)
+        console.log(`      Position: (${item.x}, ${item.y})`)
+        console.log(`      Created by: ${item.createdBy}`)
+        if (item.type === 'group') {
+          console.log(`      Nested items: ${(item as any).contentIds?.length || 0}`)
+        }
+      })
+      console.log('📦 [CANVAS STORE] === NEWLY ADDED ITEM (FULL DATA) ===')
+      console.log(JSON.stringify(content, null, 2))
+
+      return { content: newContent }
+    })
   },
   
   updateContent: (id: string, updates: Partial<Content>) => {
@@ -171,9 +214,26 @@ export const useCanvasStore = create<CanvasState>()(
   
   // Legacy implementations for backward compatibility during migration
   addShape: (shape: Content) => {
-    set((state) => ({
-      content: [...state.content, shape]
-    }))
+    set((state) => {
+      const newContent = [...state.content, shape]
+
+      // Log all content whenever anything is added
+      console.log('➕ [CANVAS STORE - LEGACY] Content added:', shape.type, shape.id)
+      console.log('📊 [CANVAS STORE - LEGACY] Total content items:', newContent.length)
+      console.log('📋 [CANVAS STORE - LEGACY] === ALL CONTENT IN STORE ===')
+      newContent.forEach((item, index) => {
+        console.log(`  [${index}] Type: ${item.type}, ID: ${item.id}`)
+        console.log(`      Position: (${item.x}, ${item.y})`)
+        console.log(`      Created by: ${item.createdBy}`)
+        if (item.type === 'group') {
+          console.log(`      Nested items: ${(item as any).contentIds?.length || 0}`)
+        }
+      })
+      console.log('📦 [CANVAS STORE - LEGACY] === NEWLY ADDED ITEM (FULL DATA) ===')
+      console.log(JSON.stringify(shape, null, 2))
+
+      return { content: newContent }
+    })
   },
   updateShape: (id: string, updates: Partial<Content>) => {
     set((state) => ({
@@ -225,3 +285,8 @@ export const useCanvasStore = create<CanvasState>()(
     }
   )
 )
+
+// Store reference for debugging
+if (typeof window !== 'undefined') {
+  (window as any).__canvasStoreRef = useCanvasStore
+}

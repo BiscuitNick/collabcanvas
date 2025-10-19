@@ -35,6 +35,7 @@ export interface CanvasProps {
   onCanvasClick?: (event: { x: number; y: number }) => void;
   isCreatingShape?: boolean;
   canEdit?: boolean;
+  enableGroupCaching?: boolean;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -60,6 +61,7 @@ const Canvas: React.FC<CanvasProps> = ({
   onCanvasClick,
   isCreatingShape = false,
   canEdit = true,
+  enableGroupCaching = false,
 }) => {
   const stageRef = useRef<Konva.Stage>(null);
   const { stagePosition, stageScale, isZooming, isDraggingShape, isPanning, shouldAnimatePan, selectedContentId, setDraggingShape } = useCanvasStore();
@@ -131,9 +133,10 @@ const Canvas: React.FC<CanvasProps> = ({
         currentUserId={currentUserId}
         selectedTool={selectedTool}
         canEdit={canEdit}
+        enableGroupCaching={enableGroupCaching}
       />
     ));
-  }, [visibleShapes, selectedShapeId, handleShapeSelect, handleShapeUpdate, handleShapeDragMove, handleShapeDragEnd, handleShapeDragStart, setDraggingShape, currentUserId, selectedTool, canEdit]);
+  }, [visibleShapes, selectedShapeId, handleShapeSelect, handleShapeUpdate, handleShapeDragMove, handleShapeDragEnd, handleShapeDragStart, setDraggingShape, currentUserId, selectedTool, canEdit, enableGroupCaching]);
 
 
   return (

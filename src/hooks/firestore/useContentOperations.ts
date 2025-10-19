@@ -4,7 +4,7 @@ import { collection, doc, addDoc, updateDoc, serverTimestamp, writeBatch } from 
 import { firestore } from '../../lib/firebase';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useCanvasId, useCanEdit } from '../../contexts/CanvasContext';
-import { SHAPE_RETRY_DELAY_MS, SHAPE_MAX_RETRIES, ENABLE_PERFORMANCE_LOGGING } from '../../lib/config';
+import { SHAPE_RETRY_DELAY_MS, SHAPE_MAX_RETRIES } from '../../lib/config';
 import type { Content } from '../../types';
 
 // Remove undefined values from an object for Firestore compatibility
@@ -16,6 +16,41 @@ const removeUndefinedValues = (obj: any): any => {
     }
   }
   return result;
+};
+
+// Minimize group contentData to reduce Firestore index entries
+const minimizeGroupContentData = (contentData: any): any => {
+  const minimized: any = {};
+  for (const key in contentData) {
+    const item = contentData[key];
+    // Store only essential fields to reduce index entries
+    minimized[key] = {
+      type: item.type,
+      x: item.x,
+      y: item.y,
+      // Type-specific essential fields
+      ...(item.type === 'rectangle' && {
+        width: item.width,
+        height: item.height,
+        fill: item.fill,
+      }),
+      ...(item.type === 'circle' && {
+        radius: item.radius,
+        fill: item.fill,
+      }),
+      ...(item.type === 'text' && {
+        text: item.text,
+        fontSize: item.fontSize,
+        fill: item.fill,
+      }),
+      ...(item.type === 'image' && {
+        src: item.src,
+        width: item.width,
+        height: item.height,
+      }),
+    };
+  }
+  return minimized;
 };
 
 export const useContentOperations = (
@@ -34,7 +69,6 @@ export const useContentOperations = (
   const [enableFirestore, setEnableFirestore] = useState(() => {
     const stored = localStorage.getItem('enableFirestore');
     const value = stored ? JSON.parse(stored) : true;
-    console.log('🔍 useContentOperations initial enableFirestore:', value, 'from localStorage:', stored);
     return value;
   });
 
@@ -43,7 +77,6 @@ export const useContentOperations = (
       const stored = localStorage.getItem('enableFirestore');
       const current = stored ? JSON.parse(stored) : true;
       if (current !== enableFirestore) {
-        console.log('🔍 useContentOperations enableFirestore changed:', enableFirestore, '->', current);
         setEnableFirestore(current);
       }
     }, 500);
@@ -54,13 +87,19 @@ export const useContentOperations = (
   const throttledUpdate = useCallback(async (id: string, updates: Partial<Content>) => {
     try {
       const contentRef = doc(firestore, 'canvases', canvasId, 'content', id);
-      const updateData = removeUndefinedValues({
+
+      // Minimize contentData for groups to avoid "too many index entries" error
+      const updatesToStore = updates.type === 'group' && (updates as any).contentData ? {
         ...updates,
+        contentData: minimizeGroupContentData((updates as any).contentData)
+      } : updates;
+
+      const updateData = removeUndefinedValues({
+        ...updatesToStore,
         updatedAt: serverTimestamp(),
         lastEditedBy: userUid || null,
         lastEditedAt: serverTimestamp()
       });
-      console.log(`📝 [EDIT TRACKING] Updating content ${id} with lastEditedBy: ${userUid}`);
       await updateDoc(contentRef, updateData);
       setSyncStatus(id, 'synced');
       retryCount.current = 0;
@@ -71,9 +110,6 @@ export const useContentOperations = (
         retryCount.current++;
         const retryDelay = SHAPE_RETRY_DELAY_MS * retryCount.current;
         setTimeout(() => throttledUpdate(id, updates), retryDelay);
-        if (ENABLE_PERFORMANCE_LOGGING) {
-          console.log(`🔄 Content update retry ${retryCount.current}/${SHAPE_MAX_RETRIES} in ${retryDelay}ms`);
-        }
       }
     }
   }, [setSyncStatus, canvasId, userUid]);
@@ -88,45 +124,59 @@ export const useContentOperations = (
     try {
       isCreatingContent.current = true;
 
-      console.log('🔍 createContent called:', { skipFirestore, willUseFirestore: !skipFirestore });
+      // ALWAYS add to local store first for optimistic updates
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const now = new Date();
+      const localContent: Content = {
+        ...contentData,
+        id: tempId,
+        createdAt: now,
+        updatedAt: now,
+        lastEditedBy: userUid || null,
+        lastEditedAt: now,
+      } as Content;
+
+      addStoreContent(localContent);
 
       // Use local-only mode if skipFirestore is true
       if (skipFirestore) {
-        // Local-only mode: Add to canvas store with local ID
-        const localId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const now = new Date();
-        const localContent: Content = {
-          ...contentData,
-          id: localId,
-          createdAt: now,
-          updatedAt: now,
-          lastEditedBy: userUid || null,
-          lastEditedAt: now,
-        } as Content;
-        addStoreContent(localContent);
-        console.log(`⚠️ [EDIT TRACKING] Content added to canvas store only: ${localId}, lastEditedBy: ${userUid}`);
+        // Local-only mode: we're done, content is already in the store
       } else {
-        // Firestore mode: Add to Firestore, listener will update local state
-        const path = `canvases/${canvasId}/content`;
-        console.log('📤 Firestore path:', path);
+        // Firestore mode: Also sync to Firestore, but we already have it in the store
         const contentRef = collection(firestore, 'canvases', canvasId, 'content');
-        const now = serverTimestamp();
-        const newContent = removeUndefinedValues({
+        const firestoreTimestamp = serverTimestamp();
+
+        // Minimize contentData for groups to avoid "too many index entries" error
+        const dataToStore = contentData.type === 'group' && 'contentData' in contentData ? {
           ...contentData,
-          createdAt: now,
-          updatedAt: now,
+          contentData: minimizeGroupContentData((contentData as any).contentData)
+        } : contentData;
+
+        const firestoreContent = removeUndefinedValues({
+          ...dataToStore,
+          createdAt: firestoreTimestamp,
+          updatedAt: firestoreTimestamp,
           lastEditedBy: userUid || null,
-          lastEditedAt: now
+          lastEditedAt: firestoreTimestamp
         });
-        console.log(`📤 [EDIT TRACKING] About to add to Firestore with lastEditedBy: ${userUid}`, newContent);
-        const docRef = await addDoc(contentRef, newContent);
-        console.log('✅ Content added to Firestore with ID:', docRef.id);
-        console.log('✅ Full Firestore path:', docRef.path);
-        setSyncStatus(docRef.id, 'pending');
+        const docRef = await addDoc(contentRef, firestoreContent);
+
+        // Update the temp ID to the real Firestore ID in the store
+        const updatedContent = {
+          ...localContent,
+          id: docRef.id,
+        };
+        // Replace temp item with real ID
+        const currentContent = useCanvasStore.getState().content;
+        const newContent = currentContent.map(item =>
+          item.id === tempId ? updatedContent : item
+        );
+        useCanvasStore.setState({ content: newContent });
+
+        setSyncStatus(docRef.id, 'synced');
       }
     } catch (err) {
       console.error('❌ Error creating content:', err);
-      console.error('❌ Error details:', JSON.stringify(err, null, 2));
     } finally {
       setTimeout(() => {
         isCreatingContent.current = false;
@@ -146,7 +196,6 @@ export const useContentOperations = (
       activelyEditingRef.current.add(id);
 
       // Update the local store immediately for instant UI feedback
-      console.log('✏️ Updating local store for', id, updates);
       updateStoreContent(id, updates);
 
       // Clear any existing timeout for this content
@@ -164,8 +213,6 @@ export const useContentOperations = (
       if (enableFirestore) {
         setSyncStatus(id, 'pending');
         throttledUpdate(id, updates);
-      } else {
-        console.log('⚠️ Content updated in canvas store only:', id);
       }
     } catch (err) {
       console.error('Error updating content:', err);
@@ -183,8 +230,6 @@ export const useContentOperations = (
     }
 
     try {
-      console.log(`🗑️ [SOFT DELETE] Marking content as deleted ${id}, deletedBy: ${userUid}`);
-
       // Remove from local store immediately
       deleteStoreContent(id);
 
@@ -198,9 +243,6 @@ export const useContentOperations = (
           deletedAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
-        console.log(`✅ [SOFT DELETE] Content marked as deleted in Firestore: ${id}, by user: ${userUid}`);
-      } else {
-        console.log(`⚠️ [SOFT DELETE] Content deleted from canvas store only: ${id}, by user: ${userUid}`);
       }
     } catch (err) {
       console.error('Error deleting content:', err);
@@ -231,17 +273,13 @@ export const useContentOperations = (
         });
 
         if (firestoreIds.length > 0) {
-          console.log(`📤 [CLEAR ALL - SOFT DELETE] Marking ${firestoreIds.length} items as deleted in Firestore with batch write`);
           await batch.commit();
-          console.log('✅ All content marked as deleted in Firestore');
         }
 
         const localOnlyCount = allIds.length - firestoreIds.length;
         if (localOnlyCount > 0) {
-          console.log(`⚠️ [CLEAR ALL] ${localOnlyCount} local-only items cleared from canvas store`);
         }
       } else {
-        console.log('⚠️ All content cleared from canvas store only');
       }
     } catch (err) {
       console.error('Error clearing all content:', err);
@@ -274,10 +312,6 @@ export const useContentOperations = (
     }
 
     try {
-      const startTime = performance.now();
-
-      console.log(`📦 [BATCH UPDATE] Starting batch update of ${updatesList.length} items`);
-
       // Mark all as actively editing
       updatesList.forEach(({ id }) => {
         activelyEditingRef.current.add(id);
@@ -285,7 +319,6 @@ export const useContentOperations = (
 
       // Update local store immediately for all items
       updatesList.forEach(({ id, updates }) => {
-        console.log('✏️ Updating local store for', id, updates);
         updateStoreContent(id, updates);
       });
 
@@ -307,8 +340,15 @@ export const useContentOperations = (
 
         updatesList.forEach(({ id, updates }) => {
           const contentRef = doc(firestore, 'canvases', canvasId, 'content', id);
-          const updateData = removeUndefinedValues({
+
+          // Minimize contentData for groups to avoid "too many index entries" error
+          const updatesToStore = updates.type === 'group' && (updates as any).contentData ? {
             ...updates,
+            contentData: minimizeGroupContentData((updates as any).contentData)
+          } : updates;
+
+          const updateData = removeUndefinedValues({
+            ...updatesToStore,
             updatedAt: serverTimestamp(),
             lastEditedBy: userUid || null,
             lastEditedAt: serverTimestamp()
@@ -317,17 +357,10 @@ export const useContentOperations = (
           setSyncStatus(id, 'pending');
         });
 
-        console.log(`📤 [BATCH UPDATE] Writing ${updatesList.length} updates to Firestore with batch write`);
         await batch.commit();
 
         // Set all items to synced status
         updatesList.forEach(({ id }) => setSyncStatus(id, 'synced'));
-
-        const duration = performance.now() - startTime;
-        console.log(`✅ [BATCH UPDATE] ${updatesList.length} items updated in Firestore in ${duration.toFixed(2)}ms`);
-      } else {
-        const duration = performance.now() - startTime;
-        console.log(`⚠️ [BATCH UPDATE] ${updatesList.length} items updated in canvas store only in ${duration.toFixed(2)}ms`);
       }
     } catch (err) {
       console.error('❌ Error updating content batch:', err);
@@ -350,13 +383,8 @@ export const useContentOperations = (
     }
 
     try {
-      const startTime = performance.now();
-
-      console.log(`📦 [BATCH SOFT DELETE] Starting batch soft deletion of ${ids.length} items`);
-
       // Delete from local store immediately
       ids.forEach(id => {
-        console.log(`🗑️ [SOFT DELETE] Marking content as deleted ${id}, deletedBy: ${userUid}`);
         deleteStoreContent(id);
       });
 
@@ -377,20 +405,8 @@ export const useContentOperations = (
         });
 
         if (firestoreIds.length > 0) {
-          console.log(`📤 [BATCH SOFT DELETE] Marking ${firestoreIds.length} items as deleted in Firestore with batch write`);
           await batch.commit();
-
-          const duration = performance.now() - startTime;
-          console.log(`✅ [BATCH SOFT DELETE] ${firestoreIds.length} items marked as deleted in Firestore in ${duration.toFixed(2)}ms`);
         }
-
-        const localOnlyCount = ids.length - firestoreIds.length;
-        if (localOnlyCount > 0) {
-          console.log(`⚠️ [BATCH SOFT DELETE] ${localOnlyCount} local-only items deleted from canvas store`);
-        }
-      } else {
-        const duration = performance.now() - startTime;
-        console.log(`⚠️ [BATCH SOFT DELETE] ${ids.length} items deleted from canvas store only in ${duration.toFixed(2)}ms`);
       }
     } catch (err) {
       console.error('❌ Error deleting content batch:', err);
@@ -411,9 +427,6 @@ export const useContentOperations = (
 
     try {
       isCreatingContent.current = true;
-      const startTime = performance.now();
-
-      console.log(`📦 [BATCH CREATE] Starting batch creation of ${contentDataArray.length} items, skipFirestore: ${skipFirestore}`);
 
       if (skipFirestore) {
         // Local-only mode: Add all to canvas store with local IDs
@@ -432,9 +445,6 @@ export const useContentOperations = (
 
         // Add all items to store at once
         localContent.forEach(item => addStoreContent(item));
-
-        const duration = performance.now() - startTime;
-        console.log(`✅ [BATCH CREATE] ${contentDataArray.length} items added to canvas store only in ${duration.toFixed(2)}ms`);
       } else {
         // Firestore mode: Use writeBatch for simultaneous writes
         const batch = writeBatch(firestore);
@@ -444,8 +454,15 @@ export const useContentOperations = (
 
         contentDataArray.forEach((contentData) => {
           const newDocRef = doc(contentRef);
-          const newContent = removeUndefinedValues({
+
+          // Minimize contentData for groups to avoid "too many index entries" error
+          const dataToStore = contentData.type === 'group' ? {
             ...contentData,
+            contentData: minimizeGroupContentData((contentData as any).contentData)
+          } : contentData;
+
+          const newContent = removeUndefinedValues({
+            ...dataToStore,
             createdAt: now,
             updatedAt: now,
             lastEditedBy: userUid || null,
@@ -455,14 +472,10 @@ export const useContentOperations = (
           docRefs.push(newDocRef.id);
         });
 
-        console.log(`📤 [BATCH CREATE] Writing ${contentDataArray.length} items to Firestore with batch write`);
         await batch.commit();
 
         // Set all items to pending sync status
         docRefs.forEach(id => setSyncStatus(id, 'pending'));
-
-        const duration = performance.now() - startTime;
-        console.log(`✅ [BATCH CREATE] ${contentDataArray.length} items written to Firestore in ${duration.toFixed(2)}ms`);
       }
     } catch (err) {
       console.error('❌ Error creating content batch:', err);

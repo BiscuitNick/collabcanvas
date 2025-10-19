@@ -96,6 +96,8 @@ export const useFirestoreSync = (userUid: string | undefined) => {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
+        console.log(`🔥 [FIRESTORE] Received update with ${snapshot.size} documents`);
+
         const contentData: Content[] = [];
         const deletedIds: string[] = [];
 
@@ -176,8 +178,29 @@ export const useFirestoreSync = (userUid: string | undefined) => {
               alt: data.alt || 'Image',
               opacity: data.opacity !== undefined ? data.opacity : 1,
             });
+          } else if (data.type === 'group') {
+            contentData.push({
+              ...baseContent,
+              type: 'group',
+              width: data.width || 200,
+              height: data.height || 200,
+              scaleX: data.scaleX || 1,
+              scaleY: data.scaleY || 1,
+              contentIds: data.contentIds || [],
+              contentData: data.contentData || {},
+              opacity: data.opacity !== undefined ? data.opacity : 1,
+            });
           }
         });
+
+        console.log(`🔥 [FIRESTORE] Content from Firestore:`, contentData.map(c => ({
+          id: c.id,
+          type: c.type,
+          lastEditedBy: c.lastEditedBy,
+          x: Math.round(c.x),
+          y: Math.round(c.y),
+          contentIds: (c as any).contentIds?.length || 0
+        })));
 
         // Get current store content for comparison from ref
         const currentStoreContent = storeContentRef.current;
@@ -194,12 +217,40 @@ export const useFirestoreSync = (userUid: string | undefined) => {
           const storeItem = storeContentMap.get(remoteContent.id);
           const wasLastEditedByCurrentUser = remoteContent.lastEditedBy === userUid;
 
+          // Look for temp item that might be waiting for ID replacement
+          let tempItem: Content | undefined;
+          if (!storeItem && wasLastEditedByCurrentUser) {
+            // Check if there's a temp item for this content
+            tempItem = Array.from(storeContentMap.values()).find(item =>
+              item.id.startsWith('temp-') &&
+              item.type === remoteContent.type &&
+              Math.abs(item.x - remoteContent.x) < 0.1 && // Same position (accounting for floating point)
+              Math.abs(item.y - remoteContent.y) < 0.1
+            );
+          }
+
           if (isActivelyEditing && storeItem) {
             // User is actively editing this item - keep their local changes
             mergedContent.push(storeItem);
-          } else if (wasLastEditedByCurrentUser && storeItem) {
-            // Current user was the last to edit - ignore Firestore update to avoid race condition
-            mergedContent.push(storeItem);
+          } else if (wasLastEditedByCurrentUser && (storeItem || tempItem)) {
+            // Current user was the last to edit - use local version but update ID if needed
+            const localVersion = storeItem || tempItem!;
+            if (tempItem) {
+              // Replace temp ID with real Firestore ID
+              mergedContent.push({
+                ...localVersion,
+                id: remoteContent.id,
+                createdAt: remoteContent.createdAt, // Use Firestore timestamp
+                updatedAt: remoteContent.updatedAt, // Use Firestore timestamp
+              });
+              storeContentMap.delete(tempItem.id); // Remove temp item from map
+            } else {
+              // Keep existing store item, ignore Firestore update
+              mergedContent.push(storeItem!);
+            }
+          } else if (wasLastEditedByCurrentUser && !storeItem && !tempItem) {
+            // We were last to edit but have no local copy - this shouldn't happen, but use remote to be safe
+            mergedContent.push(remoteContent);
           } else {
             // Not editing and not our edit - use remote content (this updates other users' changes)
             mergedContent.push(remoteContent);

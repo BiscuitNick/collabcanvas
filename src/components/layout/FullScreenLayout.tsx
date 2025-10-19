@@ -89,7 +89,31 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   }, [presence]);
   // Use selectedContentId directly instead of the getter selectedShapeId for proper reactivity
   const canvasSelectedShapeId = selectedContentId
-  const { createContent, createContentBatch, updateContent, updateContentBatch, clearAllContent, deleteContent } = useContent()
+  const { createContent: createContentOriginal, createContentBatch: createContentBatchOriginal, updateContent, updateContentBatch, clearAllContent, deleteContent } = useContent()
+
+  // Firestore state - must be defined before the wrappers that use it
+  const [enableFirestore, setEnableFirestore] = useState(() => {
+    const stored = localStorage.getItem('enableFirestore');
+    return stored ? JSON.parse(stored) : true;
+  })
+
+  // Group caching state for performance optimization
+  const [enableGroupCaching, setEnableGroupCaching] = useState(() => {
+    const stored = localStorage.getItem('enableGroupCaching');
+    return stored ? JSON.parse(stored) : false;
+  })
+
+  // Wrap createContent to respect Firestore setting
+  const createContent = useCallback(async (contentData: Omit<Content, 'id' | 'createdAt' | 'updatedAt'>) => {
+    console.log('🔧 [FullScreenLayout] createContent wrapper called, enableFirestore:', enableFirestore)
+    return createContentOriginal(contentData, !enableFirestore)
+  }, [createContentOriginal, enableFirestore])
+
+  // Wrap createContentBatch to respect Firestore setting
+  const createContentBatch = useCallback(async (contentDataArray: Omit<Content, 'id' | 'createdAt' | 'updatedAt'>[]) => {
+    console.log('🔧 [FullScreenLayout] createContentBatch wrapper called, enableFirestore:', enableFirestore)
+    return createContentBatchOriginal(contentDataArray, !enableFirestore)
+  }, [createContentBatchOriginal, enableFirestore])
 
   // Legacy aliases for backward compatibility
   const createShape = createContent
@@ -161,10 +185,6 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     prevSelectionRef.current = canvasSelectedShapeId
   }, [canvasSelectedShapeId])
 
-  const [enableFirestore, setEnableFirestore] = useState(() => {
-    const stored = localStorage.getItem('enableFirestore');
-    return stored ? JSON.parse(stored) : true;
-  })
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const [manualCanvasSize, setManualCanvasSize] = useState<{ width: number; height: number } | null>(null)
   const [textOptions, setTextOptions] = useState({ text: '', fontSize: 24, fontFamily: 'Arial' as const, fontStyle: 'normal' as const })
@@ -179,6 +199,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     canvasX?: number
     canvasY?: number
     target: string
+    contentTarget?: string
     tool: string
     timestamp: number
   } | null>(null)
@@ -278,13 +299,40 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         canvasY = Math.round((screenY - stagePosition.y) / stageScale)
       }
 
+      // Get content target info
+      const targetDesc = getTargetDescription(e.target)
+      let contentTarget: string | undefined
+
+      // If clicking on canvas, check what content was clicked
+      if (targetDesc === 'canvas') {
+        // Small delay to allow selection to update
+        setTimeout(() => {
+          const currentSelectedId = useCanvasStore.getState().selectedContentId
+          if (currentSelectedId) {
+            const clickedContent = content.find(c => c.id === currentSelectedId)
+            if (clickedContent) {
+              setLastEvent(prev => prev ? {
+                ...prev,
+                contentTarget: `${clickedContent.type} (${clickedContent.id.substring(0, 8)})`
+              } : null)
+            }
+          } else {
+            setLastEvent(prev => prev ? {
+              ...prev,
+              contentTarget: 'empty canvas'
+            } : null)
+          }
+        }, 10)
+      }
+
       setLastEvent({
         type: isTouch ? 'touch' : 'mouse',
         x: Math.round(clientX),
         y: Math.round(clientY),
         canvasX,
         canvasY,
-        target: getTargetDescription(e.target),
+        target: targetDesc,
+        contentTarget,
         tool: uiState.selectedTool || 'none',
         timestamp: Date.now()
       })
@@ -471,6 +519,11 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     localStorage.setItem('enableFirestore', JSON.stringify(enable))
   }, [])
 
+  const handleToggleGroupCaching = useCallback((enable: boolean) => {
+    setEnableGroupCaching(enable)
+    localStorage.setItem('enableGroupCaching', JSON.stringify(enable))
+  }, [])
+
   const handleCanvasWidthChange = useCallback((width: number) => {
     setManualCanvasSize(prev => ({ width, height: prev?.height || canvasSize.height }))
   }, [canvasSize.height])
@@ -526,8 +579,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           }
         )
 
-        // Create content - skipFirestore parameter controls whether to save to Firestore
-        await createContent(textContent, !enableFirestore)
+        // Create content - wrapper handles Firestore setting
+        await createContent(textContent)
 
         // TODO: Task 2.3 - Immediately enter edit mode with caret visible
       } catch {
@@ -558,8 +611,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           }
         )
 
-        // Create content - skipFirestore parameter controls whether to save to Firestore
-        await createContent(imageContent, !enableFirestore)
+        // Create content - wrapper handles Firestore setting
+        await createContent(imageContent)
       } catch {
         // Silently fail
       }
@@ -585,7 +638,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
             rotation: 0,
             createdBy: user?.uid || 'anonymous',
           }
-          await createShape(rectangle, !enableFirestore)
+          await createShape(rectangle)
         } else if (shapeCreationOptions.type === 'circle') {
           let radius = shapeCreationOptions.radius
           if (radius === undefined) {
@@ -610,7 +663,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
             rotation: 0,
             createdBy: user?.uid || 'anonymous',
           }
-          await createShape(circle, !enableFirestore)
+          await createShape(circle)
         }
 
       } catch {
@@ -622,7 +675,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     if (gridPositionHandlerRef.current) {
       gridPositionHandlerRef.current(event.x, event.y)
     }
-  }, [createShape, user?.uid, uiState, createContent, enableFirestore, textOptions, imageUrl])
+  }, [createShape, user?.uid, uiState, createContent, textOptions, imageUrl])
 
 
 
@@ -660,7 +713,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           onPanEnd: handlePanEnd,
           selectedTool: uiState.selectedTool,
           onCanvasClick: handleCanvasClick,
-          isCreatingShape: uiState.isCreatingShape
+          isCreatingShape: uiState.isCreatingShape,
+          enableGroupCaching: enableGroupCaching
         })}
       </div>
 
@@ -782,6 +836,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         fps={uiState.fps}
         enableFirestore={enableFirestore}
         onToggleFirestore={handleToggleFirestore}
+        enableGroupCaching={enableGroupCaching}
+        onToggleGroupCaching={handleToggleGroupCaching}
         canvasWidth={canvasSize.width}
         canvasHeight={canvasSize.height}
         onCanvasWidthChange={handleCanvasWidthChange}

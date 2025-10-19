@@ -3,8 +3,9 @@ import Rectangle from './Rectangle'
 import Circle from './Circle'
 import TextContent from './TextContent'
 import Image from './Image'
-import type { Shape, Rectangle as RectangleType, Circle as CircleType, TextContent as TextContentType, ImageContent as ImageContentType } from '../../types'
-import { isRectangle, isCircle, isTextContent, isImageContent } from '../../types'
+import GroupContent from './GroupContent'
+import type { Shape, Rectangle as RectangleType, Circle as CircleType, TextContent as TextContentType, ImageContent as ImageContentType, GroupContent as GroupContentType } from '../../types'
+import { isRectangle, isCircle, isTextContent, isImageContent, isGroupContent } from '../../types'
 
 interface ShapeFactoryProps {
   shape: Shape
@@ -18,6 +19,7 @@ interface ShapeFactoryProps {
   currentUserId?: string
   selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null
   canEdit?: boolean
+  enableGroupCaching?: boolean
 }
 
 /**
@@ -37,6 +39,7 @@ const ShapeFactory: React.FC<ShapeFactoryProps> = ({
   currentUserId,
   selectedTool,
   canEdit = true,
+  enableGroupCaching = false,
 }) => {
   // Handle null or undefined shapes
   if (!shape) {
@@ -116,6 +119,26 @@ const ShapeFactory: React.FC<ShapeFactoryProps> = ({
         currentUserId={currentUserId}
         selectedTool={selectedTool}
         canEdit={canEdit}
+      />
+    )
+  }
+
+  // Render Group component
+  if (isGroupContent(shape)) {
+    return (
+      <GroupContent
+        content={shape as GroupContentType}
+        isSelected={isSelected}
+        onSelect={onSelect}
+        onUpdate={onUpdate as (updates: Partial<GroupContentType>) => void}
+        onDragMove={onDragMove}
+        onDragEnd={onDragEnd}
+        onDragStart={onDragStart}
+        onDragEndCallback={onDragEndCallback}
+        currentUserId={currentUserId}
+        selectedTool={selectedTool}
+        canEdit={canEdit}
+        enableGroupCaching={enableGroupCaching}
       />
     )
   }

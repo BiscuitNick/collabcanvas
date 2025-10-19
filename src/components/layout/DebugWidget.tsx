@@ -3,6 +3,7 @@ import { Switch } from '../ui/switch'
 import { Label } from '../ui/label'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion'
 import { useCanvasStore } from '../../store/canvasStore'
+import { isGroupContent } from '../../types'
 
 import type { Content, Cursor } from '../../types';
 
@@ -20,6 +21,8 @@ interface DebugWidgetProps {
   fps: number
   enableFirestore?: boolean
   onToggleFirestore?: (enable: boolean) => void
+  enableGroupCaching?: boolean
+  onToggleGroupCaching?: (enable: boolean) => void
   canvasWidth: number
   canvasHeight: number
   onCanvasWidthChange?: (width: number) => void
@@ -31,6 +34,7 @@ interface DebugWidgetProps {
     canvasX?: number
     canvasY?: number
     target: string
+    contentTarget?: string
     tool: string
     timestamp: number
   } | null
@@ -48,9 +52,20 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
   fps,
   enableFirestore = true,
   onToggleFirestore,
+  enableGroupCaching = false,
+  onToggleGroupCaching,
   lastEvent
 }) => {
   const { stagePosition, stageScale } = useCanvasStore()
+
+  // Calculate total shapes including nested items in groups
+  const topLevelCount = content.length
+  const totalCount = content.reduce((count, item) => {
+    if (isGroupContent(item)) {
+      return count + 1 + item.contentIds.length
+    }
+    return count + 1
+  }, 0)
 
   if (!debugMode) return null
 
@@ -101,6 +116,12 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
                   <span className="text-gray-500">Target:</span>
                   <span className="font-mono text-xs break-all">{lastEvent.target}</span>
                 </div>
+                {lastEvent.contentTarget && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Content:</span>
+                    <span className="font-mono text-xs break-all font-semibold text-blue-600">{lastEvent.contentTarget}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-500">Time:</span>
                   <span className="font-mono text-xs">{new Date(lastEvent.timestamp).toLocaleTimeString()}</span>
@@ -115,15 +136,22 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
         {/* Content Info */}
         <AccordionItem value="content-info" className="border-b">
           <AccordionTrigger className="py-2 text-xs font-medium text-gray-700 hover:no-underline">
-            Content ({content.length})
+            Content
           </AccordionTrigger>
           <AccordionContent className="pb-2">
             <div className="space-y-1 text-gray-600">
+              <div>Top-level: {topLevelCount}</div>
+              <div>Total (w/ nested): {totalCount}</div>
               <div>Selected: {selectedShapeId || 'None'}</div>
-              <div className="text-xs max-h-32 overflow-y-auto">
+              <div className="text-xs max-h-32 overflow-y-auto mt-2">
                 {content.map(shape => (
                   <div key={shape.id} className="flex justify-between py-0.5">
-                    <span>{shape.type}</span>
+                    <span>
+                      {shape.type}
+                      {isGroupContent(shape) && (
+                        <span className="text-gray-400 ml-1">({shape.contentIds.length})</span>
+                      )}
+                    </span>
                     <span className="text-gray-400">({Math.round(shape.x)}, {Math.round(shape.y)})</span>
                   </div>
                 ))}
@@ -189,6 +217,20 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
                     id="firestore-updates"
                     checked={enableFirestore}
                     onCheckedChange={onToggleFirestore}
+                    className="scale-75"
+                  />
+                </div>
+              )}
+
+              {onToggleGroupCaching && (
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="group-caching" className="text-xs">
+                    Group Caching
+                  </Label>
+                  <Switch
+                    id="group-caching"
+                    checked={enableGroupCaching}
+                    onCheckedChange={onToggleGroupCaching}
                     className="scale-75"
                   />
                 </div>

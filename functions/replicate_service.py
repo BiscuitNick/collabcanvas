@@ -50,75 +50,67 @@ def text_to_canvas_commands_replicate(prompt: str, model: str, selected_content=
 
         print(f"[Replicate Service] Completed in {api_duration:.0f}ms, response length: {len(response_text)}")
 
+        canvas_commands = []
+        ai_message = ""
+
         try:
             cleaned_response = response_text.strip()
-            canvas_commands = json.loads(cleaned_response)
-            if not isinstance(canvas_commands, list):
-                canvas_commands = [canvas_commands]
-            print(f"[Replicate Service] Parsed {len(canvas_commands)} commands")
-        except json.JSONDecodeError:
-            json_match = re.search(r'\[[\s\S]*?\]', response_text, re.DOTALL)
-            if json_match:
-                json_text = json_match.group().strip()
-                try:
-                    canvas_commands = json.loads(json_text)
-                    if not isinstance(canvas_commands, list):
-                        canvas_commands = [canvas_commands]
-                except json.JSONDecodeError:
-                    command_matches = re.findall(r'\{[^{}]*"action"[^{}]*\}', response_text, re.DOTALL)
-                    if command_matches:
-                        canvas_commands = []
-                        for match in command_matches:
-                            try:
-                                command = json.loads(match)
-                                canvas_commands.append(command)
-                            except json.JSONDecodeError:
-                                continue
-                    else:
-                        canvas_commands = [
-                            {
-                                "action": "create",
-                                "type": "text",
-                                "x": 0,
-                                "y": 0,
-                                "width": 400,
-                                "height": 100,
-                                "fill": "#000000",
-                                "text": response_text[:100],
-                                "fontSize": 16,
-                            }
-                        ]
+            parsed_response = json.loads(cleaned_response)
+
+            # Check if response is in new format {commands: [], message: ""}
+            if isinstance(parsed_response, dict) and "commands" in parsed_response:
+                canvas_commands = parsed_response.get("commands", [])
+                ai_message = parsed_response.get("message", "")
+                print(f"[Replicate Service] Parsed new format: {len(canvas_commands)} commands, message: {ai_message[:50]}")
+            # Legacy format: array of commands
+            elif isinstance(parsed_response, list):
+                canvas_commands = parsed_response
+                ai_message = f"Created {len(canvas_commands)} item(s)"
+                print(f"[Replicate Service] Parsed legacy format: {len(canvas_commands)} commands")
+            # Single command object
             else:
-                canvas_commands = [
-                    {
-                        "action": "create",
-                        "type": "text",
-                        "x": 0,
-                        "y": 0,
-                        "width": 400,
-                        "height": 100,
-                        "fill": "#000000",
-                        "text": response_text[:100],
-                        "fontSize": 16,
-                    }
-                ]
+                canvas_commands = [parsed_response]
+                ai_message = "Created 1 item"
+                print(f"[Replicate Service] Parsed single command")
+        except json.JSONDecodeError:
+            # Try to extract JSON object first (new format)
+            json_obj_match = re.search(r'\{[\s\S]*?"commands"[\s\S]*?\}', response_text, re.DOTALL)
+            if json_obj_match:
+                try:
+                    parsed_response = json.loads(json_obj_match.group().strip())
+                    canvas_commands = parsed_response.get("commands", [])
+                    ai_message = parsed_response.get("message", "")
+                except json.JSONDecodeError:
+                    pass
 
-        if 'canvas_commands' not in locals() or not canvas_commands:
-            canvas_commands = [
-                {
-                    "action": "create",
-                    "type": "text",
-                    "x": 0,
-                    "y": 0,
-                    "width": 400,
-                    "height": 100,
-                    "fill": "#000000",
-                    "text": response_text[:100],
-                    "fontSize": 16,
-                }
-            ]
+            # Fall back to extracting array (legacy format)
+            if not canvas_commands:
+                json_match = re.search(r'\[[\s\S]*?\]', response_text, re.DOTALL)
+                if json_match:
+                    json_text = json_match.group().strip()
+                    try:
+                        canvas_commands = json.loads(json_text)
+                        if not isinstance(canvas_commands, list):
+                            canvas_commands = [canvas_commands]
+                        ai_message = f"Created {len(canvas_commands)} item(s)"
+                    except json.JSONDecodeError:
+                        command_matches = re.findall(r'\{[^{}]*"action"[^{}]*\}', response_text, re.DOTALL)
+                        if command_matches:
+                            canvas_commands = []
+                            for match in command_matches:
+                                try:
+                                    command = json.loads(match)
+                                    canvas_commands.append(command)
+                                except json.JSONDecodeError:
+                                    continue
+                            ai_message = f"Created {len(canvas_commands)} item(s)"
 
-        print(f"[Replicate Service] Returning {len(canvas_commands)} commands")
+            # Final fallback: return error message as text
+            if not canvas_commands:
+                ai_message = response_text[:200] if response_text else "Unable to parse AI response"
+                canvas_commands = []
+
+        print(f"[Replicate Service] Returning {len(canvas_commands)} commands with message: {ai_message[:50]}")
 
         debug_info = {
             "provider": "replicate",
@@ -130,7 +122,7 @@ def text_to_canvas_commands_replicate(prompt: str, model: str, selected_content=
             "processed_response": response_text,
         }
 
-        return {"success": True, "data": {"commands": canvas_commands}, "debug": debug_info}
+        return {"success": True, "data": {"commands": canvas_commands, "message": ai_message}, "debug": debug_info}
 
     except Exception as e:
         return {"success": False, "error": str(e)}

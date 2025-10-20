@@ -39,7 +39,7 @@ export interface ImageGenerationResponse {
 }
 
 export interface CanvasCommand {
-  action: 'create' | 'edit';
+  action: 'create' | 'edit' | 'grid';
   type?: 'rectangle' | 'circle' | 'text';
   x?: number;
   y?: number;
@@ -55,6 +55,13 @@ export interface CanvasCommand {
   fontStyle?: string;
   shapeId?: string;
   rotation?: number;
+  // Grid-specific properties
+  rows?: number;
+  cols?: number;
+  cellWidth?: number;
+  cellHeight?: number;
+  gap?: number;
+  colors?: 'random' | string[];
 }
 
 interface AITestRequest {

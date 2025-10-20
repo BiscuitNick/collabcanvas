@@ -25,7 +25,6 @@ import {
   Trash2,
   Type,
   Bot,
-  Blocks,
   Grid3X3,
   Copy
 } from 'lucide-react'
@@ -33,7 +32,6 @@ import ShapeCreationForm from './ShapeCreationForm'
 import TextToolbar from './TextToolbar'
 import { ShapeType, FontFamily, FontStyle, ContentType, ContentVersion } from '../../types'
 import type { Content } from '../../types'
-import { callAITest, generateImage, type AIProvider, type GPT5Model, type ImageModel } from '../../lib/aiApi'
 import { buildGrid } from '../../lib/utils'
 import { useCanvasStore } from '../../store/canvasStore'
 import { useAuth } from '../../hooks/useAuth'
@@ -84,8 +82,6 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   onCreateShapeWithOptions,
   onCreateContent,
   onCreateContentBatch,
-  onUpdateContent,
-  onUpdateContentBatch,
   onTextOptionsChange,
   // onCreateText is not used yet but reserved for future use
   onOpenAIAgent,
@@ -95,9 +91,7 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   onDeleteContent,
   canEdit = true,
   canvasViewport,
-  onGridPositionClick,
-  onPanToContent,
-  onPanAndZoomToContent
+  onGridPositionClick
 }) => {
 
   // Get selected content from canvas store
@@ -107,41 +101,11 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   // Get current user for createdBy field
   const { user } = useAuth()
 
-  // Helper function to calculate viewport center in canvas coordinates
-  const getViewportCenter = useCallback(() => {
-    if (!canvasViewport) return { x: 100, y: 100 }
-
-    const viewportCenterScreenX = canvasViewport.width / 2
-    const viewportCenterScreenY = canvasViewport.height / 2
-
-    // Convert screen coordinates to canvas coordinates
-    const canvasX = (viewportCenterScreenX - canvasViewport.position.x) / canvasViewport.scale
-    const canvasY = (viewportCenterScreenY - canvasViewport.position.y) / canvasViewport.scale
-
-    return { x: canvasX, y: canvasY }
-  }, [canvasViewport])
-
   // Local state for toolbar
   const [activeTool, setActiveTool] = useState<ToolType>('pan')
   const [showResetDialog, setShowResetDialog] = useState(false)
   const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle')
   const [textInput, setTextInput] = useState('')
-  const [agentInput, setAgentInput] = useState('')
-  const [selectedAgentOption, setSelectedAgentOption] = useState<'blocks' | 'imageplus'>('blocks')
-  const [agentLoading, setAgentLoading] = useState(false)
-  const [agentError, setAgentError] = useState<string | null>(null)
-  const [aiProvider, setAiProvider] = useState<AIProvider>(() => {
-    const saved = localStorage.getItem('collabcanvas-ai-provider')
-    return (saved as AIProvider) || 'openai'
-  })
-  const [aiModel, setAiModel] = useState<GPT5Model>(() => {
-    const saved = localStorage.getItem('collabcanvas-ai-model')
-    return (saved as GPT5Model) || 'gpt-4o-mini'
-  })
-  const [imageModel, setImageModel] = useState<ImageModel>(() => {
-    const saved = localStorage.getItem('collabcanvas-image-model')
-    return (saved as ImageModel) || 'seedream-4'
-  })
 
   // Grid tool state
   const [gridStartX, setGridStartX] = useState(0)
@@ -301,29 +265,6 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     }
   }, [])
 
-  // Persist AI provider selection
-  useEffect(() => {
-    localStorage.setItem('collabcanvas-ai-provider', aiProvider)
-  }, [aiProvider])
-
-  // Persist AI model selection
-  useEffect(() => {
-    localStorage.setItem('collabcanvas-ai-model', aiModel)
-  }, [aiModel])
-
-  // Persist image model selection
-  useEffect(() => {
-    localStorage.setItem('collabcanvas-image-model', imageModel)
-  }, [imageModel])
-
-  // Handle model compatibility when switching providers
-  useEffect(() => {
-    // If switching to OpenAI and Meta model is selected, switch to default
-    if (aiProvider === 'openai' && aiModel === 'meta/meta-llama-3-8b-instruct') {
-      setAiModel('gpt-4o-mini')
-    }
-  }, [aiProvider, aiModel])
-
   const tools = [
     { id: 'pan' as ToolType, label: 'Hand Tool', icon: Hand, description: 'Pan around the canvas' },
     { id: 'shapes' as ToolType, label: 'Shapes Tool', icon: Shapes, description: 'Create shapes' },
@@ -336,11 +277,6 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   const shapes = [
     { type: 'rectangle' as ShapeType, label: 'Rectangle', icon: Square },
     { type: 'circle' as ShapeType, label: 'Circle', icon: Circle }
-  ]
-
-  const agentOptions = [
-    { type: 'blocks' as const, label: 'Content', icon: Blocks },
-    { type: 'imageplus' as const, label: 'Image', icon: ImagePlus }
   ]
 
   const handleToolSelect = (tool: ToolType) => {
@@ -400,442 +336,10 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     setShowResetDialog(false)
   }
 
-  const handleAgentGo = async () => {
-    if (!agentInput.trim() || agentLoading) return
-
-    // Check if user selected image generation
-    if (selectedAgentOption === 'imageplus') {
-      // Check if we're editing an existing image or creating a new one
-      const isEditingImage = selectedContent && selectedContent.type === ContentType.IMAGE
-
-      if (!onCreateContent) {
-        console.error('[Agent Toolbar] onCreateContent not provided for image generation')
-        setAgentError('Content creation not available')
-        return
-      }
-
-      setAgentLoading(true)
-      setAgentError(null)
-
-      try {
-        const imageUrl = isEditingImage ? (selectedContent as any).src : undefined
-        console.log('[Agent Toolbar] Generating image with model:', imageModel, 'prompt:', agentInput.trim(), isEditingImage ? 'editing existing image' : 'creating new image')
-
-        // Call image generation API with optional image URL for editing
-        const response = await generateImage(agentInput.trim(), imageModel, imageUrl)
-
-        console.log('[Agent Toolbar] Image generation response:', response)
-
-        if (response.success && response.data?.imageUrl) {
-          if (isEditingImage) {
-            // Create new edited image to the right of the old one (keep old image)
-            const oldImage = selectedContent as any
-            const gap = 50 // Gap between old and new image
-
-            // Calculate new position: old image x + old image width + gap
-            const newX = oldImage.x + oldImage.width + gap
-            const newY = oldImage.y
-
-            await onCreateContent!({
-              type: ContentType.IMAGE,
-              version: ContentVersion.V2,
-              x: newX,
-              y: newY,
-              width: oldImage.width, // Match old image dimensions
-              height: oldImage.height,
-              src: response.data.imageUrl,
-              alt: agentInput.trim()
-            } as any)
-            console.log('[Agent Toolbar] Successfully created edited image on canvas (kept old image)')
-
-            // Pan and zoom to show the new image (centered, with auto-zoom to 25% width)
-            if (onPanAndZoomToContent) {
-              onPanAndZoomToContent(newX, newY, oldImage.width, oldImage.height)
-            } else if (onPanToContent) {
-              onPanToContent(newX, newY)
-            }
-          } else {
-            // Create new image at viewport center with 4:3 aspect ratio
-            const viewportCenter = getViewportCenter()
-            const imageWidth = 512
-            const imageHeight = 384 // 4:3 aspect ratio
-
-            const newImage = {
-              type: ContentType.IMAGE,
-              version: ContentVersion.V2,
-              x: viewportCenter.x,
-              y: viewportCenter.y,
-              width: imageWidth,
-              height: imageHeight,
-              src: response.data.imageUrl,
-              alt: agentInput.trim()
-            } as any
-
-            await onCreateContent!(newImage)
-            console.log('[Agent Toolbar] Successfully created image on canvas at viewport center')
-
-            // Pan and zoom to the newly created image (auto-zoom to 25% width)
-            if (onPanAndZoomToContent) {
-              onPanAndZoomToContent(newImage.x, newImage.y, imageWidth, imageHeight)
-            } else if (onPanToContent) {
-              onPanToContent(newImage.x, newImage.y)
-            }
-          }
-
-          // Clear input on success
-          setAgentInput('')
-        } else {
-          console.warn('[Agent Toolbar] No image URL in response:', response)
-          setAgentError('Failed to generate image. Please try again.')
-        }
-      } catch (error) {
-        console.error('[Agent Toolbar] Image generation error:', error)
-        setAgentError('Failed to generate image. Please try again.')
-      } finally {
-        setAgentLoading(false)
-      }
-      return
-    }
-
-    // Handle regular content creation/editing (blocks mode)
-    // Check if we're editing or creating
-    const isEditing = !!selectedContent
-
-    if (!isEditing && !onCreateContent) {
-      console.error('[Agent Toolbar] onCreateContent not provided')
-      setAgentError('Content creation not available')
-      return
-    }
-
-    if (isEditing && !onUpdateContent) {
-      console.error('[Agent Toolbar] onUpdateContent not provided')
-      setAgentError('Content update not available')
-      return
-    }
-
-    setAgentLoading(true)
-    setAgentError(null)
-
-    try {
-      console.log('[Agent Toolbar] Sending request with:', {
-        provider: aiProvider,
-        model: aiModel,
-        prompt: agentInput.trim(),
-        isEditing,
-        selectedContent
-      })
-
-      // Call AI backend with the user's prompt and optional selected content
-      const response = await callAITest(agentInput.trim(), aiProvider, aiModel, selectedContent)
-
-      console.log('[Agent Toolbar] Received response:', response)
-
-      if (response.success && response.data?.commands) {
-        console.log('[Agent Toolbar] Processing', response.data.commands.length, 'commands')
-
-        // Separate edit and create commands for optimized batch processing
-        const editCommands = response.data.commands.filter((cmd: any) => cmd.action === 'edit')
-        const createCommands = response.data.commands.filter((cmd: any) => cmd.action === 'create')
-
-        // Process edit commands - batch them for performance
-        const updatesToApply: Array<{ id: string; updates: Partial<Content> }> = []
-
-        for (const command of editCommands) {
-          console.log('[Agent Toolbar] Processing edit command:', command)
-
-          // Use command.shapeId if specified, otherwise use selectedContent.id
-          const targetId = command.shapeId || selectedContent?.id
-
-          if (!targetId) {
-            console.warn('[Agent Toolbar] Edit action but no target ID or selected content')
-            continue
-          }
-
-          console.log('[Agent Toolbar] Preparing edit for content:', targetId)
-          const updates: any = {}
-
-          // Build updates object from command properties
-          if (command.x !== undefined) updates.x = command.x
-          if (command.y !== undefined) updates.y = command.y
-          if (command.width !== undefined) updates.width = command.width
-          if (command.height !== undefined) updates.height = command.height
-          if (command.radius !== undefined) updates.radius = command.radius
-          if (command.fill !== undefined) updates.fill = command.fill
-          if (command.stroke !== undefined) updates.stroke = command.stroke
-          if (command.strokeWidth !== undefined) updates.strokeWidth = command.strokeWidth
-          if (command.rotation !== undefined) updates.rotation = command.rotation
-          if (command.text !== undefined) updates.text = command.text
-          if (command.fontSize !== undefined) updates.fontSize = command.fontSize
-          if (command.fontFamily !== undefined) updates.fontFamily = command.fontFamily
-          if (command.fontStyle !== undefined) updates.fontStyle = command.fontStyle
-
-          // Check if we already have updates for this ID, if so merge them
-          const existingUpdate = updatesToApply.find(u => u.id === targetId)
-          if (existingUpdate) {
-            Object.assign(existingUpdate.updates, updates)
-          } else {
-            updatesToApply.push({ id: targetId, updates: updates as Partial<Content> })
-          }
-        }
-
-        // Apply all edits in a single batch
-        if (updatesToApply.length > 0) {
-          if (onUpdateContentBatch && updatesToApply.length > 1) {
-            console.log(`🚀 [AI AGENT] Updating ${updatesToApply.length} items using batch operation`)
-            try {
-              await onUpdateContentBatch(updatesToApply)
-              console.log('[Agent Toolbar] All edits applied successfully via batch')
-            } catch (err) {
-              console.error('[Agent Toolbar] Error in batch update:', err)
-            }
-          } else {
-            // Fall back to sequential updates if only one item or batch not available
-            for (const { id, updates } of updatesToApply) {
-              try {
-                await onUpdateContent!(id, updates)
-                console.log('[Agent Toolbar] Content updated successfully:', id)
-              } catch (err) {
-                console.error('[Agent Toolbar] Error updating content:', err)
-              }
-            }
-          }
-
-          // Pan to the edited content (use first edited item's position, or updated position)
-          if (onPanToContent && updatesToApply.length > 0) {
-            const firstUpdate = updatesToApply[0]
-            // Use updated position if available, otherwise find the content and use its position
-            const targetContent = content.find(c => c.id === firstUpdate.id)
-            if (targetContent) {
-              const panX = firstUpdate.updates.x ?? targetContent.x
-              const panY = firstUpdate.updates.y ?? targetContent.y
-              onPanToContent(panX, panY)
-            }
-          }
-        }
-
-        // Process create commands - batch them for performance
-        // Get viewport center to offset AI-generated positions
-        const viewportCenter = getViewportCenter()
-        const contentToCreate: any[] = []
-
-        for (const command of createCommands) {
-          if (command.type === 'rectangle') {
-            // Validate required properties for rectangle
-            if (
-              typeof command.x === 'number' &&
-              typeof command.y === 'number' &&
-              typeof command.width === 'number' &&
-              typeof command.height === 'number' &&
-              typeof command.fill === 'string'
-            ) {
-              contentToCreate.push({
-                type: ContentType.RECTANGLE,
-                version: ContentVersion.V2,
-                x: command.x + viewportCenter.x,
-                y: command.y + viewportCenter.y,
-                width: command.width,
-                height: command.height,
-                rotation: command.rotation || 0,
-                fill: command.fill,
-                stroke: command.stroke || '#000000',
-                strokeWidth: command.strokeWidth || 1
-              })
-            } else {
-              console.warn('[Agent Toolbar] Invalid rectangle command properties:', command)
-            }
-          } else if (command.type === 'circle') {
-            // Validate required properties for circle
-            if (
-              typeof command.x === 'number' &&
-              typeof command.y === 'number' &&
-              (typeof command.width === 'number' || typeof command.radius === 'number') &&
-              typeof command.fill === 'string'
-            ) {
-              // Calculate radius from width/height or use radius directly
-              const radius = command.radius || ((command.width || 0) / 2)
-              contentToCreate.push({
-                type: ContentType.CIRCLE,
-                version: ContentVersion.V2,
-                x: command.x + viewportCenter.x,
-                y: command.y + viewportCenter.y,
-                radius: radius,
-                fill: command.fill,
-                stroke: command.stroke || '#000000',
-                strokeWidth: command.strokeWidth || 1
-              })
-            } else {
-              console.warn('[Agent Toolbar] Invalid circle command properties:', command)
-            }
-          } else if (command.type === 'text') {
-            // Validate required properties for text
-            if (
-              typeof command.x === 'number' &&
-              typeof command.y === 'number' &&
-              typeof command.text === 'string'
-            ) {
-              const textContent: any = {
-                type: ContentType.TEXT,
-                version: ContentVersion.V2,
-                x: command.x + viewportCenter.x,
-                y: command.y + viewportCenter.y,
-                text: command.text,
-                fontSize: command.fontSize || 16,
-                fontFamily: (command.fontFamily as FontFamily) || FontFamily.ARIAL,
-                fontStyle: (command.fontStyle as FontStyle) || FontStyle.NORMAL,
-                fill: command.fill || '#000000'
-              }
-              // Only add width/height if they're defined
-              if (typeof command.width === 'number') textContent.width = command.width
-              if (typeof command.height === 'number') textContent.height = command.height
-
-              contentToCreate.push(textContent)
-            } else {
-              console.warn('[Agent Toolbar] Invalid text command properties:', command)
-            }
-          } else {
-            console.warn('[Agent Toolbar] Unknown content type:', command.type)
-          }
-        }
-
-        // Batch create all content items at once - create as a group
-        if (contentToCreate.length > 0) {
-          // When creating multiple items, group them together
-          if (contentToCreate.length > 1) {
-            // Calculate bounding box for all items
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-
-            for (const item of contentToCreate) {
-              const itemMinX = item.x - (item.width || item.radius || 0) / 2
-              const itemMinY = item.y - (item.height || item.radius || 0) / 2
-              const itemMaxX = item.x + (item.width || item.radius || 0) / 2
-              const itemMaxY = item.y + (item.height || item.radius || 0) / 2
-
-              minX = Math.min(minX, itemMinX)
-              minY = Math.min(minY, itemMinY)
-              maxX = Math.max(maxX, itemMaxX)
-              maxY = Math.max(maxY, itemMaxY)
-            }
-
-            const groupWidth = maxX - minX
-            const groupHeight = maxY - minY
-            const groupCenterX = (minX + maxX) / 2
-            const groupCenterY = (minY + maxY) / 2
-
-            // Create nested items with positions relative to group
-            const nestedItems = contentToCreate.map((item, index) => {
-              const id = `agent-item-${Date.now()}-${index}`
-              return {
-                id,
-                content: {
-                  ...item,
-                  id,
-                  x: item.x - minX,
-                  y: item.y - minY,
-                  createdBy: 'system',
-                  createdAt: 0, // Will be set by Firestore
-                  updatedAt: 0  // Will be set by Firestore
-                }
-              }
-            })
-
-            // Create a group containing all items
-            const groupData = {
-              type: ContentType.GROUP,
-              version: ContentVersion.V2,
-              x: groupCenterX,
-              y: groupCenterY,
-              width: groupWidth,
-              height: groupHeight,
-              scaleX: 1,
-              scaleY: 1,
-              rotation: 0,
-              createdBy: user?.uid || 'anonymous',
-              contentIds: nestedItems.map(item => item.id),
-              contentData: Object.fromEntries(
-                nestedItems.map(item => [item.id, item.content])
-              )
-            } as any
-
-            console.log(`🚀 [AI AGENT] Creating group with ${nestedItems.length} items`)
-            try {
-              await onCreateContent!(groupData)
-              console.log('[Agent Toolbar] Group created successfully')
-
-              // Pan and zoom to the created group (auto-zoom to 25% width)
-              if (onPanAndZoomToContent) {
-                onPanAndZoomToContent(groupCenterX, groupCenterY, groupWidth, groupHeight)
-              } else if (onPanToContent) {
-                onPanToContent(groupCenterX, groupCenterY)
-              }
-            } catch (err) {
-              console.error('[Agent Toolbar] Error creating group:', err)
-            }
-          } else if (onCreateContentBatch) {
-            // Single item - create normally
-            console.log(`🚀 [AI AGENT] Creating ${contentToCreate.length} items using batch operation`)
-            try {
-              await onCreateContentBatch(contentToCreate)
-              console.log('[Agent Toolbar] All content created successfully via batch')
-
-              // Pan and zoom to the first created item (auto-zoom to 25% width)
-              if (contentToCreate.length > 0) {
-                const firstItem = contentToCreate[0]
-                const itemWidth = firstItem.width || firstItem.radius * 2 || 100
-                const itemHeight = firstItem.height || firstItem.radius * 2 || 100
-
-                if (onPanAndZoomToContent) {
-                  onPanAndZoomToContent(firstItem.x, firstItem.y, itemWidth, itemHeight)
-                } else if (onPanToContent) {
-                  onPanToContent(firstItem.x, firstItem.y)
-                }
-              }
-            } catch (err) {
-              console.error('[Agent Toolbar] Error in batch creation:', err)
-            }
-          } else {
-            console.log(`⚠️ [AI AGENT] Falling back to sequential creation for ${contentToCreate.length} items`)
-            for (const contentData of contentToCreate) {
-              try {
-                await onCreateContent!(contentData)
-              } catch (err) {
-                console.error('[Agent Toolbar] Error creating content:', err)
-              }
-            }
-
-            // Pan and zoom to the first created item (auto-zoom to 25% width)
-            if (contentToCreate.length > 0) {
-              const firstItem = contentToCreate[0]
-              const itemWidth = firstItem.width || firstItem.radius * 2 || 100
-              const itemHeight = firstItem.height || firstItem.radius * 2 || 100
-
-              if (onPanAndZoomToContent) {
-                onPanAndZoomToContent(firstItem.x, firstItem.y, itemWidth, itemHeight)
-              } else if (onPanToContent) {
-                onPanToContent(firstItem.x, firstItem.y)
-              }
-            }
-          }
-        }
-
-        // Clear input on success
-        setAgentInput('')
-        console.log('[Agent Toolbar] Successfully processed all commands')
-      } else {
-        console.warn('[Agent Toolbar] No valid commands in response:', response)
-        setAgentError('No valid commands generated. Try a different prompt.')
-      }
-    } catch (error) {
-      console.error('[Agent Toolbar] Error:', error)
-      setAgentError('Failed to process request. Please try again.')
-    } finally {
-      setAgentLoading(false)
-    }
-  }
 
 
   const getCurrentTool = () => tools.find(tool => tool.id === activeTool)
   const getCurrentShape = () => shapes.find(shape => shape.type === selectedShape)
-  const getCurrentAgentOption = () => agentOptions.find(option => option.type === selectedAgentOption)
 
   const renderDynamicContent = () => {
     switch (activeTool) {
@@ -884,83 +388,9 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
           </div>
         )
 
-      case 'agent': {
-        const currentAgentOption = getCurrentAgentOption()
-        return (
-          <div className="flex items-center space-x-2">
-            {/* Content Type Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8">
-                  {currentAgentOption && (() => {
-                    const Icon = currentAgentOption.icon
-                    return <Icon className="h-4 w-4" />
-                  })()}
-                  <ChevronDown className="h-4 w-4 ml-2" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-white">
-                {agentOptions.map((option) => {
-                  const Icon = option.icon
-                  return (
-                    <DropdownMenuItem
-                      key={option.type}
-                      onClick={() => setSelectedAgentOption(option.type)}
-                      className="flex items-center"
-                    >
-                      <Icon className="h-4 w-4 mr-2" />
-                      {option.label}
-                    </DropdownMenuItem>
-                  )
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* AI Provider Dropdown - Only show for blocks mode */}
-            {selectedAgentOption === 'blocks' && (
-              <Select value={aiProvider} onValueChange={(value) => setAiProvider(value as AIProvider)} disabled={agentLoading}>
-                <SelectTrigger className="h-8 w-24 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="replicate">Replicate</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-
-            {/* Model Dropdown - Only show for blocks mode */}
-            {selectedAgentOption === 'blocks' && (
-              <Select value={aiModel} onValueChange={(value) => setAiModel(value as GPT5Model)} disabled={agentLoading}>
-                <SelectTrigger className="h-8 w-32 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  <SelectItem value="gpt-5">GPT-5</SelectItem>
-                  <SelectItem value="gpt-5-mini">GPT-5 Mini</SelectItem>
-                  <SelectItem value="gpt-5-nano">GPT-5 Nano</SelectItem>
-                  <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
-                  <SelectItem value="gpt-4.1-nano">GPT-4.1 Nano</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-
-            {/* Image Model Dropdown - Only show for image mode */}
-            {selectedAgentOption === 'imageplus' && (
-              <Select value={imageModel} onValueChange={(value) => setImageModel(value as ImageModel)} disabled={agentLoading}>
-                <SelectTrigger className="h-8 w-40 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  <SelectItem value="seedream-4">Seedream 4</SelectItem>
-                  <SelectItem value="nano-banana">Nano Banana</SelectItem>
-                  <SelectItem value="flux-kontext-pro">Flux Kontext Pro</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        )
-      }
+      case 'agent':
+        // Agent settings now managed in AgentChat widget
+        return null
 
       case 'ai':
         return (
@@ -1036,15 +466,6 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
         fontFamily: options.fontFamily || 'Arial',
         fontStyle: options.fontStyle || 'normal',
       })
-    }
-  }
-
-  const handleAgentInputChange = (value: string) => {
-    setAgentInput(value)
-    localStorage.setItem('collabcanvas-agent-input', value)
-    // Clear error when user starts typing
-    if (agentError) {
-      setAgentError(null)
     }
   }
 
@@ -1151,42 +572,6 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
             <span className="text-sm font-medium">📖 View-Only Mode</span>
             <span className="text-xs">You can view updates but cannot edit this canvas</span>
           </div>
-        </div>
-      )}
-
-      {/* Agent Input Field - Appears above toolbar when agent tool is active */}
-      {canEdit && activeTool === 'agent' && (
-        <div className="mb-2 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-4 py-2 space-y-2 w-fit">
-          <div className="flex items-center gap-2">
-            <Input
-              type="text"
-              value={agentInput}
-              onChange={(e) => handleAgentInputChange(e.target.value)}
-              placeholder={
-                selectedAgentOption === 'imageplus'
-                  ? (selectedContent && selectedContent.type === ContentType.IMAGE ? "Edit the selected image..." : "Generate an image...")
-                  : (selectedContent ? "Edit the selected content..." : "Enter prompt for agent...")
-              }
-              className="h-8 text-sm"
-              style={{ width: '400px' }}
-              disabled={agentLoading}
-              onKeyPress={(e) => e.key === 'Enter' && handleAgentGo()}
-            />
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleAgentGo}
-              disabled={!agentInput.trim() || agentLoading}
-              className="h-8 bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {agentLoading ? 'Processing...' : 'Go'}
-            </Button>
-          </div>
-          {agentError && (
-            <div className="text-xs text-red-600">
-              {agentError}
-            </div>
-          )}
         </div>
       )}
 

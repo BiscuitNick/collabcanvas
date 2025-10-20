@@ -1,46 +1,39 @@
 import React from 'react'
-import { Group, Line, Text, Rect } from 'react-konva'
+import { Group, Text, Rect } from 'react-konva'
 import type { Cursor as CursorType } from '../../types'
 
 interface CursorProps {
   cursor: CursorType
+  scale?: number
 }
 
-const Cursor: React.FC<CursorProps> = ({ cursor }) => {
+const Cursor: React.FC<CursorProps> = ({ cursor, scale = 1 }) => {
   // Cursor is positioned in canvas coordinates within a Layer that is already transformed
   const x = cursor.x
   const y = cursor.y
-  
-  // Cursor line points (vertical line)
-  const linePoints = [
-    x, y,      // Start point
-    x, y + 24  // End point (24px height)
-  ]
+
+  // Scale cursor elements inversely to match zoom level (so cursor stays visually constant size)
+  // When zoomed in (scale > 1), we shrink the cursor proportionally
+  const inverseScale = 1 / scale
+
+  // Base cursor dimensions
+  const baseLabelPadding = 8
+  const baseLabelHeight = 20
+  const baseLabelFontSize = 12
+
+  // Scaled dimensions
+  const labelPadding = baseLabelPadding * inverseScale
+  const labelHeight = baseLabelHeight * inverseScale
+  const labelFontSize = baseLabelFontSize * inverseScale
 
   // Username label dimensions - add indicator for current user
   const labelText = cursor.isCurrentUser ? `${cursor.userName} (You)` : cursor.userName
-  const labelPadding = 8
-  const labelHeight = 20
-  
-  // Calculate label width (approximate)
-  const labelWidth = labelText.length * 7 + labelPadding * 2
+
+  // Calculate label width (approximate) - scaled
+  const labelWidth = labelText.length * 7 * inverseScale + labelPadding * 2
 
   return (
     <Group listening={false}>
-      {/* Debug: Small dot at exact click point - Removed */}
-      
-      {/* Cursor Line */}
-      <Line
-        points={linePoints}
-        stroke={cursor.color}
-        strokeWidth={cursor.isCurrentUser ? 3 : 2}
-        lineCap="round"
-        shadowColor={cursor.color}
-        shadowBlur={cursor.isCurrentUser ? 6 : 4}
-        shadowOpacity={0.8}
-        listening={false}
-      />
-      
       {/* Username Label Background */}
       <Rect
         x={x}
@@ -48,19 +41,19 @@ const Cursor: React.FC<CursorProps> = ({ cursor }) => {
         width={labelWidth}
         height={labelHeight}
         fill={cursor.color}
-        cornerRadius={4}
+        cornerRadius={4 * inverseScale}
         shadowColor="rgba(0,0,0,0.3)"
-        shadowBlur={2}
-        shadowOffset={{ x: 0, y: 1 }}
+        shadowBlur={2 * inverseScale}
+        shadowOffset={{ x: 0, y: 1 * inverseScale }}
         listening={false}
       />
-      
+
       {/* Username Label Text */}
       <Text
         x={x + labelPadding / 2}
-        y={y + 2}
+        y={y + 2 * inverseScale}
         text={labelText}
-        fontSize={12}
+        fontSize={labelFontSize}
         fontFamily="Arial, sans-serif"
         fill="white"
         fontStyle="bold"

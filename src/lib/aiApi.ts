@@ -2,6 +2,8 @@ export type AIProvider = 'openai' | 'replicate';
 
 export type GPT5Model = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano' | 'gpt-4o-mini' | 'gpt-4.1-nano' | 'meta/meta-llama-3-8b-instruct';
 
+export type ImageModel = 'seedream-4' | 'nano-banana' | 'flux-kontext-pro';
+
 export interface AIResponse {
   success: boolean;
   data?: {
@@ -21,8 +23,23 @@ export interface AIResponse {
   };
 }
 
+export interface ImageGenerationResponse {
+  success: boolean;
+  data?: {
+    imageUrl: string;
+    prompt: string;
+  };
+  error?: string;
+  debug?: {
+    provider?: string;
+    model?: string;
+    response_time_ms?: number;
+    output_type?: string;
+  };
+}
+
 export interface CanvasCommand {
-  action: 'create' | 'edit';
+  action: 'create' | 'edit' | 'grid';
   type?: 'rectangle' | 'circle' | 'text';
   x?: number;
   y?: number;
@@ -38,6 +55,13 @@ export interface CanvasCommand {
   fontStyle?: string;
   shapeId?: string;
   rotation?: number;
+  // Grid-specific properties
+  rows?: number;
+  cols?: number;
+  cellWidth?: number;
+  cellHeight?: number;
+  gap?: number;
+  colors?: 'random' | string[];
 }
 
 interface AITestRequest {
@@ -115,7 +139,7 @@ export const callAITestDirect = async (prompt: string): Promise<AIResponse> => {
     // This would be the direct Firebase function URL
     // You'll need to replace this with your actual Firebase function URL
     const functionUrl = 'https://us-central1-collabcanvas.cloudfunctions.net/ai_test';
-    
+
     const response = await fetch(functionUrl, {
       method: 'POST',
       headers: {
@@ -132,6 +156,57 @@ export const callAITestDirect = async (prompt: string): Promise<AIResponse> => {
     return data;
   } catch (error) {
     console.error('Error calling AI test function directly:', error);
+    throw error;
+  }
+};
+
+/**
+ * Generates an image using Replicate image generation models
+ * @param prompt - The user's prompt describing the image to generate
+ * @param model - The image generation model to use
+ * @param imageUrl - Optional image URL for editing/transforming an existing image
+ * @returns Promise<ImageGenerationResponse> - The generated image URL or error
+ */
+export const generateImage = async (
+  prompt: string,
+  model: ImageModel = 'seedream-4',
+  imageUrl?: string
+): Promise<ImageGenerationResponse> => {
+  try {
+    // Determine function URL based on environment
+    const isLocal = import.meta.env.DEV || window.location.hostname === 'localhost';
+
+    const functionUrl = isLocal
+      ? 'http://localhost:5001/collab-canvas-kenkel/us-central1/ai_generate_image'
+      : 'https://us-central1-collab-canvas-kenkel.cloudfunctions.net/ai_generate_image';
+
+    console.log(`[Image Generation API] ${imageUrl ? 'Editing' : 'Generating'} image with model: ${model}, prompt: ${prompt.substring(0, 50)}...${imageUrl ? ', image: ' + imageUrl.substring(0, 50) + '...' : ''}`);
+
+    const response = await fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prompt, model, imageUrl }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Image Generation API] HTTP error:', response.status, errorText);
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('[Image Generation API] Response received:', {
+      success: data.success,
+      hasImageUrl: !!data.data?.imageUrl,
+      hasError: !!data.error,
+      debug: data.debug
+    });
+
+    return data;
+  } catch (error) {
+    console.error('[Image Generation API] Error:', error);
     throw error;
   }
 };

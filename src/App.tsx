@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useAuth } from './hooks/useAuth'
 import { LoginPage } from './pages/LoginPage'
 import { CanvasPage } from './pages/CanvasPage'
+import { CanvasesListPage } from './pages/CanvasesListPage'
 
 // Loading component
 const LoadingSpinner: React.FC = () => (
@@ -25,7 +26,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return user ? <>{children}</> : <Navigate to="/login" replace />
 }
 
-// Public route wrapper (redirects to canvas if already authenticated)
+// Public route wrapper (redirects to canvases list if already authenticated)
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth()
 
@@ -33,7 +34,7 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return <LoadingSpinner />
   }
 
-  return user ? <Navigate to="/canvas" replace /> : <>{children}</>
+  return user ? <Navigate to="/canvases" replace /> : <>{children}</>
 }
 
 function App() {
@@ -52,17 +53,26 @@ function App() {
           />
           
           {/* Protected routes */}
-          <Route 
-            path="/canvas" 
+          <Route
+            path="/canvases"
+            element={
+              <ProtectedRoute>
+                <CanvasesListPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/canvas"
             element={
               <ProtectedRoute>
                 <CanvasPage />
               </ProtectedRoute>
-            } 
+            }
           />
-          
+
           {/* Default redirect */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/" element={<Navigate to="/canvases" replace />} />
           
           {/* Catch all - redirect to login */}
           <Route path="*" element={<Navigate to="/login" replace />} />

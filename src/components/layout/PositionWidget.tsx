@@ -13,18 +13,19 @@ interface PositionWidgetProps {
 
 const PositionWidget: React.FC<PositionWidgetProps> = ({ className }) => {
   const [isVisible, setIsVisible] = useState(true)
-  const { stagePosition, stageScale, updatePosition, updateScale } = useCanvasStore()
+  const { stagePosition, stageScale, updatePosition, updatePositionAnimated, updateScale, selectedContentId, content } = useCanvasStore()
   
-  // Calculate viewport center coordinates relative to canvas center
+  // Calculate viewport center coordinates in canvas space (where canvas center is 0,0)
   const getViewportCenter = useCallback(() => {
     // Get viewport dimensions
     const viewportWidth = window.innerWidth
     const viewportHeight = window.innerHeight
-    
+
     // Calculate viewport center in canvas coordinates
-    const viewportCenterX = (-stagePosition.x + viewportWidth / 2) / stageScale
-    const viewportCenterY = -(-stagePosition.y + viewportHeight / 2) / stageScale
-    
+    // Canvas coordinate = (viewport point - stage position) / scale
+    const viewportCenterX = (viewportWidth / 2 - stagePosition.x) / stageScale
+    const viewportCenterY = (viewportHeight / 2 - stagePosition.y) / stageScale
+
     return {
       x: Math.round(viewportCenterX),
       y: Math.round(viewportCenterY)
@@ -44,20 +45,24 @@ const PositionWidget: React.FC<PositionWidgetProps> = ({ className }) => {
   const handleXChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value) || 0
     setXValue(value)
-    
-    // Immediately update canvas position
+
+    // Pan to show this canvas X coordinate at viewport center
+    // viewport center = stage position + canvas point * scale
+    // stage position = viewport center - canvas point * scale
     const viewportWidth = window.innerWidth
-    const newStageX = -(value * stageScale - viewportWidth / 2)
+    const newStageX = (viewportWidth / 2) - (value * stageScale)
     updatePosition(newStageX, stagePosition.y)
   }
 
   const handleYChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value) || 0
     setYValue(value)
-    
-    // Immediately update canvas position
+
+    // Pan to show this canvas Y coordinate at viewport center
+    // viewport center = stage position + canvas point * scale
+    // stage position = viewport center - canvas point * scale
     const viewportHeight = window.innerHeight
-    const newStageY = -(-value * stageScale - viewportHeight / 2)
+    const newStageY = (viewportHeight / 2) - (value * stageScale)
     updatePosition(stagePosition.x, newStageY)
   }
 
@@ -85,7 +90,7 @@ const PositionWidget: React.FC<PositionWidgetProps> = ({ className }) => {
     const viewportHeight = window.innerHeight
     const centerX = viewportWidth / 2
     const centerY = viewportHeight / 2
-    updatePosition(centerX, centerY)
+    updatePositionAnimated(centerX, centerY) // Use animated pan for reset
     updateScale(1) // Reset zoom to 100%
     setXValue(0)
     setYValue(0)
@@ -95,8 +100,46 @@ const PositionWidget: React.FC<PositionWidgetProps> = ({ className }) => {
   const handleZoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const percentage = parseFloat(e.target.value)
     const clampedPercentage = isNaN(percentage) ? 100 : Math.max(5, Math.min(300, percentage))
-    const scale = clampedPercentage / 100
-    updateScale(scale)
+    const newScale = clampedPercentage / 100
+    const oldScale = stageScale
+
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+    const viewportCenterX = viewportWidth / 2
+    const viewportCenterY = viewportHeight / 2
+
+    // Calculate the focal point for zooming (in canvas coordinates where center is 0,0)
+    let canvasFocalX: number
+    let canvasFocalY: number
+
+    // If content is selected, zoom to its center
+    if (selectedContentId) {
+      const selectedContent = content.find(c => c.id === selectedContentId)
+      if (selectedContent) {
+        // All content is now center-anchored, so x,y IS the center
+        canvasFocalX = selectedContent.x
+        canvasFocalY = selectedContent.y
+      } else {
+        // Fallback to viewport center if selected content not found
+        canvasFocalX = (viewportCenterX - stagePosition.x) / oldScale
+        canvasFocalY = (viewportCenterY - stagePosition.y) / oldScale
+      }
+    } else {
+      // No selection - zoom to what's currently at viewport center
+      // Convert viewport center to canvas coordinates
+      canvasFocalX = (viewportCenterX - stagePosition.x) / oldScale
+      canvasFocalY = (viewportCenterY - stagePosition.y) / oldScale
+    }
+
+    // Calculate new stage position to keep focal point at viewport center
+    // viewport center = stage position + canvas focal point * new scale
+    // stage position = viewport center - canvas focal point * new scale
+    const newPosX = viewportCenterX - (canvasFocalX * newScale)
+    const newPosY = viewportCenterY - (canvasFocalY * newScale)
+
+    // Update scale and position together
+    updateScale(newScale)
+    updatePosition(newPosX, newPosY)
   }
 
   const handleZoomBlur = (e: React.FocusEvent<HTMLInputElement>) => {

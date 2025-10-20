@@ -45,6 +45,7 @@ Always return an array of canvas commands that can be executed to fulfill the us
 Available commands:
 - create: Create new shapes (rectangle, circle, text)
 - edit: Edit/modify existing selected content (only when selected content is provided)
+- grid: Create a grid or checkerboard pattern (special optimized command)
 
 Command format for CREATE:
 {
@@ -83,34 +84,80 @@ Command format for EDIT (only include properties that should change):
   "rotation": number (optional - in degrees)
 }
 
+Command format for GRID (for grids, checkerboards, or patterns):
+{
+  "action": "grid",
+  "rows": number (number of rows, default 5),
+  "cols": number (number of columns, default 5),
+  "cellWidth": number (width of each cell, default 100),
+  "cellHeight": number (height of each cell, default 100),
+  "gap": number (gap between cells, default 10),
+  "colors": "random" | ["#color1", "#color2"] (use "random" for random colors, or array for checkerboard pattern),
+  "stroke": "color_hex" (optional, border color),
+  "strokeWidth": number (optional, border width)
+}
+
+IMPORTANT: If the user asks for a grid, checkerboard, pattern, or large number of squares/rectangles in a grid layout, use the "grid" action instead of creating individual rectangles. This is much more efficient.
+
 Validation:
 - CREATE commands MUST include "action" and "type"
 - EDIT commands MUST include "action" and at least one property to change
 - If any generated item is invalid, REMOVE that item from the final output (do not replace it or add placeholders)
 
-Return only a JSON array of commands, no other text.
+OUTPUT FORMAT:
+Return a JSON object with two fields:
+1. "commands": An array of canvas commands to execute
+2. "message": A brief, friendly description of what you created or edited (1-2 sentences)
 
 Example output for CREATE:
-[
-  {
-    "action": "create",
-    "type": "rectangle",
-    "x": 100,
-    "y": 100,
-    "width": 200,
-    "height": 150,
-    "fill": "#FF0000"
-  }
-]
+{
+  "commands": [
+    {
+      "action": "create",
+      "type": "rectangle",
+      "x": 100,
+      "y": 100,
+      "width": 200,
+      "height": 150,
+      "fill": "#FF0000"
+    }
+  ],
+  "message": "Created a red rectangle at position (100, 100) with dimensions 200x150."
+}
 
 Example output for EDIT (when selected content is provided):
-[
-  {
-    "action": "edit",
-    "fill": "#0000FF",
-    "width": 300
-  }
-]"""
+{
+  "commands": [
+    {
+      "action": "edit",
+      "fill": "#0000FF",
+      "width": 300
+    }
+  ],
+  "message": "Changed the color to blue and increased the width to 300 pixels."
+}
+
+Example output for GRID (when user asks for grid/checkerboard):
+{
+  "commands": [
+    {
+      "action": "grid",
+      "rows": 10,
+      "cols": 10,
+      "cellWidth": 50,
+      "cellHeight": 50,
+      "gap": 5,
+      "colors": ["#FFFFFF", "#000000"]
+    }
+  ],
+  "message": "Created a 10x10 checkerboard pattern with alternating black and white squares."
+}
+
+Example output for ERROR (when request cannot be completed):
+{
+  "commands": [],
+  "message": "I cannot create that shape. Please specify what type of shape you'd like (rectangle, circle, or text) and where to place it."
+}"""
 
 def get_canvas_system_prompt(selected_content=None):
     """Get the canvas system prompt, optionally with selected content context"""
@@ -123,7 +170,7 @@ CURRENT EDITING CONTEXT:
 You are editing an existing {selected_content.get('type', 'content')} with the following current properties:
 {json.dumps(selected_content, indent=2)}
 
-The user wants to modify this content. Return an "edit" action with ONLY the properties that should change based on their request. Do not repeat unchanged properties.
+The user wants to modify this content. Return an edited version of the content with the changes requested.
 """
         return base_prompt + content_info
 

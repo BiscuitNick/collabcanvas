@@ -2,8 +2,16 @@ import React from 'react'
 import Rectangle from './Rectangle'
 import Circle from './Circle'
 import TextContent from './TextContent'
-import type { Shape, Rectangle as RectangleType, Circle as CircleType, TextContent as TextContentType } from '../../types'
-import { isRectangle, isCircle, isTextContent } from '../../types'
+import Image from './Image'
+import GroupContent from './GroupContent'
+import type { Shape, Rectangle as RectangleType, Circle as CircleType, TextContent as TextContentType, ImageContent as ImageContentType, GroupContent as GroupContentType } from '../../types'
+import { isRectangle, isCircle, isTextContent, isImageContent, isGroupContent } from '../../types'
+
+interface LockInfo {
+  userId: string
+  userName: string
+  lockedItemId: string | null
+}
 
 interface ShapeFactoryProps {
   shape: Shape
@@ -15,7 +23,10 @@ interface ShapeFactoryProps {
   onDragStart: () => void
   onDragEndCallback: () => void
   currentUserId?: string
-  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
+  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null
+  canEdit?: boolean
+  enableGroupCaching?: boolean
+  lockInfo?: LockInfo | null
 }
 
 /**
@@ -34,7 +45,12 @@ const ShapeFactory: React.FC<ShapeFactoryProps> = ({
   onDragEndCallback,
   currentUserId,
   selectedTool,
+  canEdit = true,
+  enableGroupCaching = false,
+  lockInfo = null,
 }) => {
+  // Check if locked by another user
+  const isLockedByOther = lockInfo !== null && lockInfo.userId !== currentUserId;
   // Handle null or undefined shapes
   if (!shape) {
     console.warn('ShapeFactory received null or undefined shape')
@@ -55,6 +71,9 @@ const ShapeFactory: React.FC<ShapeFactoryProps> = ({
         onDragEndCallback={onDragEndCallback}
         currentUserId={currentUserId}
         selectedTool={selectedTool}
+        canEdit={canEdit}
+        isLockedByOther={isLockedByOther}
+        lockInfo={lockInfo}
       />
     )
   }
@@ -73,6 +92,9 @@ const ShapeFactory: React.FC<ShapeFactoryProps> = ({
         onDragEndCallback={onDragEndCallback}
         currentUserId={currentUserId}
         selectedTool={selectedTool}
+        canEdit={canEdit}
+        isLockedByOther={isLockedByOther}
+        lockInfo={lockInfo}
       />
     )
   }
@@ -91,6 +113,52 @@ const ShapeFactory: React.FC<ShapeFactoryProps> = ({
         onDragEndCallback={onDragEndCallback}
         currentUserId={currentUserId}
         selectedTool={selectedTool}
+        canEdit={canEdit}
+        isLockedByOther={isLockedByOther}
+        lockInfo={lockInfo}
+      />
+    )
+  }
+
+  // Render Image component
+  if (isImageContent(shape)) {
+    return (
+      <Image
+        content={shape as ImageContentType}
+        isSelected={isSelected}
+        onSelect={onSelect}
+        onUpdate={onUpdate as (updates: Partial<ImageContentType>) => void}
+        onDragMove={onDragMove}
+        onDragEnd={onDragEnd}
+        onDragStart={onDragStart}
+        onDragEndCallback={onDragEndCallback}
+        currentUserId={currentUserId}
+        selectedTool={selectedTool}
+        canEdit={canEdit}
+        isLockedByOther={isLockedByOther}
+        lockInfo={lockInfo}
+      />
+    )
+  }
+
+  // Render Group component
+  if (isGroupContent(shape)) {
+    return (
+      <GroupContent
+        content={shape as GroupContentType}
+        isSelected={isSelected}
+        onSelect={onSelect}
+        onUpdate={onUpdate as (updates: Partial<GroupContentType>) => void}
+        onDragMove={onDragMove}
+        onDragEnd={onDragEnd}
+        onDragStart={onDragStart}
+        onDragEndCallback={onDragEndCallback}
+        currentUserId={currentUserId}
+        selectedTool={selectedTool}
+        canEdit={canEdit}
+        enableGroupCaching={enableGroupCaching}
+        isLockedByOther={isLockedByOther}
+        lockInfo={lockInfo}
       />
     )
   }

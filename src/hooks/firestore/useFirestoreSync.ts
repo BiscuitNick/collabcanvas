@@ -1,8 +1,8 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
 import { firestore } from '../../lib/firebase';
-import { CANVAS_ID } from '../../lib/config';
+import { useCanvasId } from '../../contexts/CanvasContext';
 import type { Content } from '../../types';
 import { ContentVersion } from '../../types';
 import { useCanvasStore } from '../../store/canvasStore';
@@ -43,26 +43,59 @@ const useFirestoreEnabled = () => {
 };
 
 export const useFirestoreSync = (userUid: string | undefined) => {
+  const canvasId = useCanvasId();
   const [content, setContent] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [contentIds, setContentIds] = useState<string[]>([]);
   const contentStateRef = useRef<Content[]>([]);
   const activelyEditingRef = useRef<Set<string>>(new Set());
   const isCreatingContent = useRef(false);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const enableFirestore = useFirestoreEnabled();
 
-  // Get canvas store content - used when Firestore is disabled
+  // Get canvas store content and setContent action
   const storeContent = useCanvasStore((state) => state.content);
+  const setStoreContent = useCanvasStore((state) => state.setContent);
+
+  // Keep a ref to the latest store content for use in callbacks
+  const storeContentRef = useRef<Content[]>(storeContent);
+  useEffect(() => {
+    storeContentRef.current = storeContent;
+  }, [storeContent]);
 
   useEffect(() => {
     contentStateRef.current = content;
   }, [content]);
 
+  // Get the setContentIds function from the store
+  const setStoreContentIds = useCanvasStore((state) => state.setContentIds);
+
+  // Listen to canvas document for contentIds ordering
+  useEffect(() => {
+    if (!userUid || !enableFirestore) {
+      return;
+    }
+
+    const canvasRef = doc(firestore, 'canvases', canvasId);
+    const unsubscribe = onSnapshot(canvasRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        const firestoreContentIds = data.contentIds || [];
+        setContentIds(firestoreContentIds);
+        // Also update the store's contentIds directly from Firestore
+        setStoreContentIds(firestoreContentIds);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [userUid, enableFirestore, canvasId, setStoreContentIds]);
+
   // When Firestore is disabled, sync with canvas store
   useEffect(() => {
     if (!enableFirestore && userUid) {
       setContent(storeContent);
+      // Store already has the content, no need to set it again
     }
   }, [storeContent, enableFirestore, userUid]);
 
@@ -75,22 +108,30 @@ export const useFirestoreSync = (userUid: string | undefined) => {
 
     // If Firestore is disabled, use canvas store as source of truth
     if (!enableFirestore) {
-      console.log('🔌 Firestore disabled - using canvas store');
       setContent(storeContent);
+      // Store already has the content, no need to set it again
       setLoading(false);
       return;
     }
 
-    console.log('🔌 Firestore enabled - setting up listener');
-    const contentRef = collection(firestore, 'canvases', CANVAS_ID, 'content');
+    const contentRef = collection(firestore, 'canvases', canvasId, 'content');
     const q = query(contentRef, orderBy('createdAt', 'asc'));
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
         const contentData: Content[] = [];
+        const deletedIds: string[] = [];
+
         snapshot.forEach((doc) => {
           const data = doc.data();
+
+          // Skip deleted items - filter them out from sync
+          // This handles soft deletes propagating to all users
+          if (data.deleted === true) {
+            deletedIds.push(doc.id);
+            return;
+          }
 
           // Common fields for all content types
           const baseContent = {
@@ -106,6 +147,11 @@ export const useFirestoreSync = (userUid: string | undefined) => {
             lockedByUserName: data.lockedByUserName || null,
             lockedByUserColor: data.lockedByUserColor || null,
             lockedAt: data.lockedAt || null,
+            lastEditedBy: data.lastEditedBy || null,
+            lastEditedAt: data.lastEditedAt || null,
+            deleted: data.deleted || false,
+            deletedBy: data.deletedBy || null,
+            deletedAt: data.deletedAt || null,
             syncStatus: 'synced' as const,
           };
 
@@ -148,37 +194,90 @@ export const useFirestoreSync = (userUid: string | undefined) => {
             contentData.push({
               ...baseContent,
               type: 'image',
-              src: data.src,
-              width: data.width,
-              height: data.height,
-              alt: data.alt,
+              src: data.src || '',
+              width: data.width || 100,
+              height: data.height || 100,
+              alt: data.alt || 'Image',
+              opacity: data.opacity !== undefined ? data.opacity : 1,
+            });
+          } else if (data.type === 'group') {
+            contentData.push({
+              ...baseContent,
+              type: 'group',
+              width: data.width || 200,
+              height: data.height || 200,
+              scaleX: data.scaleX || 1,
+              scaleY: data.scaleY || 1,
+              contentIds: data.contentIds || [],
+              contentData: data.contentData || {},
+              opacity: data.opacity !== undefined ? data.opacity : 1,
             });
           }
         });
 
-        // Merge remote content with local-only content
-        // Preserve local-only items (those with IDs starting with "local-")
-        const localOnlyItems = contentStateRef.current.filter(c => c.id.startsWith('local-'));
+        // Get current store content for comparison from ref
+        const currentStoreContent = storeContentRef.current;
 
-        // Merge: prioritize local state for actively editing items, add local-only items
-        const mergedContent = [
-          ...contentData.map((remoteContent) => {
-            const local = contentStateRef.current.find((c) => c.id === remoteContent.id);
-            const isActivelyEditing = activelyEditingRef.current.has(remoteContent.id);
-            if (isActivelyEditing && local) {
-              return local;
-            }
-            return remoteContent;
-          }),
-          ...localOnlyItems
-        ];
+        // Create a map of current store content for quick lookup
+        const storeContentMap = new Map(currentStoreContent.map(c => [c.id, c]));
+
+        // Build the merged content array
+        const mergedContent: Content[] = [];
+
+        // Process remote content
+        contentData.forEach((remoteContent) => {
+          const isActivelyEditing = activelyEditingRef.current.has(remoteContent.id);
+          const storeItem = storeContentMap.get(remoteContent.id);
+          const wasLastEditedByCurrentUser = remoteContent.lastEditedBy === userUid;
+
+          if (isActivelyEditing && storeItem) {
+            // User is actively editing this item - keep their local changes
+            mergedContent.push(storeItem);
+          } else if (wasLastEditedByCurrentUser && storeItem) {
+            // Current user was the last to edit - use local version
+            mergedContent.push(storeItem);
+          } else {
+            // Not editing and not our edit - use remote content (this updates other users' changes)
+            mergedContent.push(remoteContent);
+          }
+
+          // Remove from map to track what's been processed
+          storeContentMap.delete(remoteContent.id);
+        });
+
+        // Add any remaining local-only items (those not in Firestore)
+        // But exclude any that were marked as deleted
+        storeContentMap.forEach((localItem) => {
+          if ((localItem.id.startsWith('local-') || localItem.id.startsWith('hardcoded-')) && !deletedIds.includes(localItem.id)) {
+            mergedContent.push(localItem);
+          }
+        });
+
+        // Order content based on contentIds (z-index)
+        const orderedContent: Content[] = [];
+        const contentMap = new Map(mergedContent.map(c => [c.id, c]));
+
+        // Add content in the order specified by contentIds
+        contentIds.forEach(id => {
+          const item = contentMap.get(id);
+          if (item) {
+            orderedContent.push(item);
+            contentMap.delete(id);
+          }
+        });
+
+        // Add any remaining items not in contentIds (new items)
+        contentMap.forEach(item => {
+          orderedContent.push(item);
+        });
 
         if (updateTimeoutRef.current) {
           clearTimeout(updateTimeoutRef.current);
         }
 
         updateTimeoutRef.current = setTimeout(() => {
-          setContent(mergedContent);
+          setContent(orderedContent);
+          setStoreContent(orderedContent); // Update Zustand store with ordered content
           setLoading(false);
           setError(null);
         }, isCreatingContent.current ? 100 : 0);
@@ -196,7 +295,7 @@ export const useFirestoreSync = (userUid: string | undefined) => {
         clearTimeout(updateTimeoutRef.current);
       }
     };
-  }, [userUid, enableFirestore]);
+  }, [userUid, enableFirestore, setStoreContent, canvasId]); // Note: storeContent is read inside but not a dependency to avoid infinite loops
 
   return { content, setContent, loading, error, activelyEditingRef, isCreatingContent };
 };

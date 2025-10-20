@@ -50,8 +50,8 @@ export function getViewportCenter(
 // Calculate dynamic step for zoom based on current zoom level
 export const getZoomStep = (currentPercentage: number) => {
   if (currentPercentage < 25) return 1
-  if (currentPercentage < 100) return 5
-  return 10
+  if (currentPercentage < 100) return 2
+  return 3
 }
 
 // Text validation constants
@@ -95,7 +95,7 @@ export function formatTimeAgo(date: number | Date | null | undefined): string {
   if (elapsedMs < 1000) return 'just now'
 
   const elapsedSecs = Math.floor(elapsedMs / 1000)
-  if (elapsedSecs < 60) return `${elapsedSecs}s ago`
+  if (elapsedSecs < 60) return elapsedSecs === 1 ? '1 second ago' : `${elapsedSecs} seconds ago`
 
   const elapsedMins = Math.floor(elapsedSecs / 60)
   if (elapsedMins < 60) return elapsedMins === 1 ? '1 minute ago' : `${elapsedMins} minutes ago`
@@ -104,11 +104,20 @@ export function formatTimeAgo(date: number | Date | null | undefined): string {
   if (elapsedHours < 24) return elapsedHours === 1 ? '1 hour ago' : `${elapsedHours} hours ago`
 
   const elapsedDays = Math.floor(elapsedHours / 24)
-  return elapsedDays === 1 ? '1 day ago' : `${elapsedDays} days ago`
+  if (elapsedDays < 7) return elapsedDays === 1 ? '1 day ago' : `${elapsedDays} days ago`
+
+  const elapsedWeeks = Math.floor(elapsedDays / 7)
+  if (elapsedWeeks < 4) return elapsedWeeks === 1 ? '1 week ago' : `${elapsedWeeks} weeks ago`
+
+  const elapsedMonths = Math.floor(elapsedDays / 30)
+  if (elapsedMonths < 12) return elapsedMonths === 1 ? '1 month ago' : `${elapsedMonths} months ago`
+
+  const elapsedYears = Math.floor(elapsedDays / 365)
+  return elapsedYears === 1 ? '1 year ago' : `${elapsedYears} years ago`
 }
 
 // Import types for factory function
-import type { TextContent } from '../types'
+import type { TextContent, ImageContent } from '../types'
 import { ContentType, ContentVersion, DEFAULT_CONTENT_VALUES } from '../types'
 
 // Factory function to create TextContent
@@ -149,6 +158,37 @@ export function createTextContent(
     verticalAlign: options?.verticalAlign ?? defaults.verticalAlign,
     opacity: options?.opacity ?? defaults.opacity,
     rotation: options?.rotation ?? defaults.rotation,
+    createdBy: userId,
+    // createdAt and updatedAt will be added by Firestore with serverTimestamp()
+  }
+}
+
+export function createImageContent(
+  x: number,
+  y: number,
+  userId: string,
+  options?: {
+    src?: string
+    width?: number
+    height?: number
+    alt?: string
+    opacity?: number
+    rotation?: number
+  }
+): Omit<ImageContent, 'id' | 'createdAt' | 'updatedAt'> {
+  const defaults = DEFAULT_CONTENT_VALUES.image
+
+  return {
+    type: ContentType.IMAGE,
+    version: ContentVersion.V2,
+    x,
+    y,
+    src: options?.src ?? defaults.src,
+    width: options?.width ?? defaults.width,
+    height: options?.height ?? defaults.height,
+    alt: options?.alt ?? defaults.alt,
+    opacity: options?.opacity ?? 1,
+    rotation: options?.rotation ?? 0,
     createdBy: userId,
     // createdAt and updatedAt will be added by Firestore with serverTimestamp()
   }

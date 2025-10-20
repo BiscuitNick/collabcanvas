@@ -3,6 +3,7 @@ import { Switch } from '../ui/switch'
 import { Label } from '../ui/label'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion'
 import { useCanvasStore } from '../../store/canvasStore'
+import { isGroupContent } from '../../types'
 
 import type { Content, Cursor } from '../../types';
 
@@ -20,10 +21,25 @@ interface DebugWidgetProps {
   fps: number
   enableFirestore?: boolean
   onToggleFirestore?: (enable: boolean) => void
+  enableRTDB?: boolean
+  onToggleRTDB?: (enable: boolean) => void
+  enableGroupCaching?: boolean
+  onToggleGroupCaching?: (enable: boolean) => void
   canvasWidth: number
   canvasHeight: number
   onCanvasWidthChange?: (width: number) => void
   onCanvasHeightChange?: (height: number) => void
+  lastEvent?: {
+    type: 'mouse' | 'touch'
+    x: number
+    y: number
+    canvasX?: number
+    canvasY?: number
+    target: string
+    contentTarget?: string
+    tool: string
+    timestamp: number
+  } | null
 }
 
 const DebugWidget: React.FC<DebugWidgetProps> = ({
@@ -37,15 +53,37 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
   onToggleViewportCulling,
   fps,
   enableFirestore = true,
-  onToggleFirestore
+  onToggleFirestore,
+  enableRTDB = true,
+  onToggleRTDB,
+  enableGroupCaching = false,
+  onToggleGroupCaching,
+  canvasWidth,
+  canvasHeight,
+  lastEvent
 }) => {
   const { stagePosition, stageScale } = useCanvasStore()
+
+  // Calculate viewport dimensions in canvas coordinates
+  // When zoomed out, viewport shows more canvas units
+  // When zoomed in, viewport shows fewer canvas units
+  const viewportCanvasWidth = Math.round(canvasWidth / stageScale)
+  const viewportCanvasHeight = Math.round(canvasHeight / stageScale)
+
+  // Calculate total shapes including nested items in groups
+  const topLevelCount = content.length
+  const totalCount = content.reduce((count, item) => {
+    if (isGroupContent(item)) {
+      return count + 1 + item.contentIds.length
+    }
+    return count + 1
+  }, 0)
 
   if (!debugMode) return null
 
   return (
     <div className="text-xs">
-      <Accordion type="multiple" defaultValue={["canvas-state", "debug-controls"]} className="w-full">
+      <Accordion type="multiple" defaultValue={["canvas-state"]} className="w-full">
         {/* Canvas State */}
         <AccordionItem value="canvas-state" className="border-b">
           <AccordionTrigger className="py-2 text-xs font-medium text-gray-700 hover:no-underline">
@@ -55,23 +93,78 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
             <div className="space-y-1 text-gray-600">
               <div>Position: ({Math.round(stagePosition.x)}, {Math.round(stagePosition.y)})</div>
               <div>Scale: {Math.round(stageScale * 100)}%</div>
+              <div>Viewport: {viewportCanvasWidth} × {viewportCanvasHeight} px</div>
               <div>FPS: {Math.round(fps)}</div>
             </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Last Event */}
+        <AccordionItem value="last-event" className="border-b">
+          <AccordionTrigger className="py-2 text-xs font-medium text-gray-700 hover:no-underline">
+            Last Event
+          </AccordionTrigger>
+          <AccordionContent className="pb-2">
+            {lastEvent ? (
+              <div className="space-y-1 text-gray-600">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Type:</span>
+                  <span className="font-mono">{lastEvent.type}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Tool:</span>
+                  <span className="font-mono">{lastEvent.tool}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Screen:</span>
+                  <span className="font-mono">({lastEvent.x}, {lastEvent.y})</span>
+                </div>
+                {lastEvent.canvasX !== undefined && lastEvent.canvasY !== undefined && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Canvas:</span>
+                    <span className="font-mono">({lastEvent.canvasX}, {lastEvent.canvasY})</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Target:</span>
+                  <span className="font-mono text-xs break-all">{lastEvent.target}</span>
+                </div>
+                {lastEvent.contentTarget && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Content:</span>
+                    <span className="font-mono text-xs break-all font-semibold text-blue-600">{lastEvent.contentTarget}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Time:</span>
+                  <span className="font-mono text-xs">{new Date(lastEvent.timestamp).toLocaleTimeString()}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-gray-400 italic">No events yet</div>
+            )}
           </AccordionContent>
         </AccordionItem>
 
         {/* Content Info */}
         <AccordionItem value="content-info" className="border-b">
           <AccordionTrigger className="py-2 text-xs font-medium text-gray-700 hover:no-underline">
-            Content ({content.length})
+            Content
           </AccordionTrigger>
           <AccordionContent className="pb-2">
             <div className="space-y-1 text-gray-600">
+              <div>Top-level: {topLevelCount}</div>
+              <div>Total (w/ nested): {totalCount}</div>
               <div>Selected: {selectedShapeId || 'None'}</div>
-              <div className="text-xs max-h-32 overflow-y-auto">
+              <div className="text-xs max-h-32 overflow-y-auto mt-2">
                 {content.map(shape => (
                   <div key={shape.id} className="flex justify-between py-0.5">
-                    <span>{shape.type}</span>
+                    <span>
+                      {shape.type}
+                      {isGroupContent(shape) && (
+                        <span className="text-gray-400 ml-1">({shape.contentIds.length})</span>
+                      )}
+                    </span>
                     <span className="text-gray-400">({Math.round(shape.x)}, {Math.round(shape.y)})</span>
                   </div>
                 ))}
@@ -137,6 +230,34 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
                     id="firestore-updates"
                     checked={enableFirestore}
                     onCheckedChange={onToggleFirestore}
+                    className="scale-75"
+                  />
+                </div>
+              )}
+
+              {onToggleRTDB && (
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="rtdb-updates" className="text-xs">
+                    RTDB Updates
+                  </Label>
+                  <Switch
+                    id="rtdb-updates"
+                    checked={enableRTDB}
+                    onCheckedChange={onToggleRTDB}
+                    className="scale-75"
+                  />
+                </div>
+              )}
+
+              {onToggleGroupCaching && (
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="group-caching" className="text-xs">
+                    Group Caching
+                  </Label>
+                  <Switch
+                    id="group-caching"
+                    checked={enableGroupCaching}
+                    onCheckedChange={onToggleGroupCaching}
                     className="scale-75"
                   />
                 </div>

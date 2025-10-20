@@ -1,4 +1,5 @@
 import React from 'react'
+import { useNavigate } from 'react-router'
 import { Button } from '../ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar'
 import {
@@ -9,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuItem
 } from '../ui/dropdown-menu'
-import { LogOut } from 'lucide-react'
+import { LogOut, LayoutGrid, LogIn } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
 interface UserProfileButtonProps {
@@ -18,9 +19,21 @@ interface UserProfileButtonProps {
 
 const UserProfileButton: React.FC<UserProfileButtonProps> = () => {
   const { user, logout } = useAuth()
+  const navigate = useNavigate()
 
+  // Show login button if not logged in
   if (!user) {
-    return null
+    return (
+      <Button
+        variant="ghost"
+        className="rounded-lg px-4 py-2 hover:bg-gray-200"
+        onClick={() => navigate('/login')}
+        title="Login"
+      >
+        <LogIn className="h-4 w-4 mr-2" />
+        <span className="text-sm font-medium">Login</span>
+      </Button>
+    )
   }
 
   // Generate initials from displayName or email
@@ -41,6 +54,10 @@ const UserProfileButton: React.FC<UserProfileButtonProps> = () => {
 
   const handleSignOut = async () => {
     await logout()
+  }
+
+  const handleGoToCanvases = () => {
+    navigate('/canvases')
   }
 
   return (
@@ -70,6 +87,14 @@ const UserProfileButton: React.FC<UserProfileButtonProps> = () => {
             {user.email}
           </div>
         )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={handleGoToCanvases}
+          className="cursor-pointer"
+        >
+          <LayoutGrid className="h-4 w-4 mr-2" />
+          All Canvases
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={handleSignOut}

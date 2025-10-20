@@ -6,13 +6,14 @@ import { useContentLocking } from './firestore/useContentLocking';
 export const useContent = () => {
   const { user } = useAuth();
   const { content, setContent, loading, error, activelyEditingRef, isCreatingContent } = useFirestoreSync(user?.uid);
-  const { createContent, updateContent, deleteContent, clearAllContent, startEditingContent, stopEditingContent } = useContentOperations(
+  const { createContent, createContentBatch, updateContent, updateContentBatch, deleteContent, deleteContentBatch, clearAllContent, startEditingContent, stopEditingContent } = useContentOperations(
     content,
     setContent,
     activelyEditingRef,
-    isCreatingContent
+    isCreatingContent,
+    user?.uid
   );
-  const { lockContent, unlockContent } = useContentLocking(content);
+  const { lockContent, unlockContent } = useContentLocking();
 
   const retry = () => {
     // This needs to be implemented to re-trigger the firestore sync
@@ -21,8 +22,11 @@ export const useContent = () => {
   return {
     content,
     createContent,
+    createContentBatch,
     updateContent,
+    updateContentBatch,
     deleteContent,
+    deleteContentBatch,
     clearAllContent,
     loading,
     error,

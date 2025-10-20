@@ -10,13 +10,16 @@ import { useCursorContext } from '../../hooks/useCursorContext';
 import { useInteractionHandling } from './hooks/useInteractionHandling';
 import { useShapeHandling } from './hooks/useShapeHandling';
 import { useViewportCulling } from './hooks/useViewportCulling';
+import { useSmoothPanning } from './hooks/useSmoothPanning';
+import { useRTDBUserLocks } from '../../hooks/rtdb/useRTDBUserLocks';
+import { useCanvasId } from '../../contexts/CanvasContext';
 
 export interface CanvasProps {
   width: number;
   height: number;
   content: Content[];
   cursors: CursorType[];
-  updateShape: (id: string, updates: Partial<Content>) => Promise<void>;
+  updateShape: (id: string, updates: Partial<Content>, immediate?: boolean) => Promise<void>;
   onMouseMove: (x: number, y: number, canvasWidth: number, canvasHeight: number) => void;
   showSelfCursor?: boolean;
   currentUserId?: string;
@@ -24,15 +27,19 @@ export interface CanvasProps {
   onVisibleShapesChange?: (visibleCount: number) => void;
   lockShape?: (id: string) => Promise<void>;
   unlockShape?: (id: string) => Promise<void>;
+  setSelection?: (id: string | null) => Promise<void>;
+  flushToFirestore?: (id: string) => Promise<void>;
   startEditingShape?: (id: string) => void;
   stopEditingShape?: (id: string) => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
   onPanStart?: () => void;
   onPanEnd?: () => void;
-  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null;
+  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null;
   onCanvasClick?: (event: { x: number; y: number }) => void;
   isCreatingShape?: boolean;
+  canEdit?: boolean;
+  enableGroupCaching?: boolean;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -48,6 +55,8 @@ const Canvas: React.FC<CanvasProps> = ({
   onVisibleShapesChange,
   lockShape,
   unlockShape,
+  setSelection,
+  flushToFirestore,
   startEditingShape,
   stopEditingShape,
   onDragStart,
@@ -57,29 +66,36 @@ const Canvas: React.FC<CanvasProps> = ({
   selectedTool,
   onCanvasClick,
   isCreatingShape = false,
+  canEdit = true,
+  enableGroupCaching = false,
 }) => {
   const stageRef = useRef<Konva.Stage>(null);
-  const { stagePosition, stageScale, isZooming, isDraggingShape, isPanning, selectedContentId, setDraggingShape } = useCanvasStore();
+  const canvasId = useCanvasId();
+  const { stagePosition, stageScale, isZooming, isDraggingShape, isPanning, shouldAnimatePan, selectedContentId, setDraggingShape, isMovingContent } = useCanvasStore();
   // Use selectedContentId directly instead of the getter selectedShapeId for proper reactivity
   const selectedShapeId = selectedContentId;
+
+  // Get lock info from presence data only
+  const { getItemLock } = useRTDBUserLocks(canvasId);
 
   useCursorContext({
     selectedTool: selectedTool || null,
     isDragging: isDraggingShape,
     isPanning: isPanning,
     isResizing: false, // TODO: Add resize state
+    isMoving: isMovingContent,
   });
 
   const { handleShapeSelect, handleShapeUpdate, handleShapeDragStart, handleShapeDragMove, handleShapeDragEnd } = useShapeHandling({
-    content,
-    currentUserId,
     updateShape,
     lockShape,
     unlockShape,
+    setSelection,
     startEditingShape,
     stopEditingShape,
     onDragStart,
     onDragEnd,
+    flushToFirestore,
   });
 
   const interactionHandlers = useInteractionHandling({
@@ -88,9 +104,11 @@ const Canvas: React.FC<CanvasProps> = ({
     onMouseMove,
     onPanStart,
     onPanEnd,
+    selectedTool,
     onCanvasClick,
     isCreatingShape,
     unlockShape,
+    setSelection,
   });
 
   const visibleShapes = useViewportCulling({
@@ -101,23 +119,40 @@ const Canvas: React.FC<CanvasProps> = ({
     onVisibleShapesChange,
   });
 
+  // Enable smooth panning animation
+  useSmoothPanning({
+    stageRef,
+    targetX: stagePosition.x,
+    targetY: stagePosition.y,
+    duration: 300,
+    isUserDragging: isPanning, // Disable animation during user dragging
+    isZooming: isZooming, // Disable animation during user zooming
+    shouldAnimate: shouldAnimatePan, // Only animate when explicitly requested
+  });
+
   const renderedShapes = useMemo(() => {
-    return visibleShapes.map((shape) => (
-      <ShapeFactory
-        key={shape.id}
-        shape={shape}
-        isSelected={selectedShapeId === shape.id}
-        onSelect={() => handleShapeSelect(shape.id)}
-        onUpdate={(updates) => handleShapeUpdate(shape.id, updates)}
-        onDragMove={(x, y) => handleShapeDragMove(shape.id, x, y)}
-        onDragEnd={(x, y) => handleShapeDragEnd(shape.id, x, y)}
-        onDragStart={() => handleShapeDragStart(shape.id)}
-        onDragEndCallback={() => setDraggingShape(false)}
-        currentUserId={currentUserId}
-        selectedTool={selectedTool}
-      />
-    ));
-  }, [visibleShapes, selectedShapeId, handleShapeSelect, handleShapeUpdate, handleShapeDragMove, handleShapeDragEnd, handleShapeDragStart, setDraggingShape, currentUserId, selectedTool]);
+    return visibleShapes.map((shape) => {
+      const lockInfo = getItemLock(shape.id);
+      return (
+        <ShapeFactory
+          key={shape.id}
+          shape={shape}
+          isSelected={selectedShapeId === shape.id}
+          onSelect={() => handleShapeSelect(shape.id)}
+          onUpdate={(updates) => handleShapeUpdate(shape.id, updates)}
+          onDragMove={(x, y) => handleShapeDragMove(shape.id, x, y)}
+          onDragEnd={(x, y) => handleShapeDragEnd(shape.id, x, y)}
+          onDragStart={() => handleShapeDragStart(shape.id)}
+          onDragEndCallback={() => setDraggingShape(false)}
+          currentUserId={currentUserId}
+          selectedTool={selectedTool}
+          canEdit={canEdit}
+          enableGroupCaching={enableGroupCaching}
+          lockInfo={lockInfo}
+        />
+      );
+    });
+  }, [visibleShapes, selectedShapeId, handleShapeSelect, handleShapeUpdate, handleShapeDragMove, handleShapeDragEnd, handleShapeDragStart, setDraggingShape, currentUserId, selectedTool, canEdit, enableGroupCaching, getItemLock]);
 
 
   return (
@@ -127,8 +162,6 @@ const Canvas: React.FC<CanvasProps> = ({
           ref={stageRef}
           width={width}
           height={height}
-          x={stagePosition.x}
-          y={stagePosition.y}
           scaleX={stageScale}
           scaleY={stageScale}
           draggable={!isZooming && !isDraggingShape && !selectedShapeId}
@@ -145,7 +178,7 @@ const Canvas: React.FC<CanvasProps> = ({
                 return true;
               })
               .map((cursor) => (
-                <Cursor key={cursor.userId} cursor={cursor} />
+                <Cursor key={cursor.userId} cursor={cursor} scale={stageScale} />
               ))}
           </Layer>
         </Stage>

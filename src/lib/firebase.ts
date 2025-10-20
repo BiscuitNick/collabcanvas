@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
+import { getDatabase } from 'firebase/database'
 
 // Your web app's Firebase configuration
 // Using environment variables for security
@@ -26,5 +27,8 @@ export const firestore = initializeFirestore(app, {
     tabManager: persistentMultipleTabManager()
   })
 })
+
+// Initialize Realtime Database for real-time sync
+export const database = getDatabase(app)
 
 export default app

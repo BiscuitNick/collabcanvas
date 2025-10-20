@@ -1,16 +1,43 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { useSearchParams, Navigate } from 'react-router'
 import { useAuth } from '../hooks/useAuth'
 import { useContent } from '../hooks/useContent'
 import { useCursors } from '../hooks/useCursors'
 import { usePresence } from '../hooks/usePresence'
 import { useCanvasStore } from '../store/canvasStore'
+import { useCanvasMetadata } from '../hooks/useCanvasMetadata'
+import { CanvasProvider, useCanEdit } from '../contexts/CanvasContext'
 import FullScreenLayout from '../components/layout/FullScreenLayout'
 import Canvas from '../components/canvas/Canvas'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { CANVAS_HALF } from '../lib/constants'
 
 export const CanvasPage: React.FC = () => {
+  const [searchParams] = useSearchParams()
+  const canvasId = searchParams.get('id')
+  const { user } = useAuth()
+
+  // Redirect to canvases list if no canvas ID is provided
+  if (!canvasId) {
+    return <Navigate to="/canvases" replace />
+  }
+
+  // Get edit permission from metadata
+  const { canEdit } = useCanvasMetadata(canvasId, user?.uid)
+
+  return (
+    <CanvasProvider canvasId={canvasId} canEdit={canEdit}>
+      <CanvasPageContent />
+    </CanvasProvider>
+  )
+}
+
+const CanvasPageContent: React.FC = () => {
+  const [searchParams] = useSearchParams()
+  const canvasId = searchParams.get('id')!
   const { user, loading: authLoading } = useAuth()
+  const { loading: metadataLoading, error: metadataError, canView } = useCanvasMetadata(canvasId, user?.uid)
+  const canEdit = useCanEdit()
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const [pendingUserClick, setPendingUserClick] = useState<string | null>(null)
   const [showSelfCursor] = useState(true)
@@ -28,10 +55,12 @@ export const CanvasPage: React.FC = () => {
     loading: contentLoading,
     lockContent,
     unlockContent,
+    setSelection,
+    flushToFirestore,
     startEditingContent,
     stopEditingContent
   } = useContent()
-  
+
   // Legacy aliases for backward compatibility
   const updateShape = updateContent
   const lockShape = lockContent
@@ -40,12 +69,22 @@ export const CanvasPage: React.FC = () => {
   const stopEditingShape = stopEditingContent
   const setVisibleShapesCount = setVisibleContentCount
 
-  const { stagePosition, stageScale, updatePosition } = useCanvasStore()
-  
+  const { stageScale, updatePosition } = useCanvasStore()
+
+  // Reset view when switching to a different canvas
+  // Center world (0, 0) at the screen center
+  useEffect(() => {
+    if (canvasSize.width > 0 && canvasSize.height > 0) {
+      // To show world coordinate (0, 0) at the center of the screen,
+      // set stage position to (width/2, height/2)
+      updatePosition(canvasSize.width / 2, canvasSize.height / 2)
+    }
+  }, [canvasId, canvasSize.width, canvasSize.height, updatePosition])
+
   const {
     cursors,
     updateCursor
-  } = useCursors(user?.uid || '', user?.displayName || 'Anonymous', stagePosition, canvasSize.width, canvasSize.height, stageScale)
+  } = useCursors(user?.uid || '', user?.displayName || 'Anonymous')
 
   const {
     presenceUsers
@@ -109,12 +148,24 @@ export const CanvasPage: React.FC = () => {
 
 
 
-  if (authLoading || contentLoading) {
+  if (authLoading || contentLoading || metadataLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 bg-blue-600 rounded-full animate-pulse mx-auto mb-4"></div>
           <p className="text-gray-600">Loading canvas...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (metadataError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Canvas Not Found</h2>
+          <p className="text-gray-600 mb-4">{metadataError.message}</p>
+          <a href="/canvases" className="text-blue-600 hover:underline">Go to Canvases</a>
         </div>
       </div>
     )
@@ -126,6 +177,18 @@ export const CanvasPage: React.FC = () => {
         <div className="text-center">
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentication Required</h2>
           <p className="text-gray-600">Please log in to access the canvas.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!canView) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
+          <p className="text-gray-600 mb-4">You don't have permission to view this canvas.</p>
+          <a href="/canvases" className="text-blue-600 hover:underline">Go to Canvases</a>
         </div>
       </div>
     )
@@ -161,8 +224,11 @@ export const CanvasPage: React.FC = () => {
           onVisibleShapesChange={setVisibleShapesCount}
           lockShape={lockShape}
           unlockShape={unlockShape}
+          setSelection={setSelection}
+          flushToFirestore={flushToFirestore}
           startEditingShape={startEditingShape}
           stopEditingShape={stopEditingShape}
+          canEdit={canEdit}
         />
       </FullScreenLayout>
     </ErrorBoundary>

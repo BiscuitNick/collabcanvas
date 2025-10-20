@@ -1,9 +1,11 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router';
 import { useAuth } from '../../../hooks/useAuth';
 
 const UserAccount: React.FC = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <div className="mt-auto pt-4 border-t border-gray-200">
@@ -26,12 +28,21 @@ const UserAccount: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={logout}
-          className="px-3 py-1.5 bg-red-500 text-white text-sm rounded hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
-        >
-          Logout
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate('/canvases')}
+            className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            title="View all canvases"
+          >
+            Canvases
+          </button>
+          <button
+            onClick={logout}
+            className="px-3 py-1.5 bg-red-500 text-white text-sm rounded hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+          >
+            Logout
+          </button>
+        </div>
       </div>
     </div>
   );

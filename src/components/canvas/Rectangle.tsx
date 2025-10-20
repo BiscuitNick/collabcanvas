@@ -1,10 +1,16 @@
 import React, { useRef, useEffect, useCallback, memo } from 'react'
-import { Rect, Transformer } from 'react-konva'
+import { Rect, Transformer, Group, Text } from 'react-konva'
 import Konva from 'konva' // Import Konva for types
 import type { Rectangle } from '../../types'
 import { clamp } from '../../lib/utils'
 import { CANVAS_HALF, MIN_SHAPE_SIZE, MAX_SHAPE_SIZE } from '../../lib/constants'
-import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS } from '../../lib/config'
+import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS, LOCK_INDICATOR_STROKE_WIDTH } from '../../lib/config'
+
+interface LockInfo {
+  userId: string
+  userName: string
+  lockedItemId: string | null
+}
 
 interface RectangleProps {
   shape: Rectangle
@@ -16,7 +22,10 @@ interface RectangleProps {
   onDragStart: () => void
   onDragEndCallback: () => void
   currentUserId?: string
-  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
+  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null
+  canEdit?: boolean
+  isLockedByOther?: boolean
+  lockInfo?: LockInfo | null
 }
 
 const RectangleComponent: React.FC<RectangleProps> = memo(({
@@ -28,17 +37,17 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   onDragEnd,
   onDragStart,
   onDragEndCallback,
-  currentUserId,
-  selectedTool,
+  currentUserId: _currentUserId,
+  selectedTool: _selectedTool,
+  canEdit = true,
+  isLockedByOther = false,
+  lockInfo = null,
 }) => {
   const rectRef = useRef<Konva.Rect>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
   const lastUpdateRef = useRef<number>(0)
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingUpdateRef = useRef<{ x: number; y: number } | null>(null)
-
-  // Check if shape is locked by another user
-  const isLockedByOther = shape.lockedByUserId && shape.lockedByUserId !== currentUserId
 
   // Canvas bounds - 64000x64000 with center at (0,0) for infinite feel
   // Moved to src/lib/constants.ts
@@ -64,9 +73,11 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
 
       // Throttle: only update if enough time has passed since last update
       if (now - lastUpdateRef.current >= RECTANGLE_DRAG_THROTTLE_MS) {
-        // Clamp position within canvas bounds
-        const clampedX = clamp(pendingUpdate.x, -CANVAS_HALF, CANVAS_HALF - shape.width)
-        const clampedY = clamp(pendingUpdate.y, -CANVAS_HALF, CANVAS_HALF - shape.height)
+        // Clamp position within canvas bounds (x,y is now the center)
+        const halfWidth = shape.width / 2
+        const halfHeight = shape.height / 2
+        const clampedX = clamp(pendingUpdate.x, -CANVAS_HALF + halfWidth, CANVAS_HALF - halfWidth)
+        const clampedY = clamp(pendingUpdate.y, -CANVAS_HALF + halfHeight, CANVAS_HALF - halfHeight)
 
         onDragMove(clampedX, clampedY)
         lastUpdateRef.current = now
@@ -98,30 +109,32 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   }, [])
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    // Log shape click
-    console.log('🖱️ Canvas clicked - Shape:', { type: 'rectangle', id: shape.id, x: shape.x.toFixed(2), y: shape.y.toFixed(2) })
-
-    // Only allow selection with select, pan, or ai tools
-    const allowSelection = selectedTool === 'select' || selectedTool === 'pan' || selectedTool === 'ai' || selectedTool === null
-
-    if (!allowSelection) {
-      // Don't stop propagation - let the tool action happen
-      console.log('🔧 Tool active - passing click through to canvas')
+    // Prevent selection if locked by another user
+    if (isLockedByOther) {
+      // IMPORTANT: Must stop propagation to prevent canvas panning!
+      e.cancelBubble = true
+      e.evt.stopPropagation()
       return
     }
 
-    // Prevent event from bubbling to stage for selection
+    // Always allow selection when clicking on existing content
+    // The shape handling hook will handle tool switching as needed
+
+    // Prevent event from bubbling to stage
     e.cancelBubble = true
     e.evt.stopPropagation()
 
-    // Prevent selection if locked by another user
-    if (isLockedByOther) {
-      console.log('⚠️ Cannot select - locked by another user')
-      return
-    }
-
-    // Call onSelect to show details in panel
+    // Call onSelect to trigger selection and potential tool switch
     onSelect()
+  }
+
+  const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Stop propagation on mousedown for locked shapes to prevent stage drag initiation
+    if (isLockedByOther) {
+      e.cancelBubble = true
+      e.evt.stopPropagation()
+      e.evt.stopImmediatePropagation?.()
+    }
   }
 
   const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -134,6 +147,13 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
       e.target.stopDrag()
       return
     }
+
+    // Set cursor to grabbing while dragging
+    const container = e.target.getStage()?.container()
+    if (container) {
+      container.style.cursor = 'grabbing'
+    }
+
     // Notify parent that dragging has started
     onDragStart()
   }
@@ -151,16 +171,24 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
     // Get the current position of the rectangle
     const rectX = e.target.x()
     const rectY = e.target.y()
-    
-    // Clamp position within canvas bounds
-    const clampedX = clamp(rectX, -CANVAS_HALF, CANVAS_HALF - shape.width)
-    const clampedY = clamp(rectY, -CANVAS_HALF, CANVAS_HALF - shape.height)
-    
+
+    // Clamp position within canvas bounds (x,y is now the center)
+    const halfWidth = shape.width / 2
+    const halfHeight = shape.height / 2
+    const clampedX = clamp(rectX, -CANVAS_HALF + halfWidth, CANVAS_HALF - halfWidth)
+    const clampedY = clamp(rectY, -CANVAS_HALF + halfHeight, CANVAS_HALF - halfHeight)
+
+    // Reset cursor after dragging ends
+    const container = e.target.getStage()?.container()
+    if (container) {
+      container.style.cursor = 'grab'
+    }
+
     // Update position in store (React will handle the re-render)
     onDragEnd(clampedX, clampedY)
-    
+
     // Removed as it is handled by the Canvas component directly
-    
+
     // Notify parent that dragging has ended
     onDragEndCallback()
   }
@@ -185,9 +213,11 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
     const newX = node.x()
     const newY = node.y()
 
-    // Clamp position within canvas bounds
-    const clampedX = clamp(newX, -CANVAS_HALF, CANVAS_HALF - newWidth)
-    const clampedY = clamp(newY, -CANVAS_HALF, CANVAS_HALF - newHeight)
+    // Clamp position within canvas bounds (x,y is now the center)
+    const halfWidth = newWidth / 2
+    const halfHeight = newHeight / 2
+    const clampedX = clamp(newX, -CANVAS_HALF + halfWidth, CANVAS_HALF - halfWidth)
+    const clampedY = clamp(newY, -CANVAS_HALF + halfHeight, CANVAS_HALF - halfHeight)
 
     // Normalize rotation to 0-360 degrees
     const normalizedRotation = ((rotation % 360) + 360) % 360
@@ -217,34 +247,47 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
 
   return (
     <>
-      <Rect
-        ref={rectRef}
-        x={shape.x}
-        y={shape.y}
+      <Group>
+        <Rect
+          ref={rectRef}
+          x={shape.x}
+          y={shape.y}
         width={shape.width}
         height={shape.height}
+        offsetX={shape.width / 2}
+        offsetY={shape.height / 2}
         rotation={shape.rotation}
         fill={shape.fill}
-        stroke={isLockedByOther ? (shape.lockedByUserColor || '#FF0000') : (isSelected ? '#007AFF' : 'transparent')}
-        strokeWidth={isLockedByOther ? Math.min(20, ((shape.width + shape.height) / 2) * 0.1) : (isSelected ? 2 : 0)}
+        stroke={isLockedByOther ? '#FF0000' : (isSelected ? '#007AFF' : 'transparent')}
+        strokeWidth={isLockedByOther ? LOCK_INDICATOR_STROKE_WIDTH : (isSelected ? 2 : 0)}
         shadowColor="rgba(0, 0, 0, 0.1)"
         shadowBlur={4}
         shadowOffset={{ x: 2, y: 2 }}
         shadowOpacity={0.3}
-        draggable={isSelected && !isLockedByOther}
+        draggable={isSelected && !isLockedByOther && canEdit}
         onClick={handleClick}
         onTap={handleClick}
-        onDragStart={isSelected && !isLockedByOther ? handleDragStart : undefined}
-        onDragMove={isSelected && !isLockedByOther ? handleDragMove : undefined}
-        onDragEnd={isSelected && !isLockedByOther ? handleDragEnd : undefined}
-        onTransformStart={isSelected && !isLockedByOther ? handleTransformStart : undefined}
-        onTransformEnd={isSelected && !isLockedByOther ? handleTransformEnd : undefined}
+        onMouseDown={handleMouseDown}
+        onDragStart={isSelected && !isLockedByOther && canEdit ? handleDragStart : undefined}
+        onDragMove={isSelected && !isLockedByOther && canEdit ? handleDragMove : undefined}
+        onDragEnd={isSelected && !isLockedByOther && canEdit ? handleDragEnd : undefined}
+        onTransformStart={isSelected && !isLockedByOther && canEdit ? handleTransformStart : undefined}
+        onTransformEnd={isSelected && !isLockedByOther && canEdit ? handleTransformEnd : undefined}
         // Hover effects
         onMouseEnter={(e: Konva.KonvaEventObject<MouseEvent>) => {
           try {
             const container = e.target.getStage()?.container()
             if (container) {
-              container.style.cursor = isLockedByOther ? 'not-allowed' : 'pointer'
+              // Show 'grab' cursor when hovering over selected content
+              // Show 'not-allowed' if locked by another user
+              // Otherwise show 'pointer'
+              if (isLockedByOther) {
+                container.style.cursor = 'not-allowed'
+              } else if (isSelected) {
+                container.style.cursor = 'grab'
+              } else {
+                container.style.cursor = 'pointer'
+              }
             }
           } catch {
             // Ignore errors in test environment
@@ -260,8 +303,44 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
             // Ignore errors in test environment
           }
         }}
-      />
-      {isSelected && !isLockedByOther && (
+        />
+
+        {/* Lock indicator - Centered tag with username and lock icon */}
+        {isLockedByOther && lockInfo?.userName && (
+          <Group
+            x={shape.x}
+            y={shape.y}
+            offsetX={shape.width / 2}
+            offsetY={shape.height / 2}
+          >
+            {/* Background rounded rectangle */}
+            <Rect
+              x={shape.width / 2 - 60}
+              y={shape.height / 2 - 12}
+              width={120}
+              height={24}
+              fill="rgba(255, 68, 68, 0.95)"
+              cornerRadius={12}
+              shadowColor="black"
+              shadowBlur={6}
+              shadowOpacity={0.3}
+              shadowOffsetY={2}
+            />
+            {/* Lock icon and username text */}
+            <Text
+              x={shape.width / 2 - 55}
+              y={shape.height / 2 - 8}
+              text={`🔒 ${lockInfo.userName}`}
+              fontSize={13}
+              fill="white"
+              fontStyle="bold"
+              align="center"
+            />
+          </Group>
+        )}
+      </Group>
+
+      {isSelected && !isLockedByOther && canEdit && (
         <Transformer
           ref={transformerRef}
           boundBoxFunc={(oldBox, newBox) => {

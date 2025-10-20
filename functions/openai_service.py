@@ -119,11 +119,17 @@ def text_to_canvas_commands(prompt: str, model: str, selected_content=None) -> d
                         command["strokeWidth"] = function_args["strokeWidth"]
 
                     canvas_commands.append(command)
-            print(f"[OpenAI Service] Returning {len(canvas_commands)} commands")
-            return {"success": True, "data": {"commands": canvas_commands}, "debug": debug_info}
+
+            # Extract AI message from the response content or generate a default one
+            ai_message = message.content if message.content else f"Created {len(canvas_commands)} item(s) on the canvas."
+
+            print(f"[OpenAI Service] Returning {len(canvas_commands)} commands with message")
+            return {"success": True, "data": {"commands": canvas_commands, "message": ai_message}, "debug": debug_info}
         else:
-            print(f"[OpenAI Service] No tool calls in response")
-            return {"success": True, "data": {"commands": []}, "debug": debug_info}
+            # Check if there's a text response with guidance
+            ai_message = message.content if message.content else "No items created. Please provide more details about what you'd like to create."
+            print(f"[OpenAI Service] No tool calls in response, message: {ai_message[:50]}")
+            return {"success": True, "data": {"commands": [], "message": ai_message}, "debug": debug_info}
 
     except Exception as e:
         print(f"[OpenAI Service] Error: {str(e)}")

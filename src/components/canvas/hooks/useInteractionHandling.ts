@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import Konva from 'konva';
 import { useCanvasStore } from '../../../store/canvasStore';
-import { CANVAS_HALF } from '../../../lib/constants';
 import { getZoomStep } from '../../../lib/utils';
 
 interface InteractionHandlingProps {
@@ -11,10 +10,11 @@ interface InteractionHandlingProps {
   onMouseMove: (x: number, y: number, canvasWidth: number, canvasHeight: number) => void;
   onPanStart?: () => void;
   onPanEnd?: () => void;
-  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'ai' | 'pan' | 'agent' | null;
+  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null;
   onCanvasClick?: (event: { x: number; y: number }) => void;
   isCreatingShape?: boolean;
   unlockShape?: (id: string) => Promise<void>;
+  setSelection?: (id: string | null) => Promise<void>;
 }
 
 export const useInteractionHandling = ({
@@ -23,10 +23,12 @@ export const useInteractionHandling = ({
   onMouseMove,
   onPanStart,
   onPanEnd,
+  selectedTool,
   onCanvasClick,
   isCreatingShape,
   unlockShape,
-}: Omit<InteractionHandlingProps, 'selectedTool'>) => {
+  setSelection,
+}: InteractionHandlingProps) => {
   const {
     stagePosition,
     stageScale,
@@ -45,15 +47,9 @@ export const useInteractionHandling = ({
   const [lastTouchCenter, setLastTouchCenter] = useState<{ x: number; y: number } | null>(null);
 
   const clampPosition = (x: number, y: number) => {
-    const minX = -CANVAS_HALF;
-    const maxX = CANVAS_HALF;
-    const minY = -CANVAS_HALF;
-    const maxY = CANVAS_HALF;
-
-    return {
-      x: Math.max(minX, Math.min(maxX, x)),
-      y: Math.max(minY, Math.min(maxY, y)),
-    };
+    // For now, disable clamping to debug the zoom issue
+    // The clamping logic needs to be completely rethought for center-origin canvas
+    return { x, y };
   };
 
   const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -74,6 +70,14 @@ export const useInteractionHandling = ({
     onPanStart?.();
   };
 
+  const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+    const stage = e.target.getStage();
+    if (!stage || e.target !== stage) return;
+
+    // Update position during drag
+    updatePosition(stage.x(), stage.y());
+  };
+
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     const stage = e.target.getStage();
     if (!stage) return;
@@ -87,8 +91,11 @@ export const useInteractionHandling = ({
 
     setPanning(false);
     onPanEnd?.();
-    const clampedPos = clampPosition(e.target.x(), e.target.y());
-    updatePosition(clampedPos.x, clampedPos.y);
+
+    // Since we're now controlling position through x/y props, we need to prevent
+    // the stage from updating its position internally
+    stage.x(stagePosition.x);
+    stage.y(stagePosition.y);
 
     if (onMouseMove) {
       const pointer = stage.getPointerPosition();
@@ -106,27 +113,36 @@ export const useInteractionHandling = ({
 
     setZooming(true);
     const stage = e.target.getStage();
-    const oldScale = stage?.scaleX();
+    const oldScale = stageScale;
     const pointer = stage?.getPointerPosition();
 
-    if (!pointer || !stage || oldScale === undefined) {
+    if (!pointer || !stage) {
       setZooming(false);
       return;
     }
 
+    // Calculate new scale
     const currentPercentage = Math.round(oldScale * 100);
     const step = getZoomStep(currentPercentage);
     const newPercentage = e.evt.deltaY > 0 ? Math.max(5, currentPercentage - step) : Math.min(300, currentPercentage + step);
     const newScale = newPercentage / 100;
-    updateScale(newScale);
 
+    // Convert pointer position to canvas coordinates (where canvas center is 0,0)
+    // Canvas point = (viewport point - stage position) / scale
+    const canvasPointX = (pointer.x - stagePosition.x) / oldScale;
+    const canvasPointY = (pointer.y - stagePosition.y) / oldScale;
+
+    // Calculate new stage position so that the canvas point stays under the pointer
+    // viewport point = stage position + canvas point * new scale
+    // stage position = viewport point - canvas point * new scale
     const newPos = {
-      x: pointer.x - ((pointer.x - stage.x()) / oldScale) * newScale,
-      y: pointer.y - ((pointer.y - stage.y()) / oldScale) * newScale,
+      x: pointer.x - canvasPointX * newScale,
+      y: pointer.y - canvasPointY * newScale,
     };
 
     setZooming(false);
     const clampedPos = clampPosition(newPos.x, newPos.y);
+    updateScale(newScale);
     updatePosition(clampedPos.x, clampedPos.y);
   };
 
@@ -147,19 +163,39 @@ export const useInteractionHandling = ({
     const transform = stage.getAbsoluteTransform().copy().invert();
     const canvasPoint = transform.point({ x: pointerPosition.x, y: pointerPosition.y });
 
-    if (clickedOnEmpty) {
-      // Clicked on empty canvas area
-      console.log('🖱️ Canvas clicked - Empty area at:', { x: canvasPoint.x.toFixed(2), y: canvasPoint.y.toFixed(2) });
+    // Special handling for grid tool - always deselect and update position when clicking empty canvas
+    if (clickedOnEmpty && selectedTool === 'grid') {
+      // Deselect any selected content
+      selectShape(null);
 
-      // Unlock the currently selected shape before deselecting
-      if (selectedContentId && unlockShape) {
+      // Use setSelection for RTDB-based unlocking
+      if (setSelection) {
+        setSelection(null);
+      } else if (selectedContentId && unlockShape) {
         unlockShape(selectedContentId);
       }
 
-      // Always deselect current shape when clicking empty canvas or placing new shape
+      // Trigger grid position update
+      if (onCanvasClick) {
+        onCanvasClick({ x: canvasPoint.x, y: canvasPoint.y });
+      }
+      return;
+    }
+
+    if (clickedOnEmpty) {
+      // Clicked on empty canvas area - deselect and unlock
+      // Always deselect current shape first (updates local state immediately)
       selectShape(null);
 
-      // If creating a shape, trigger the shape creation
+      // Use setSelection for RTDB-based unlocking
+      if (setSelection) {
+        setSelection(null);  // This will handle unlocking and clearing selection in RTDB
+      } else if (selectedContentId && unlockShape) {
+        // Fallback to old unlocking mechanism
+        unlockShape(selectedContentId);
+      }
+
+      // If creating a shape, trigger the canvas click callback
       if (isCreatingShape && onCanvasClick) {
         onCanvasClick({ x: canvasPoint.x, y: canvasPoint.y });
         return;
@@ -167,15 +203,6 @@ export const useInteractionHandling = ({
     } else {
       // Clicked on a shape - the shape's onSelect handler will be called via ShapeFactory
       // The shape's onClick handler will call onSelect which handles switching selection
-      // Just log the click for debugging
-      const shapeId = e.target.id() || 'unknown';
-      const shapeName = e.target.name() || e.target.className;
-      console.log('🖱️ Canvas clicked - Shape:', {
-        type: shapeName,
-        id: shapeId,
-        x: canvasPoint.x.toFixed(2),
-        y: canvasPoint.y.toFixed(2)
-      });
     }
   };
 
@@ -273,6 +300,7 @@ export const useInteractionHandling = ({
 
   return {
     onDragStart: handleDragStart,
+    onDragMove: handleDragMove,
     onDragEnd: handleDragEnd,
     onWheel: handleWheel,
     onClick: handleStageClick,

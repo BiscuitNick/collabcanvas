@@ -1,9 +1,15 @@
 import React, { useRef, useEffect, useCallback, memo } from 'react'
-import { Text, Transformer } from 'react-konva'
+import { Text, Transformer, Group, Rect } from 'react-konva'
 import Konva from 'konva'
 import type { TextContent } from '../../types'
 import { clamp } from '../../lib/utils'
 import { CANVAS_HALF } from '../../lib/constants'
+
+interface LockInfo {
+  userId: string
+  userName: string
+  lockedItemId: string | null
+}
 
 interface TextContentProps {
   content: TextContent
@@ -15,7 +21,10 @@ interface TextContentProps {
   onDragStart: () => void
   onDragEndCallback: () => void
   currentUserId?: string
-  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | null
+  selectedTool?: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null
+  canEdit?: boolean
+  isLockedByOther?: boolean
+  lockInfo?: LockInfo | null
 }
 
 const TextContentComponent: React.FC<TextContentProps> = memo(({
@@ -27,17 +36,17 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
   onDragEnd,
   onDragStart,
   onDragEndCallback,
-  currentUserId,
-  selectedTool,
+  currentUserId: _currentUserId,
+  selectedTool: _selectedTool,
+  canEdit = true,
+  isLockedByOther = false,
+  lockInfo: _lockInfo = null,
 }) => {
   const textRef = useRef<Konva.Text>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
   const lastUpdateRef = useRef<number>(0)
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingUpdateRef = useRef<{ x: number; y: number } | null>(null)
-
-  // Check if content is locked by another user
-  const isLockedByOther = content.lockedByUserId && content.lockedByUserId !== currentUserId
 
   // Throttled drag move function
   const throttledDragMove = useCallback((x: number, y: number) => {
@@ -94,29 +103,22 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
   }, [])
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    // Log text content click
-    console.log('🖱️ Canvas clicked - Shape:', { type: 'text', id: content.id, x: content.x.toFixed(2), y: content.y.toFixed(2), text: content.text })
-
-    // Only allow selection with select, pan, or ai tools
-    const allowSelection = selectedTool === 'select' || selectedTool === 'pan' || selectedTool === 'ai' || selectedTool === null
-
-    if (!allowSelection) {
-      // Don't stop propagation - let the tool action happen
-      console.log('🔧 Tool active - passing click through to canvas')
+    // Prevent selection if locked by another user
+    if (isLockedByOther) {
+      // IMPORTANT: Must stop propagation to prevent canvas panning!
+      e.cancelBubble = true
+      e.evt.stopPropagation()
       return
     }
 
-    // Prevent event from bubbling to stage for selection
+    // Always allow selection when clicking on existing content
+    // The shape handling hook will handle tool switching as needed
+
+    // Prevent event from bubbling to stage
     e.cancelBubble = true
     e.evt.stopPropagation()
 
-    // Prevent selection if locked by another user
-    if (isLockedByOther) {
-      console.log('⚠️ Cannot select - locked by another user')
-      return
-    }
-
-    // Call onSelect to show details in panel
+    // Call onSelect to trigger selection and potential tool switch
     onSelect()
   }
 
@@ -127,11 +129,20 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
 
     // Prevent editing if locked by another user
     if (isLockedByOther) {
-      console.log('⚠️ Cannot edit - locked by another user')
+      // Already stopped propagation above, so just return
       return
     }
 
     // TODO: Task 4 - Enter edit mode
+  }
+
+  const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Stop propagation on mousedown for locked shapes to prevent stage drag initiation
+    if (isLockedByOther) {
+      e.cancelBubble = true
+      e.evt.stopPropagation()
+      e.evt.stopImmediatePropagation?.()
+    }
   }
 
   const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -143,6 +154,13 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
       e.target.stopDrag()
       return
     }
+
+    // Set cursor to grabbing while dragging
+    const container = e.target.getStage()?.container()
+    if (container) {
+      container.style.cursor = 'grabbing'
+    }
+
     onDragStart()
   }
 
@@ -161,6 +179,12 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
     // Clamp position within canvas bounds
     const clampedX = clamp(textX, -CANVAS_HALF, CANVAS_HALF)
     const clampedY = clamp(textY, -CANVAS_HALF, CANVAS_HALF)
+
+    // Reset cursor after dragging ends
+    const container = e.target.getStage()?.container()
+    if (container) {
+      container.style.cursor = 'grab'
+    }
 
     // Update position in store
     onDragEnd(clampedX, clampedY)
@@ -212,38 +236,54 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
     node.y(clampedY)
   }
 
+  // Calculate text dimensions for centering
+  const textWidth = textRef.current?.getTextWidth() || 0
+  const textHeight = textRef.current?.getTextHeight() || 0
+
   return (
     <>
       <Text
         ref={textRef}
         x={content.x}
         y={content.y}
+        offsetX={textWidth / 2}
+        offsetY={textHeight / 2}
         text={content.text || ''}
         fontSize={content.fontSize}
         fontFamily={content.fontFamily}
         fontStyle={content.fontStyle}
         fill={content.fill}
+        stroke={undefined}
+        strokeWidth={0}
         rotation={content.rotation || 0}
         align={content.textAlign || 'left'}
         verticalAlign={content.verticalAlign || 'top'}
-        stroke={isLockedByOther ? (content.lockedByUserColor || '#FF0000') : (isSelected ? '#007AFF' : undefined)}
-        strokeWidth={isLockedByOther ? 2 : (isSelected ? 1 : 0)}
-        draggable={isSelected && !isLockedByOther}
+        draggable={isSelected && !isLockedByOther && canEdit}
         onClick={handleClick}
         onTap={handleClick}
+        onMouseDown={handleMouseDown}
         onDblClick={handleDblClick}
         onDblTap={handleDblClick}
-        onDragStart={isSelected && !isLockedByOther ? handleDragStart : undefined}
-        onDragMove={isSelected && !isLockedByOther ? handleDragMove : undefined}
-        onDragEnd={isSelected && !isLockedByOther ? handleDragEnd : undefined}
-        onTransformStart={isSelected && !isLockedByOther ? handleTransformStart : undefined}
-        onTransformEnd={isSelected && !isLockedByOther ? handleTransformEnd : undefined}
+        onDragStart={isSelected && !isLockedByOther && canEdit ? handleDragStart : undefined}
+        onDragMove={isSelected && !isLockedByOther && canEdit ? handleDragMove : undefined}
+        onDragEnd={isSelected && !isLockedByOther && canEdit ? handleDragEnd : undefined}
+        onTransformStart={isSelected && !isLockedByOther && canEdit ? handleTransformStart : undefined}
+        onTransformEnd={isSelected && !isLockedByOther && canEdit ? handleTransformEnd : undefined}
         // Hover effects
         onMouseEnter={(e: Konva.KonvaEventObject<MouseEvent>) => {
           try {
             const container = e.target.getStage()?.container()
             if (container) {
-              container.style.cursor = isLockedByOther ? 'not-allowed' : 'pointer'
+              // Show 'grab' cursor when hovering over selected content
+              // Show 'not-allowed' if locked by another user
+              // Otherwise show 'pointer'
+              if (isLockedByOther) {
+                container.style.cursor = 'not-allowed'
+              } else if (isSelected) {
+                container.style.cursor = 'grab'
+              } else {
+                container.style.cursor = 'pointer'
+              }
             }
           } catch {
             // Ignore errors
@@ -260,7 +300,37 @@ const TextContentComponent: React.FC<TextContentProps> = memo(({
           }
         }}
       />
-      {isSelected && !isLockedByOther && (
+
+      {/* Lock indicator - Centered tag with username and lock icon */}
+      {isLockedByOther && _lockInfo?.userName && (
+        <Group>
+          {/* Background rounded rectangle */}
+          <Rect
+            x={content.x - 60}
+            y={content.y - 12}
+            width={120}
+            height={24}
+            fill="rgba(255, 68, 68, 0.95)"
+            cornerRadius={12}
+            shadowColor="black"
+            shadowBlur={6}
+            shadowOpacity={0.3}
+            shadowOffsetY={2}
+          />
+          {/* Lock icon and username text */}
+          <Text
+            x={content.x - 55}
+            y={content.y - 8}
+            text={`🔒 ${_lockInfo.userName}`}
+            fontSize={13}
+            fill="white"
+            fontStyle="bold"
+            align="center"
+          />
+        </Group>
+      )}
+
+      {isSelected && !isLockedByOther && canEdit && (
         <Transformer
           ref={transformerRef}
           keepRatio={false}

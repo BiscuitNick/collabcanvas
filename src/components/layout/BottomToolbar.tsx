@@ -74,6 +74,8 @@ interface BottomToolbarProps {
     height: number
   }
   onGridPositionClick?: (handler: (x: number, y: number) => void) => void
+  onPanToContent?: (x: number, y: number) => void
+  onPanAndZoomToContent?: (x: number, y: number, width: number, height: number) => void
 }
 
 type ToolType = 'pan' | 'shapes' | 'text' | 'ai' | 'agent' | 'grid' | 'reset'
@@ -93,7 +95,9 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   onDeleteContent,
   canEdit = true,
   canvasViewport,
-  onGridPositionClick
+  onGridPositionClick,
+  onPanToContent,
+  onPanAndZoomToContent
 }) => {
 
   // Get selected content from canvas store
@@ -102,6 +106,20 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
   // Get current user for createdBy field
   const { user } = useAuth()
+
+  // Helper function to calculate viewport center in canvas coordinates
+  const getViewportCenter = useCallback(() => {
+    if (!canvasViewport) return { x: 100, y: 100 }
+
+    const viewportCenterScreenX = canvasViewport.width / 2
+    const viewportCenterScreenY = canvasViewport.height / 2
+
+    // Convert screen coordinates to canvas coordinates
+    const canvasX = (viewportCenterScreenX - canvasViewport.position.x) / canvasViewport.scale
+    const canvasY = (viewportCenterScreenY - canvasViewport.position.y) / canvasViewport.scale
+
+    return { x: canvasX, y: canvasY }
+  }, [canvasViewport])
 
   // Local state for toolbar
   const [activeTool, setActiveTool] = useState<ToolType>('pan')
@@ -387,6 +405,9 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
     // Check if user selected image generation
     if (selectedAgentOption === 'imageplus') {
+      // Check if we're editing an existing image or creating a new one
+      const isEditingImage = selectedContent && selectedContent.type === ContentType.IMAGE
+
       if (!onCreateContent) {
         console.error('[Agent Toolbar] onCreateContent not provided for image generation')
         setAgentError('Content creation not available')
@@ -397,30 +418,72 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
       setAgentError(null)
 
       try {
-        console.log('[Agent Toolbar] Generating image with model:', imageModel, 'prompt:', agentInput.trim())
+        const imageUrl = isEditingImage ? (selectedContent as any).src : undefined
+        console.log('[Agent Toolbar] Generating image with model:', imageModel, 'prompt:', agentInput.trim(), isEditingImage ? 'editing existing image' : 'creating new image')
 
-        // Call image generation API
-        const response = await generateImage(agentInput.trim(), imageModel)
+        // Call image generation API with optional image URL for editing
+        const response = await generateImage(agentInput.trim(), imageModel, imageUrl)
 
         console.log('[Agent Toolbar] Image generation response:', response)
 
         if (response.success && response.data?.imageUrl) {
-          // Create image content on canvas
-          // Place at center of viewport, with 4:3 aspect ratio to match Seedream 4 output
-          await onCreateContent({
-            type: ContentType.IMAGE,
-            version: ContentVersion.V2,
-            x: 100, // Default position
-            y: 100,
-            width: 512, // Default dimensions for generated images (4:3 aspect ratio)
-            height: 384, // 512 * 3/4 = 384 for 4:3 aspect ratio
-            src: response.data.imageUrl,
-            alt: agentInput.trim()
-          } as any)
+          if (isEditingImage) {
+            // Create new edited image to the right of the old one (keep old image)
+            const oldImage = selectedContent as any
+            const gap = 50 // Gap between old and new image
+
+            // Calculate new position: old image x + old image width + gap
+            const newX = oldImage.x + oldImage.width + gap
+            const newY = oldImage.y
+
+            await onCreateContent!({
+              type: ContentType.IMAGE,
+              version: ContentVersion.V2,
+              x: newX,
+              y: newY,
+              width: oldImage.width, // Match old image dimensions
+              height: oldImage.height,
+              src: response.data.imageUrl,
+              alt: agentInput.trim()
+            } as any)
+            console.log('[Agent Toolbar] Successfully created edited image on canvas (kept old image)')
+
+            // Pan and zoom to show the new image (centered, with auto-zoom to 25% width)
+            if (onPanAndZoomToContent) {
+              onPanAndZoomToContent(newX, newY, oldImage.width, oldImage.height)
+            } else if (onPanToContent) {
+              onPanToContent(newX, newY)
+            }
+          } else {
+            // Create new image at viewport center with 4:3 aspect ratio
+            const viewportCenter = getViewportCenter()
+            const imageWidth = 512
+            const imageHeight = 384 // 4:3 aspect ratio
+
+            const newImage = {
+              type: ContentType.IMAGE,
+              version: ContentVersion.V2,
+              x: viewportCenter.x,
+              y: viewportCenter.y,
+              width: imageWidth,
+              height: imageHeight,
+              src: response.data.imageUrl,
+              alt: agentInput.trim()
+            } as any
+
+            await onCreateContent!(newImage)
+            console.log('[Agent Toolbar] Successfully created image on canvas at viewport center')
+
+            // Pan and zoom to the newly created image (auto-zoom to 25% width)
+            if (onPanAndZoomToContent) {
+              onPanAndZoomToContent(newImage.x, newImage.y, imageWidth, imageHeight)
+            } else if (onPanToContent) {
+              onPanToContent(newImage.x, newImage.y)
+            }
+          }
 
           // Clear input on success
           setAgentInput('')
-          console.log('[Agent Toolbar] Successfully created image on canvas')
         } else {
           console.warn('[Agent Toolbar] No image URL in response:', response)
           setAgentError('Failed to generate image. Please try again.')
@@ -536,9 +599,23 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
               }
             }
           }
+
+          // Pan to the edited content (use first edited item's position, or updated position)
+          if (onPanToContent && updatesToApply.length > 0) {
+            const firstUpdate = updatesToApply[0]
+            // Use updated position if available, otherwise find the content and use its position
+            const targetContent = content.find(c => c.id === firstUpdate.id)
+            if (targetContent) {
+              const panX = firstUpdate.updates.x ?? targetContent.x
+              const panY = firstUpdate.updates.y ?? targetContent.y
+              onPanToContent(panX, panY)
+            }
+          }
         }
 
         // Process create commands - batch them for performance
+        // Get viewport center to offset AI-generated positions
+        const viewportCenter = getViewportCenter()
         const contentToCreate: any[] = []
 
         for (const command of createCommands) {
@@ -554,8 +631,8 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
               contentToCreate.push({
                 type: ContentType.RECTANGLE,
                 version: ContentVersion.V2,
-                x: command.x,
-                y: command.y,
+                x: command.x + viewportCenter.x,
+                y: command.y + viewportCenter.y,
                 width: command.width,
                 height: command.height,
                 rotation: command.rotation || 0,
@@ -579,8 +656,8 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
               contentToCreate.push({
                 type: ContentType.CIRCLE,
                 version: ContentVersion.V2,
-                x: command.x,
-                y: command.y,
+                x: command.x + viewportCenter.x,
+                y: command.y + viewportCenter.y,
                 radius: radius,
                 fill: command.fill,
                 stroke: command.stroke || '#000000',
@@ -599,8 +676,8 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
               const textContent: any = {
                 type: ContentType.TEXT,
                 version: ContentVersion.V2,
-                x: command.x,
-                y: command.y,
+                x: command.x + viewportCenter.x,
+                y: command.y + viewportCenter.y,
                 text: command.text,
                 fontSize: command.fontSize || 16,
                 fontFamily: (command.fontFamily as FontFamily) || FontFamily.ARIAL,
@@ -683,6 +760,13 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
             try {
               await onCreateContent!(groupData)
               console.log('[Agent Toolbar] Group created successfully')
+
+              // Pan and zoom to the created group (auto-zoom to 25% width)
+              if (onPanAndZoomToContent) {
+                onPanAndZoomToContent(groupCenterX, groupCenterY, groupWidth, groupHeight)
+              } else if (onPanToContent) {
+                onPanToContent(groupCenterX, groupCenterY)
+              }
             } catch (err) {
               console.error('[Agent Toolbar] Error creating group:', err)
             }
@@ -692,6 +776,19 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
             try {
               await onCreateContentBatch(contentToCreate)
               console.log('[Agent Toolbar] All content created successfully via batch')
+
+              // Pan and zoom to the first created item (auto-zoom to 25% width)
+              if (contentToCreate.length > 0) {
+                const firstItem = contentToCreate[0]
+                const itemWidth = firstItem.width || firstItem.radius * 2 || 100
+                const itemHeight = firstItem.height || firstItem.radius * 2 || 100
+
+                if (onPanAndZoomToContent) {
+                  onPanAndZoomToContent(firstItem.x, firstItem.y, itemWidth, itemHeight)
+                } else if (onPanToContent) {
+                  onPanToContent(firstItem.x, firstItem.y)
+                }
+              }
             } catch (err) {
               console.error('[Agent Toolbar] Error in batch creation:', err)
             }
@@ -702,6 +799,19 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
                 await onCreateContent!(contentData)
               } catch (err) {
                 console.error('[Agent Toolbar] Error creating content:', err)
+              }
+            }
+
+            // Pan and zoom to the first created item (auto-zoom to 25% width)
+            if (contentToCreate.length > 0) {
+              const firstItem = contentToCreate[0]
+              const itemWidth = firstItem.width || firstItem.radius * 2 || 100
+              const itemHeight = firstItem.height || firstItem.radius * 2 || 100
+
+              if (onPanAndZoomToContent) {
+                onPanAndZoomToContent(firstItem.x, firstItem.y, itemWidth, itemHeight)
+              } else if (onPanToContent) {
+                onPanToContent(firstItem.x, firstItem.y)
               }
             }
           }
@@ -1052,7 +1162,11 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
               type="text"
               value={agentInput}
               onChange={(e) => handleAgentInputChange(e.target.value)}
-              placeholder={selectedContent ? "Edit the selected content..." : "Enter prompt for agent..."}
+              placeholder={
+                selectedAgentOption === 'imageplus'
+                  ? (selectedContent && selectedContent.type === ContentType.IMAGE ? "Edit the selected image..." : "Generate an image...")
+                  : (selectedContent ? "Edit the selected content..." : "Enter prompt for agent...")
+              }
               className="h-8 text-sm"
               style={{ width: '400px' }}
               disabled={agentLoading}

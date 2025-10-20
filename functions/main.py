@@ -105,10 +105,11 @@ def ai_generate_image(req: https_fn.Request) -> https_fn.Response:
 
     prompt = request_data['prompt']
     model = request_data.get('model', 'seedream-4')
+    image_url = request_data.get('imageUrl')
 
-    print(f"[Image Generation Endpoint] Request - Model: {model}, Prompt: {prompt[:50]}...")
+    print(f"[Image Generation Endpoint] Request - Model: {model}, Prompt: {prompt[:50]}..., Image URL: {image_url[:50] if image_url else 'None'}...")
 
-    result = generate_image_replicate(prompt, model)
+    result = generate_image_replicate(prompt, model, image_url)
 
     print(f"[Image Generation Endpoint] Response - Success: {result['success']}")
     if not result['success']:

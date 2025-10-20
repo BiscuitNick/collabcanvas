@@ -475,6 +475,60 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     updatePositionAnimated(desiredX, desiredY) // Use animated pan when clicking layers
   }, [canvasSize.width, canvasSize.height, stageScale, updatePositionAnimated])
 
+  // Pan and zoom to show content, ensuring it takes at least 35% of viewport width
+  // Only zooms if content is too small to see or too large to fit
+  const handlePanAndZoomToContent = useCallback((x: number, y: number, width: number, height: number) => {
+    // Only pan if canvas size is valid
+    if (canvasSize.width === 0 || canvasSize.height === 0) return
+
+    // Calculate current size of content in screen pixels
+    const currentContentWidthOnScreen = width * stageScale
+    const currentContentHeightOnScreen = height * stageScale
+
+    // Calculate target size (35% of viewport width)
+    const targetWidthRatio = 0.35
+    const targetContentWidth = canvasSize.width * targetWidthRatio
+
+    // Determine if we need to zoom
+    let needsZoom = false
+    let newScale = stageScale
+
+    // Content is too small to see (less than 35% of viewport)
+    if (currentContentWidthOnScreen < targetContentWidth) {
+      needsZoom = true
+      newScale = targetContentWidth / width
+      console.log(`[Pan & Zoom] Content too small, zooming in from ${stageScale.toFixed(2)} to ${newScale.toFixed(2)}`)
+    }
+    // Content is too large to fit in viewport (larger than viewport)
+    else if (currentContentWidthOnScreen > canvasSize.width || currentContentHeightOnScreen > canvasSize.height) {
+      needsZoom = true
+      // Calculate scale to fit content in viewport (with some padding)
+      const scaleForWidth = (canvasSize.width * 0.9) / width
+      const scaleForHeight = (canvasSize.height * 0.9) / height
+      newScale = Math.min(scaleForWidth, scaleForHeight)
+      console.log(`[Pan & Zoom] Content too large, zooming out from ${stageScale.toFixed(2)} to ${newScale.toFixed(2)}`)
+    } else {
+      console.log(`[Pan & Zoom] Content already fits well, no zoom needed (current: ${(currentContentWidthOnScreen / canvasSize.width * 100).toFixed(0)}% of viewport)`)
+    }
+
+    // Clamp scale between 0.05x (5%) and 3x (300%)
+    const clampedScale = Math.max(0.05, Math.min(3, newScale))
+
+    // Update scale only if needed
+    if (needsZoom) {
+      const { updateScale } = useCanvasStore.getState()
+      updateScale(clampedScale)
+    }
+
+    // Calculate stage position to center the content on the viewport
+    const finalScale = needsZoom ? clampedScale : stageScale
+    const desiredX = (canvasSize.width / 2) - (x * finalScale)
+    const desiredY = (canvasSize.height / 2) - (y * finalScale)
+    updatePositionAnimated(desiredX, desiredY)
+
+    console.log(`[Pan & Zoom] Content: ${width}x${height}, Final Scale: ${finalScale.toFixed(2)}, Position: ${x}, ${y}`)
+  }, [canvasSize.width, canvasSize.height, stageScale, updatePositionAnimated])
+
   // Reopen properties pane
   const reopenPropertiesPane = useCallback(() => {
     setUIState(prev => ({
@@ -780,6 +834,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
             height: canvasSize.height
           }}
           onGridPositionClick={handleGridPositionHandlerRegistration}
+          onPanToContent={handlePanToContent}
+          onPanAndZoomToContent={handlePanAndZoomToContent}
         />
 
       {/* Tool Button - Bottom Left (Layers Panel) */}

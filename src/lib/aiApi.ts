@@ -157,11 +157,13 @@ export const callAITestDirect = async (prompt: string): Promise<AIResponse> => {
  * Generates an image using Replicate image generation models
  * @param prompt - The user's prompt describing the image to generate
  * @param model - The image generation model to use
+ * @param imageUrl - Optional image URL for editing/transforming an existing image
  * @returns Promise<ImageGenerationResponse> - The generated image URL or error
  */
 export const generateImage = async (
   prompt: string,
-  model: ImageModel = 'seedream-4'
+  model: ImageModel = 'seedream-4',
+  imageUrl?: string
 ): Promise<ImageGenerationResponse> => {
   try {
     // Determine function URL based on environment
@@ -171,14 +173,14 @@ export const generateImage = async (
       ? 'http://localhost:5001/collab-canvas-kenkel/us-central1/ai_generate_image'
       : 'https://us-central1-collab-canvas-kenkel.cloudfunctions.net/ai_generate_image';
 
-    console.log(`[Image Generation API] Generating image with model: ${model}, prompt: ${prompt.substring(0, 50)}...`);
+    console.log(`[Image Generation API] ${imageUrl ? 'Editing' : 'Generating'} image with model: ${model}, prompt: ${prompt.substring(0, 50)}...${imageUrl ? ', image: ' + imageUrl.substring(0, 50) + '...' : ''}`);
 
     const response = await fetch(functionUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ prompt, model }),
+      body: JSON.stringify({ prompt, model, imageUrl }),
     });
 
     if (!response.ok) {

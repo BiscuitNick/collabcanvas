@@ -135,13 +135,18 @@ def text_to_canvas_commands_replicate(prompt: str, model: str, selected_content=
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-def generate_image_replicate(prompt: str, model: str = "seedream-4") -> dict:
-    """Generates an image using Replicate image generation models.
+def generate_image_replicate(prompt: str, model: str = "seedream-4", image_url: str = None) -> dict:
+    """Generates or edits an image using Replicate image generation models.
 
     Supported models:
     - seedream-4: bytedance/seedream-4
     - nano-banana: google/nano-banana
     - flux-kontext-pro: black-forest-labs/flux-kontext-pro
+
+    Args:
+        prompt: The text prompt describing the image or the edits to make
+        model: The image generation model to use
+        image_url: Optional URL of an existing image to edit/transform
     """
     start_time = time.time()
     try:
@@ -150,7 +155,8 @@ def generate_image_replicate(prompt: str, model: str = "seedream-4") -> dict:
             print("[Replicate Image Service] API token not configured")
             return {"success": False, "error": "Replicate API token not configured"}
 
-        print(f"[Replicate Image Service] Generating image with model: {model}, prompt: {prompt[:50]}...")
+        is_editing = image_url is not None
+        print(f"[Replicate Image Service] {'Editing' if is_editing else 'Generating'} image with model: {model}, prompt: {prompt[:50]}...{', image: ' + image_url[:50] + '...' if image_url else ''}")
 
         # Map model names to paths and configure input payloads
         if model == "seedream-4":
@@ -161,7 +167,7 @@ def generate_image_replicate(prompt: str, model: str = "seedream-4") -> dict:
                 "width": 2048,
                 "height": 2048,
                 "max_images": 1,
-                "image_input": [],
+                "image_input": [image_url] if image_url else [],
                 "aspect_ratio": "4:3",
                 "sequential_image_generation": "disabled"
             }
@@ -169,8 +175,8 @@ def generate_image_replicate(prompt: str, model: str = "seedream-4") -> dict:
             model_path = "google/nano-banana"
             input_payload = {
                 "prompt": prompt,
-                "image_input": [],
-                "aspect_ratio": "match_input_image",
+                "image_input": [image_url] if image_url else [],
+                "aspect_ratio": "match_input_image" if image_url else "1:1",
                 "output_format": "jpg"
             }
         elif model == "flux-kontext-pro":
@@ -182,6 +188,9 @@ def generate_image_replicate(prompt: str, model: str = "seedream-4") -> dict:
                 "safety_tolerance": 2,
                 "prompt_upsampling": False
             }
+            # Add input_image if provided
+            if image_url:
+                input_payload["input_image"] = image_url
         else:
             print(f"[Replicate Image Service] Unknown model: {model}")
             return {"success": False, "error": f"Unknown model: {model}"}

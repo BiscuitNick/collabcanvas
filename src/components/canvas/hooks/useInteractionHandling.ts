@@ -163,6 +163,25 @@ export const useInteractionHandling = ({
     const transform = stage.getAbsoluteTransform().copy().invert();
     const canvasPoint = transform.point({ x: pointerPosition.x, y: pointerPosition.y });
 
+    // Special handling for grid tool - always deselect and update position when clicking empty canvas
+    if (clickedOnEmpty && selectedTool === 'grid') {
+      // Deselect any selected content
+      selectShape(null);
+
+      // Use setSelection for RTDB-based unlocking
+      if (setSelection) {
+        setSelection(null);
+      } else if (selectedContentId && unlockShape) {
+        unlockShape(selectedContentId);
+      }
+
+      // Trigger grid position update
+      if (onCanvasClick) {
+        onCanvasClick({ x: canvasPoint.x, y: canvasPoint.y });
+      }
+      return;
+    }
+
     if (clickedOnEmpty) {
       // Clicked on empty canvas area - deselect and unlock
       // Always deselect current shape first (updates local state immediately)
@@ -176,8 +195,8 @@ export const useInteractionHandling = ({
         unlockShape(selectedContentId);
       }
 
-      // If creating a shape or using grid tool, trigger the canvas click callback
-      if ((isCreatingShape || selectedTool === 'grid') && onCanvasClick) {
+      // If creating a shape, trigger the canvas click callback
+      if (isCreatingShape && onCanvasClick) {
         onCanvasClick({ x: canvasPoint.x, y: canvasPoint.y });
         return;
       }

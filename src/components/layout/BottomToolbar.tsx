@@ -26,11 +26,11 @@ import {
   Type,
   Bot,
   Blocks,
-  Grid3X3
+  Grid3X3,
+  Copy
 } from 'lucide-react'
 import ShapeCreationForm from './ShapeCreationForm'
 import TextToolbar from './TextToolbar'
-import ImageToolbar from './ImageToolbar'
 import { ShapeType, FontFamily, FontStyle, ContentType, ContentVersion } from '../../types'
 import type { Content } from '../../types'
 import { callAITest, generateImage, type AIProvider, type GPT5Model, type ImageModel } from '../../lib/aiApi'
@@ -59,12 +59,13 @@ interface BottomToolbarProps {
     fontFamily: FontFamily
     fontStyle: FontStyle
   }) => void
-  onImageUrlChange?: (url: string) => void
   onCreateText?: () => void
   onOpenAIAgent: () => void
   selectedTool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null
   onToolSelect: (tool: 'select' | 'rectangle' | 'circle' | 'text' | 'image' | 'ai' | 'pan' | 'agent' | 'grid' | null) => void
   onResetCanvas: () => void
+  onCopyContent?: (content: Content) => void
+  onDeleteContent?: (id: string) => void
   canEdit?: boolean
   canvasViewport?: {
     position: { x: number; y: number }
@@ -75,7 +76,7 @@ interface BottomToolbarProps {
   onGridPositionClick?: (handler: (x: number, y: number) => void) => void
 }
 
-type ToolType = 'pan' | 'shapes' | 'text' | 'image' | 'ai' | 'agent' | 'grid'
+type ToolType = 'pan' | 'shapes' | 'text' | 'ai' | 'agent' | 'grid' | 'reset'
 
 const BottomToolbar: React.FC<BottomToolbarProps> = ({
   onCreateShapeWithOptions,
@@ -84,11 +85,12 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   onUpdateContent,
   onUpdateContentBatch,
   onTextOptionsChange,
-  onImageUrlChange,
   // onCreateText is not used yet but reserved for future use
   onOpenAIAgent,
   onToolSelect,
   onResetCanvas,
+  onCopyContent,
+  onDeleteContent,
   canEdit = true,
   canvasViewport,
   onGridPositionClick
@@ -103,9 +105,9 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
   // Local state for toolbar
   const [activeTool, setActiveTool] = useState<ToolType>('pan')
+  const [showResetDialog, setShowResetDialog] = useState(false)
   const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle')
   const [textInput, setTextInput] = useState('')
-  const [imageUrl, setImageUrl] = useState('')
   const [agentInput, setAgentInput] = useState('')
   const [selectedAgentOption, setSelectedAgentOption] = useState<'blocks' | 'imageplus'>('blocks')
   const [agentLoading, setAgentLoading] = useState(false)
@@ -308,9 +310,9 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     { id: 'pan' as ToolType, label: 'Hand Tool', icon: Hand, description: 'Pan around the canvas' },
     { id: 'shapes' as ToolType, label: 'Shapes Tool', icon: Shapes, description: 'Create shapes' },
     { id: 'text' as ToolType, label: 'Text Tool', icon: Type, description: 'Create text' },
-    { id: 'image' as ToolType, label: 'Image Tool', icon: ImagePlus, description: 'Add images' },
     { id: 'grid' as ToolType, label: 'Grid Tool', icon: Grid3X3, description: 'Create grid' },
-    { id: 'agent' as ToolType, label: 'Agent Tool', icon: Bot, description: 'AI agent' }
+    { id: 'agent' as ToolType, label: 'Agent Tool', icon: Bot, description: 'AI agent' },
+    { id: 'reset' as ToolType, label: 'Reset Canvas', icon: Trash2, description: 'Clear all content' }
   ]
 
   const shapes = [
@@ -324,6 +326,12 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   ]
 
   const handleToolSelect = (tool: ToolType) => {
+    // Special handling for reset tool - show dialog instead of selecting
+    if (tool === 'reset') {
+      setShowResetDialog(true)
+      return
+    }
+
     setActiveTool(tool)
     localStorage.setItem('collabcanvas-active-tool', tool)
 
@@ -335,9 +343,6 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     } else if (tool === 'text') {
       onToolSelect('text')
       // Text creation will be triggered by clicking on canvas
-    } else if (tool === 'image') {
-      onToolSelect('image')
-      // Image creation will be triggered by clicking on canvas
     } else if (tool === 'agent') {
       onToolSelect('agent')
       // Agent tool selected
@@ -362,6 +367,19 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     localStorage.setItem('collabcanvas-selected-shape', shape)
     // Update the tool selection to the new shape type
     onToolSelect(shape as any)
+  }
+
+  const handleConfirmReset = () => {
+    // Call the reset canvas function
+    onResetCanvas()
+    // Close the dialog
+    setShowResetDialog(false)
+    // Switch to pan tool
+    handleToolSelect('pan')
+  }
+
+  const handleCancelReset = () => {
+    setShowResetDialog(false)
   }
 
   const handleAgentGo = async () => {
@@ -756,16 +774,6 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
           </div>
         )
 
-      case 'image':
-        return (
-          <div className="flex items-center space-x-2">
-            <ImageToolbar onImageUrlChange={(url) => {
-              setImageUrl(url)
-              onImageUrlChange?.(url)
-            }} />
-          </div>
-        )
-
       case 'agent': {
         const currentAgentOption = getCurrentAgentOption()
         return (
@@ -864,13 +872,26 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
         return (
           <div className="flex items-center space-x-2">
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              onClick={onResetCanvas}
-              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-              title="Clear all shapes and reset canvas"
+              onClick={() => selectedContent && onCopyContent?.(selectedContent)}
+              disabled={!selectedContent}
+              className="h-8 flex items-center gap-1.5 text-gray-700 disabled:text-gray-400 disabled:border-gray-200"
+              title="Copy selected content"
+            >
+              <Copy className="h-4 w-4" />
+              <span className="text-xs">Copy</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => selectedContent && onDeleteContent?.(selectedContent.id)}
+              disabled={!selectedContent}
+              className="h-8 flex items-center gap-1.5 text-red-600 border-red-200 hover:bg-red-50 disabled:text-gray-400 disabled:border-gray-200"
+              title="Delete selected content"
             >
               <Trash2 className="h-4 w-4" />
+              <span className="text-xs">Delete</span>
             </Button>
           </div>
         )
@@ -908,11 +929,6 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
     }
   }
 
-  const handleImageUrlChange = (value: string) => {
-    setImageUrl(value)
-    localStorage.setItem('collabcanvas-image-url', value)
-  }
-
   const handleAgentInputChange = (value: string) => {
     setAgentInput(value)
     localStorage.setItem('collabcanvas-agent-input', value)
@@ -923,9 +939,103 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
   }
 
   return (
-    <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center">
-      {/* View-Only Mode Notice */}
-      {!canEdit && (
+    <>
+      {/* Reset Confirmation Dialog */}
+      {showResetDialog && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.75)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '24px'
+        }}>
+          <div style={{
+            background: '#2a2a2a',
+            borderRadius: '12px',
+            padding: '32px',
+            maxWidth: '400px',
+            width: '100%',
+            border: '1px solid #3a3a3a'
+          }}>
+            <h3 style={{
+              fontSize: '20px',
+              fontWeight: '600',
+              marginBottom: '16px',
+              color: '#fff'
+            }}>
+              Reset Canvas
+            </h3>
+            <p style={{
+              fontSize: '14px',
+              color: '#888',
+              marginBottom: '24px',
+              lineHeight: '1.5'
+            }}>
+              Are you sure you want to reset the canvas? This will <strong style={{ color: '#fff' }}>delete all content</strong> and cannot be undone.
+            </p>
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={handleCancelReset}
+                style={{
+                  padding: '10px 20px',
+                  background: '#3a3a3a',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#4a4a4a'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#3a3a3a'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmReset}
+                style={{
+                  padding: '10px 20px',
+                  background: '#ff6b6b',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#ff5555'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#ff6b6b'
+                }}
+              >
+                Reset Canvas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center">
+        {/* View-Only Mode Notice */}
+        {!canEdit && (
         <div className="mb-2 bg-amber-50 border border-amber-300 text-amber-800 rounded-lg shadow-lg px-4 py-2">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">📖 View-Only Mode</span>
@@ -975,19 +1085,6 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
             onChange={(e) => handleTextInputChange(e.target.value)}
             placeholder="Enter text..."
             className="h-8 w-64 text-sm"
-          />
-        </div>
-      )}
-
-      {/* Image URL Input Field - Appears above toolbar when image tool is active */}
-      {activeTool === 'image' && (
-        <div className="mb-2 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg px-4 py-2">
-          <Input
-            type="text"
-            value={imageUrl}
-            onChange={(e) => handleImageUrlChange(e.target.value)}
-            placeholder="https://example.com/image.jpg"
-            className="h-8 w-96 text-sm"
           />
         </div>
       )}
@@ -1192,7 +1289,8 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   )
 }
 

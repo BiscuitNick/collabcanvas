@@ -54,6 +54,7 @@ interface CanvasState {
   isZooming: boolean
   isDraggingContent: boolean
   shouldAnimatePan: boolean
+  isMovingContent: boolean  // True when in click-to-lock move mode
 
   // Selected content
   selectedContentId: string | null
@@ -71,6 +72,7 @@ interface CanvasState {
   setPanning: (isPanning: boolean) => void
   setZooming: (isZooming: boolean) => void
   setDraggingContent: (isDraggingContent: boolean) => void
+  setMovingContent: (isMovingContent: boolean) => void
   addContent: (content: Content) => void
   updateContent: (id: string, updates: Partial<Content>) => void
   deleteContent: (id: string) => void
@@ -117,6 +119,7 @@ export const useCanvasStore = create<CanvasState>()(
   isZooming: false,
   isDraggingContent: false,
   shouldAnimatePan: false,
+  isMovingContent: false,
   selectedContentId: null,
   contentSyncStatus: {},
   pendingUpdates: new Map(),
@@ -146,6 +149,10 @@ export const useCanvasStore = create<CanvasState>()(
   
   setDraggingContent: (isDraggingContent: boolean) => {
     set({ isDraggingContent })
+  },
+
+  setMovingContent: (isMovingContent: boolean) => {
+    set({ isMovingContent })
   },
   
   addContent: (content: Content) => {

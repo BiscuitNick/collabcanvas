@@ -71,7 +71,7 @@ const Canvas: React.FC<CanvasProps> = ({
 }) => {
   const stageRef = useRef<Konva.Stage>(null);
   const canvasId = useCanvasId();
-  const { stagePosition, stageScale, isZooming, isDraggingShape, isPanning, shouldAnimatePan, selectedContentId, setDraggingShape } = useCanvasStore();
+  const { stagePosition, stageScale, isZooming, isDraggingShape, isPanning, shouldAnimatePan, selectedContentId, setDraggingShape, isMovingContent } = useCanvasStore();
   // Use selectedContentId directly instead of the getter selectedShapeId for proper reactivity
   const selectedShapeId = selectedContentId;
 
@@ -83,6 +83,7 @@ const Canvas: React.FC<CanvasProps> = ({
     isDragging: isDraggingShape,
     isPanning: isPanning,
     isResizing: false, // TODO: Add resize state
+    isMoving: isMovingContent,
   });
 
   const { handleShapeSelect, handleShapeUpdate, handleShapeDragStart, handleShapeDragMove, handleShapeDragEnd } = useShapeHandling({

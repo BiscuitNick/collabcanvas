@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { Bug, Users, Layers } from 'lucide-react'
 import { useCanvasStore } from '../../store/canvasStore'
 import type { Shape, Content, Cursor as CursorType, PresenceUser } from '../../types'
-import { isGroupContent } from '../../types'
+import { isGroupContent, isTextContent, isRectangleContent, isCircleContent, isImageContent } from '../../types'
 import type { CanvasProps } from '../canvas/Canvas'
 import UserProfileButton from './UserProfileButton'
 import PositionWidget from './PositionWidget'
@@ -78,7 +78,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   useKeyboardShortcuts()
   const { user } = useAuth()
   const canEdit = useCanEdit()
-  const { selectShape, resetView, selectedContentId, updatePositionAnimated, stageScale, stagePosition } = useCanvasStore()
+  const { selectShape, resetView, selectedContentId, updatePositionAnimated, stageScale, stagePosition, isMovingContent } = useCanvasStore()
 
   // Convert presence array to a Map for efficient user lookup
   const usersMap = React.useMemo(() => {
@@ -128,12 +128,21 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
 
   // Handle copying content with offset
   const handleCopyContent = useCallback((itemToCopy: Content) => {
-    // Calculate new position - all content is now center-anchored
-    // Simply offset to the right and down
-    const offset = 50
+    // Calculate new position based on content type
+    let newX = itemToCopy.x
+    let newY = itemToCopy.y
 
-    const newX = itemToCopy.x + offset
-    const newY = itemToCopy.y + offset
+    if (isTextContent(itemToCopy)) {
+      // For text, offset by height in Y direction
+      const height = itemToCopy.height || itemToCopy.fontSize || 24
+      newY = itemToCopy.y + height
+    } else if (isRectangleContent(itemToCopy) || isImageContent(itemToCopy) || isGroupContent(itemToCopy)) {
+      // For rectangles, images, and groups, offset by width in X direction
+      newX = itemToCopy.x + itemToCopy.width
+    } else if (isCircleContent(itemToCopy)) {
+      // For circles, offset by diameter (radius * 2) in X direction
+      newX = itemToCopy.x + (itemToCopy.radius * 2)
+    }
 
     // Remove id, createdAt, updatedAt as they'll be generated
     const { id, createdAt, updatedAt, ...contentToCopy } = itemToCopy as any
@@ -238,7 +247,6 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const [manualCanvasSize, setManualCanvasSize] = useState<{ width: number; height: number } | null>(null)
   const [textOptions, setTextOptions] = useState({ text: '', fontSize: 24, fontFamily: 'Arial' as const, fontStyle: 'normal' as const })
-  const [imageUrl, setImageUrl] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
   const fpsRef = useRef({ frames: 0, lastTime: performance.now() })
   const gridPositionHandlerRef = useRef<((x: number, y: number) => void) | null>(null)
@@ -285,7 +293,8 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     selectedTool: uiState.selectedTool,
     isDragging: uiState.isDragging,
     isPanning: uiState.isPanning,
-    isResizing: uiState.isResizing
+    isResizing: uiState.isResizing,
+    isMoving: isMovingContent
   })
 
   // Track last mouse/touch event for debugging
@@ -600,10 +609,6 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     setTextOptions(options)
   }, [])
 
-  const handleImageUrlChange = useCallback((url: string) => {
-    setImageUrl(url)
-  }, [])
-
   const handleGridPositionHandlerRegistration = useCallback((handler: (x: number, y: number) => void) => {
     gridPositionHandlerRef.current = handler
   }, [])
@@ -647,36 +652,6 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
         await createContent(textContent)
 
         // TODO: Task 2.3 - Immediately enter edit mode with caret visible
-      } catch {
-        // Silently fail
-      }
-      return
-    }
-
-    // Handle image creation
-    if (uiState.selectedTool === 'image') {
-      try {
-        const { createImageContent } = await import('../../lib/utils')
-
-        if (!imageUrl.trim()) {
-          // Don't create image if no URL provided
-          return
-        }
-
-        const imageContent = createImageContent(
-          event.x,
-          event.y,
-          user?.uid || 'anonymous',
-          {
-            src: imageUrl,
-            width: 100,
-            height: 100,
-            alt: 'User image',
-          }
-        )
-
-        // Create content - wrapper handles Firestore setting
-        await createContent(imageContent)
       } catch {
         // Silently fail
       }
@@ -739,7 +714,7 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
     if (gridPositionHandlerRef.current) {
       gridPositionHandlerRef.current(event.x, event.y)
     }
-  }, [createShape, user?.uid, uiState, createContent, textOptions, imageUrl])
+  }, [createShape, user?.uid, uiState, createContent, textOptions])
 
 
 
@@ -791,11 +766,12 @@ const FullScreenLayout: React.FC<FullScreenLayoutProps> = ({
           onUpdateContent={updateShape}
           onUpdateContentBatch={updateContentBatch}
           onTextOptionsChange={handleTextOptionsChange}
-          onImageUrlChange={handleImageUrlChange}
           onOpenAIAgent={handleOpenAIAgent}
           selectedTool={uiState.selectedTool}
           onToolSelect={handleToolSelect}
           onResetCanvas={handleResetCanvas}
+          onCopyContent={handleCopyContent}
+          onDeleteContent={handleDeleteContent}
           canEdit={canEdit}
           canvasViewport={{
             position: stagePosition,

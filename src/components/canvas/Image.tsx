@@ -1,10 +1,9 @@
 import React, { useRef, useEffect, useCallback, memo } from 'react'
-import { Image as KonvaImage, Transformer } from 'react-konva'
+import { Image as KonvaImage, Transformer, Group, Rect, Text } from 'react-konva'
 import Konva from 'konva'
 import type { ImageContent } from '../../types'
 import { clamp } from '../../lib/utils'
 import { CANVAS_HALF } from '../../lib/constants'
-import { LOCK_INDICATOR_STROKE_WIDTH } from '../../lib/config'
 
 interface LockInfo {
   userId: string
@@ -38,7 +37,7 @@ const ImageComponent: React.FC<ImageComponentProps> = memo(({
   onDragStart,
   onDragEndCallback,
   currentUserId: _currentUserId,
-  selectedTool,
+  selectedTool: _selectedTool,
   canEdit = true,
   isLockedByOther = false,
   lockInfo: _lockInfo = null,
@@ -145,14 +144,6 @@ const ImageComponent: React.FC<ImageComponentProps> = memo(({
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     console.log('🖱️ Canvas clicked - Image:', { id: content.id, x: content.x.toFixed(2), y: content.y.toFixed(2), src: content.src })
 
-    // Only allow selection with select, pan, or ai tools
-    const allowSelection = selectedTool === 'select' || selectedTool === 'pan' || selectedTool === 'ai' || selectedTool === null
-
-    if (!allowSelection) {
-      console.log('🔧 Tool active - passing click through to canvas')
-      return
-    }
-
     // Prevent selection if locked by another user
     if (isLockedByOther) {
       console.log('⚠️ Cannot select - locked by another user')
@@ -161,11 +152,14 @@ const ImageComponent: React.FC<ImageComponentProps> = memo(({
       return
     }
 
-    // Prevent event from bubbling to stage for selection
+    // Always allow selection when clicking on existing content
+    // The shape handling hook will handle tool switching as needed
+
+    // Prevent event from bubbling to stage
     e.cancelBubble = true
     e.evt.stopPropagation()
 
-    // Call onSelect to show details in panel
+    // Call onSelect to trigger selection and potential tool switch
     onSelect()
   }
 
@@ -187,6 +181,13 @@ const ImageComponent: React.FC<ImageComponentProps> = memo(({
       e.target.stopDrag()
       return
     }
+
+    // Set cursor to grabbing while dragging
+    const container = e.target.getStage()?.container()
+    if (container) {
+      container.style.cursor = 'grabbing'
+    }
+
     onDragStart()
   }
 
@@ -205,6 +206,12 @@ const ImageComponent: React.FC<ImageComponentProps> = memo(({
     // Clamp position within canvas bounds
     const clampedX = clamp(imageX, -CANVAS_HALF, CANVAS_HALF)
     const clampedY = clamp(imageY, -CANVAS_HALF, CANVAS_HALF)
+
+    // Reset cursor after dragging ends
+    const container = e.target.getStage()?.container()
+    if (container) {
+      container.style.cursor = 'grab'
+    }
 
     // Update position in store
     onDragEnd(clampedX, clampedY)
@@ -263,8 +270,8 @@ const ImageComponent: React.FC<ImageComponentProps> = memo(({
         height={content.height}
         offsetX={content.width / 2}
         offsetY={content.height / 2}
-        stroke={isLockedByOther ? '#FF0000' : undefined}
-        strokeWidth={isLockedByOther ? LOCK_INDICATOR_STROKE_WIDTH : 0}
+        stroke={undefined}
+        strokeWidth={0}
         rotation={content.rotation || 0}
         draggable={isSelected && !isLockedByOther && canEdit}
         onClick={handleClick}
@@ -279,7 +286,16 @@ const ImageComponent: React.FC<ImageComponentProps> = memo(({
           try {
             const container = e.target.getStage()?.container()
             if (container) {
-              container.style.cursor = isLockedByOther ? 'not-allowed' : 'pointer'
+              // Show 'grab' cursor when hovering over selected content
+              // Show 'not-allowed' if locked by another user
+              // Otherwise show 'pointer'
+              if (isLockedByOther) {
+                container.style.cursor = 'not-allowed'
+              } else if (isSelected) {
+                container.style.cursor = 'grab'
+              } else {
+                container.style.cursor = 'pointer'
+              }
             }
           } catch {
             // Ignore errors
@@ -296,6 +312,35 @@ const ImageComponent: React.FC<ImageComponentProps> = memo(({
           }
         }}
       />
+
+      {/* Lock indicator - Centered tag with username and lock icon */}
+      {isLockedByOther && _lockInfo?.userName && (
+        <Group>
+          {/* Background rounded rectangle */}
+          <Rect
+            x={content.x - 60}
+            y={content.y - 12}
+            width={120}
+            height={24}
+            fill="rgba(255, 68, 68, 0.95)"
+            cornerRadius={12}
+            shadowColor="black"
+            shadowBlur={6}
+            shadowOpacity={0.3}
+            shadowOffsetY={2}
+          />
+          {/* Lock icon and username text */}
+          <Text
+            x={content.x - 55}
+            y={content.y - 8}
+            text={`🔒 ${_lockInfo.userName}`}
+            fontSize={13}
+            fill="white"
+            fontStyle="bold"
+            align="center"
+          />
+        </Group>
+      )}
 
       {isSelected && !isLockedByOther && canEdit && (
         <Transformer

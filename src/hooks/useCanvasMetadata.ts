@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { doc, getDoc, updateDoc } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { firestore } from '../lib/firebase'
 import type { Canvas, CanvasVisibility, CanvasPermission } from './useCanvases'
 
@@ -84,7 +84,7 @@ export function useCanvasMetadata(canvasId: string, userId?: string): UseCanvasM
 
     try {
       const canvasRef = doc(firestore, 'canvases', canvasId)
-      await updateDoc(canvasRef, { visibility })
+      await updateDoc(canvasRef, { visibility, updatedAt: serverTimestamp() })
       await fetchCanvas()
     } catch (err) {
       console.error('Error updating visibility:', err)
@@ -99,7 +99,7 @@ export function useCanvasMetadata(canvasId: string, userId?: string): UseCanvasM
 
     try {
       const canvasRef = doc(firestore, 'canvases', canvasId)
-      await updateDoc(canvasRef, { publicCanEdit })
+      await updateDoc(canvasRef, { publicCanEdit, updatedAt: serverTimestamp() })
       await fetchCanvas()
     } catch (err) {
       console.error('Error updating public edit permission:', err)
@@ -115,7 +115,7 @@ export function useCanvasMetadata(canvasId: string, userId?: string): UseCanvasM
     try {
       const newPermissions = [...canvas.permissions, permission]
       const canvasRef = doc(firestore, 'canvases', canvasId)
-      await updateDoc(canvasRef, { permissions: newPermissions })
+      await updateDoc(canvasRef, { permissions: newPermissions, updatedAt: serverTimestamp() })
       await fetchCanvas()
     } catch (err) {
       console.error('Error adding permission:', err)
@@ -131,7 +131,7 @@ export function useCanvasMetadata(canvasId: string, userId?: string): UseCanvasM
     try {
       const newPermissions = canvas.permissions.filter(p => p.userId !== userIdToRemove)
       const canvasRef = doc(firestore, 'canvases', canvasId)
-      await updateDoc(canvasRef, { permissions: newPermissions })
+      await updateDoc(canvasRef, { permissions: newPermissions, updatedAt: serverTimestamp() })
       await fetchCanvas()
     } catch (err) {
       console.error('Error removing permission:', err)
@@ -149,7 +149,7 @@ export function useCanvasMetadata(canvasId: string, userId?: string): UseCanvasM
         p.userId === userIdToUpdate ? { ...p, role } : p
       )
       const canvasRef = doc(firestore, 'canvases', canvasId)
-      await updateDoc(canvasRef, { permissions: newPermissions })
+      await updateDoc(canvasRef, { permissions: newPermissions, updatedAt: serverTimestamp() })
       await fetchCanvas()
     } catch (err) {
       console.error('Error updating permission:', err)

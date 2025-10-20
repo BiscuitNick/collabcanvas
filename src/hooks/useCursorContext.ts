@@ -16,13 +16,15 @@ interface UseCursorContextProps {
   isDragging?: boolean
   isPanning?: boolean
   isResizing?: boolean
+  isMoving?: boolean
 }
 
 export const useCursorContext = ({
   selectedTool,
   isDragging = false,
   isPanning = false,
-  isResizing = false
+  isResizing = false,
+  isMoving = false
 }: UseCursorContextProps) => {
   useEffect(() => {
     const body = document.body
@@ -31,13 +33,19 @@ export const useCursorContext = ({
     // Determine cursor based on tool and interaction state
     if (isResizing) {
       cursor = 'resize'
+    } else if (isMoving) {
+      cursor = 'grabbing'
     } else if (isDragging) {
       cursor = 'grabbing'
     } else if (isPanning) {
       cursor = 'grabbing'
     } else {
+      // Default cursor for blank canvas areas based on selected tool
       switch (selectedTool) {
         case 'pan':
+          cursor = 'grab'
+          break
+        case 'agent':
           cursor = 'grab'
           break
         case 'select':
@@ -48,15 +56,11 @@ export const useCursorContext = ({
           break
         case 'rectangle':
         case 'circle':
-          cursor = 'crosshair'
-          break
+        case 'image':
         case 'grid':
           cursor = 'crosshair'
           break
         case 'ai':
-          cursor = 'pointer'
-          break
-        case 'agent':
           cursor = 'pointer'
           break
         default:
@@ -71,5 +75,5 @@ export const useCursorContext = ({
     return () => {
       body.style.cursor = 'default'
     }
-  }, [selectedTool, isDragging, isPanning, isResizing])
+  }, [selectedTool, isDragging, isPanning, isResizing, isMoving])
 }

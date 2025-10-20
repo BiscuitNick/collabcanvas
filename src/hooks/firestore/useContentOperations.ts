@@ -268,7 +268,8 @@ export const useContentOperations = (
         await updateDoc(canvasRef, {
           contentIds: [],
           contentIdsLastEditedBy: userUid || null,
-          contentIdsLastEditedAt: serverTimestamp()
+          contentIdsLastEditedAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
         });
       }
 

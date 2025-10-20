@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback, memo } from 'react'
-import { Rect, Transformer, Group, Text, Circle } from 'react-konva'
+import { Rect, Transformer, Group, Text } from 'react-konva'
 import Konva from 'konva' // Import Konva for types
 import type { Rectangle } from '../../types'
 import { clamp } from '../../lib/utils'
@@ -38,7 +38,7 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
   onDragStart,
   onDragEndCallback,
   currentUserId: _currentUserId,
-  selectedTool,
+  selectedTool: _selectedTool,
   canEdit = true,
   isLockedByOther = false,
   lockInfo = null,
@@ -117,19 +117,14 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
       return
     }
 
-    // Only allow selection with select, pan, or ai tools
-    const allowSelection = selectedTool === 'select' || selectedTool === 'pan' || selectedTool === 'ai' || selectedTool === null
+    // Always allow selection when clicking on existing content
+    // The shape handling hook will handle tool switching as needed
 
-    if (!allowSelection) {
-      // Don't stop propagation - let the tool action happen
-      return
-    }
-
-    // Prevent event from bubbling to stage for selection
+    // Prevent event from bubbling to stage
     e.cancelBubble = true
     e.evt.stopPropagation()
 
-    // Call onSelect to show details in panel
+    // Call onSelect to trigger selection and potential tool switch
     onSelect()
   }
 
@@ -152,6 +147,13 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
       e.target.stopDrag()
       return
     }
+
+    // Set cursor to grabbing while dragging
+    const container = e.target.getStage()?.container()
+    if (container) {
+      container.style.cursor = 'grabbing'
+    }
+
     // Notify parent that dragging has started
     onDragStart()
   }
@@ -175,6 +177,12 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
     const halfHeight = shape.height / 2
     const clampedX = clamp(rectX, -CANVAS_HALF + halfWidth, CANVAS_HALF - halfWidth)
     const clampedY = clamp(rectY, -CANVAS_HALF + halfHeight, CANVAS_HALF - halfHeight)
+
+    // Reset cursor after dragging ends
+    const container = e.target.getStage()?.container()
+    if (container) {
+      container.style.cursor = 'grab'
+    }
 
     // Update position in store (React will handle the re-render)
     onDragEnd(clampedX, clampedY)
@@ -270,7 +278,16 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
           try {
             const container = e.target.getStage()?.container()
             if (container) {
-              container.style.cursor = isLockedByOther ? 'not-allowed' : 'pointer'
+              // Show 'grab' cursor when hovering over selected content
+              // Show 'not-allowed' if locked by another user
+              // Otherwise show 'pointer'
+              if (isLockedByOther) {
+                container.style.cursor = 'not-allowed'
+              } else if (isSelected) {
+                container.style.cursor = 'grab'
+              } else {
+                container.style.cursor = 'pointer'
+              }
             }
           } catch {
             // Ignore errors in test environment
@@ -288,48 +305,37 @@ const RectangleComponent: React.FC<RectangleProps> = memo(({
         }}
         />
 
-        {/* Lock indicator */}
-        {isLockedByOther && (
+        {/* Lock indicator - Centered tag with username and lock icon */}
+        {isLockedByOther && lockInfo?.userName && (
           <Group
             x={shape.x}
             y={shape.y}
             offsetX={shape.width / 2}
             offsetY={shape.height / 2}
           >
-            {/* Lock background circle */}
-            <Circle
-              x={shape.width - 15}
-              y={15}
-              radius={12}
-              fill="#FF4444"
-              stroke="#FFFFFF"
-              strokeWidth={2}
+            {/* Background rounded rectangle */}
+            <Rect
+              x={shape.width / 2 - 60}
+              y={shape.height / 2 - 12}
+              width={120}
+              height={24}
+              fill="rgba(255, 68, 68, 0.95)"
+              cornerRadius={12}
               shadowColor="black"
-              shadowBlur={4}
+              shadowBlur={6}
               shadowOpacity={0.3}
+              shadowOffsetY={2}
             />
-            {/* Lock icon (simplified) */}
+            {/* Lock icon and username text */}
             <Text
-              x={shape.width - 21}
-              y={9}
-              text="🔒"
-              fontSize={12}
+              x={shape.width / 2 - 55}
+              y={shape.height / 2 - 8}
+              text={`🔒 ${lockInfo.userName}`}
+              fontSize={13}
               fill="white"
+              fontStyle="bold"
+              align="center"
             />
-            {/* Lock owner label */}
-            {lockInfo?.userName && (
-              <Text
-                x={shape.width / 2 - 50}
-                y={-25}
-                text={`Locked by ${lockInfo.userName}`}
-                fontSize={12}
-                fill="#FF4444"
-                stroke="white"
-                strokeWidth={0.5}
-                align="center"
-                width={100}
-              />
-            )}
           </Group>
         )}
       </Group>

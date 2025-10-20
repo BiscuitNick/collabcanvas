@@ -1,10 +1,10 @@
 import React, { useRef, useEffect, useCallback, memo } from 'react'
-import { Circle as KonvaCircle, Transformer } from 'react-konva'
+import { Circle as KonvaCircle, Transformer, Group, Rect, Text as KonvaText } from 'react-konva'
 import Konva from 'konva' // Import Konva for types
 import type { Circle } from '../../types'
 import { clamp } from '../../lib/utils'
 import { CANVAS_HALF, MIN_SHAPE_SIZE, MAX_SHAPE_SIZE } from '../../lib/constants'
-import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS, LOCK_INDICATOR_STROKE_WIDTH } from '../../lib/config'
+import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS } from '../../lib/config'
 
 interface LockInfo {
   userId: string
@@ -38,7 +38,7 @@ const CircleComponent: React.FC<CircleProps> = memo(({
   onDragStart,
   onDragEndCallback,
   currentUserId: _currentUserId,
-  selectedTool,
+  selectedTool: _selectedTool,
   canEdit = true,
   isLockedByOther = false,
   lockInfo: _lockInfo = null,
@@ -110,15 +110,6 @@ const CircleComponent: React.FC<CircleProps> = memo(({
     // Log shape click
     console.log('🖱️ Canvas clicked - Shape:', { type: 'circle', id: shape.id, x: shape.x.toFixed(2), y: shape.y.toFixed(2) })
 
-    // Only allow selection with select, pan, or ai tools
-    const allowSelection = selectedTool === 'select' || selectedTool === 'pan' || selectedTool === 'ai' || selectedTool === null
-
-    if (!allowSelection) {
-      // Don't stop propagation - let the tool action happen
-      console.log('🔧 Tool active - passing click through to canvas')
-      return
-    }
-
     // Prevent selection if locked by another user
     if (isLockedByOther) {
       console.log('⚠️ Cannot select - locked by another user')
@@ -128,11 +119,14 @@ const CircleComponent: React.FC<CircleProps> = memo(({
       return
     }
 
-    // Prevent event from bubbling to stage for selection
+    // Always allow selection when clicking on existing content
+    // The shape handling hook will handle tool switching as needed
+
+    // Prevent event from bubbling to stage
     e.cancelBubble = true
     e.evt.stopPropagation()
 
-    // Call onSelect to show details in panel
+    // Call onSelect to trigger selection and potential tool switch
     onSelect()
   }
 
@@ -155,6 +149,13 @@ const CircleComponent: React.FC<CircleProps> = memo(({
       e.target.stopDrag()
       return
     }
+
+    // Set cursor to grabbing while dragging
+    const container = e.target.getStage()?.container()
+    if (container) {
+      container.style.cursor = 'grabbing'
+    }
+
     // Notify parent that dragging has started
     onDragStart()
   }
@@ -176,6 +177,12 @@ const CircleComponent: React.FC<CircleProps> = memo(({
     // Clamp position within canvas bounds (x,y is the center for circles)
     const clampedX = clamp(circleX, -CANVAS_HALF + effectiveRadius, CANVAS_HALF - effectiveRadius)
     const clampedY = clamp(circleY, -CANVAS_HALF + effectiveRadius, CANVAS_HALF - effectiveRadius)
+
+    // Reset cursor after dragging ends
+    const container = e.target.getStage()?.container()
+    if (container) {
+      container.style.cursor = 'grab'
+    }
 
     // Update position in store (React will handle the re-render)
     onDragEnd(clampedX, clampedY)
@@ -231,8 +238,8 @@ const CircleComponent: React.FC<CircleProps> = memo(({
         y={shape.y}
         radius={effectiveRadius}
         fill={shape.fill}
-        stroke={isLockedByOther ? '#FF0000' : (shape.stroke || 'transparent')}
-        strokeWidth={isLockedByOther ? LOCK_INDICATOR_STROKE_WIDTH : (shape.strokeWidth || 0)}
+        stroke={shape.stroke || 'transparent'}
+        strokeWidth={shape.strokeWidth || 0}
         shadowColor="rgba(0, 0, 0, 0.1)"
         shadowBlur={4}
         shadowOffset={{ x: 2, y: 2 }}
@@ -251,7 +258,16 @@ const CircleComponent: React.FC<CircleProps> = memo(({
           try {
             const container = e.target.getStage()?.container()
             if (container) {
-              container.style.cursor = isLockedByOther ? 'not-allowed' : 'pointer'
+              // Show 'grab' cursor when hovering over selected content
+              // Show 'not-allowed' if locked by another user
+              // Otherwise show 'pointer'
+              if (isLockedByOther) {
+                container.style.cursor = 'not-allowed'
+              } else if (isSelected) {
+                container.style.cursor = 'grab'
+              } else {
+                container.style.cursor = 'pointer'
+              }
             }
           } catch {
             // Ignore errors in test environment
@@ -268,6 +284,35 @@ const CircleComponent: React.FC<CircleProps> = memo(({
           }
         }}
       />
+
+      {/* Lock indicator - Centered tag with username and lock icon */}
+      {isLockedByOther && _lockInfo?.userName && (
+        <Group>
+          {/* Background rounded rectangle */}
+          <Rect
+            x={shape.x - 60}
+            y={shape.y - 12}
+            width={120}
+            height={24}
+            fill="rgba(255, 68, 68, 0.95)"
+            cornerRadius={12}
+            shadowColor="black"
+            shadowBlur={6}
+            shadowOpacity={0.3}
+            shadowOffsetY={2}
+          />
+          {/* Lock icon and username text */}
+          <KonvaText
+            x={shape.x - 55}
+            y={shape.y - 8}
+            text={`🔒 ${_lockInfo.userName}`}
+            fontSize={13}
+            fill="white"
+            fontStyle="bold"
+            align="center"
+          />
+        </Group>
+      )}
 
       {isSelected && !isLockedByOther && canEdit && (
         <Transformer

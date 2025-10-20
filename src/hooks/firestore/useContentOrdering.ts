@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { doc, updateDoc, arrayUnion, arrayRemove, getDoc, setDoc, Timestamp } from 'firebase/firestore'
+import { doc, updateDoc, arrayUnion, arrayRemove, getDoc, setDoc, Timestamp, serverTimestamp } from 'firebase/firestore'
 import { firestore } from '../../lib/firebase'
 
 export const useContentOrdering = (canvasId: string, userUid?: string) => {
@@ -12,7 +12,8 @@ export const useContentOrdering = (canvasId: string, userUid?: string) => {
       // Tracking fields for who last edited contentIds
       const trackingFields = {
         contentIdsLastEditedBy: userUid || null,
-        contentIdsLastEditedAt: Timestamp.now()
+        contentIdsLastEditedAt: Timestamp.now(),
+        updatedAt: serverTimestamp()
       }
 
       if (!canvasDoc.exists()) {
@@ -54,7 +55,8 @@ export const useContentOrdering = (canvasId: string, userUid?: string) => {
       // Tracking fields for who last edited contentIds
       const trackingFields = {
         contentIdsLastEditedBy: userUid || null,
-        contentIdsLastEditedAt: Timestamp.now()
+        contentIdsLastEditedAt: Timestamp.now(),
+        updatedAt: serverTimestamp()
       }
 
       await updateDoc(canvasRef, { contentIds: arrayRemove(contentId), ...trackingFields })
@@ -88,7 +90,8 @@ export const useContentOrdering = (canvasId: string, userUid?: string) => {
       // Tracking fields for who last edited contentIds
       const trackingFields = {
         contentIdsLastEditedBy: userUid || null,
-        contentIdsLastEditedAt: Timestamp.now()
+        contentIdsLastEditedAt: Timestamp.now(),
+        updatedAt: serverTimestamp()
       }
 
       await updateDoc(canvasRef, { contentIds: newContentIds, ...trackingFields })
@@ -113,7 +116,8 @@ export const useContentOrdering = (canvasId: string, userUid?: string) => {
       // Tracking fields for who last edited contentIds
       const trackingFields = {
         contentIdsLastEditedBy: userUid || null,
-        contentIdsLastEditedAt: Timestamp.now()
+        contentIdsLastEditedAt: Timestamp.now(),
+        updatedAt: serverTimestamp()
       }
 
       await updateDoc(canvasRef, { contentIds: newContentIds, ...trackingFields })
@@ -141,7 +145,8 @@ export const useContentOrdering = (canvasId: string, userUid?: string) => {
       // Tracking fields for who last edited contentIds
       const trackingFields = {
         contentIdsLastEditedBy: userUid || null,
-        contentIdsLastEditedAt: Timestamp.now()
+        contentIdsLastEditedAt: Timestamp.now(),
+        updatedAt: serverTimestamp()
       }
 
       await updateDoc(canvasRef, { contentIds: newContentIds, ...trackingFields })
@@ -169,7 +174,8 @@ export const useContentOrdering = (canvasId: string, userUid?: string) => {
       // Tracking fields for who last edited contentIds
       const trackingFields = {
         contentIdsLastEditedBy: userUid || null,
-        contentIdsLastEditedAt: Timestamp.now()
+        contentIdsLastEditedAt: Timestamp.now(),
+        updatedAt: serverTimestamp()
       }
 
       await updateDoc(canvasRef, { contentIds: newContentIds, ...trackingFields })

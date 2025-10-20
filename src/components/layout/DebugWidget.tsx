@@ -58,9 +58,17 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
   onToggleRTDB,
   enableGroupCaching = false,
   onToggleGroupCaching,
+  canvasWidth,
+  canvasHeight,
   lastEvent
 }) => {
   const { stagePosition, stageScale } = useCanvasStore()
+
+  // Calculate viewport dimensions in canvas coordinates
+  // When zoomed out, viewport shows more canvas units
+  // When zoomed in, viewport shows fewer canvas units
+  const viewportCanvasWidth = Math.round(canvasWidth / stageScale)
+  const viewportCanvasHeight = Math.round(canvasHeight / stageScale)
 
   // Calculate total shapes including nested items in groups
   const topLevelCount = content.length
@@ -75,7 +83,7 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
 
   return (
     <div className="text-xs">
-      <Accordion type="multiple" defaultValue={["canvas-state", "last-event", "debug-controls"]} className="w-full">
+      <Accordion type="multiple" defaultValue={["canvas-state"]} className="w-full">
         {/* Canvas State */}
         <AccordionItem value="canvas-state" className="border-b">
           <AccordionTrigger className="py-2 text-xs font-medium text-gray-700 hover:no-underline">
@@ -85,6 +93,7 @@ const DebugWidget: React.FC<DebugWidgetProps> = ({
             <div className="space-y-1 text-gray-600">
               <div>Position: ({Math.round(stagePosition.x)}, {Math.round(stagePosition.y)})</div>
               <div>Scale: {Math.round(stageScale * 100)}%</div>
+              <div>Viewport: {viewportCanvasWidth} × {viewportCanvasHeight} px</div>
               <div>FPS: {Math.round(fps)}</div>
             </div>
           </AccordionContent>

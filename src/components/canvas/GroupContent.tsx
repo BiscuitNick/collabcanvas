@@ -5,7 +5,7 @@ import type { GroupContent } from '../../types'
 import { isRectangleContent, isCircleContent, isTextContent, isImageContent } from '../../types'
 import { clamp } from '../../lib/utils'
 import { CANVAS_HALF, MIN_SHAPE_SIZE, MAX_SHAPE_SIZE } from '../../lib/constants'
-import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS, LOCK_INDICATOR_STROKE_WIDTH } from '../../lib/config'
+import { RECTANGLE_DRAG_THROTTLE_MS, RECTANGLE_DRAG_DEBOUNCE_MS } from '../../lib/config'
 
 interface LockInfo {
   userId: string
@@ -40,7 +40,7 @@ const GroupContentComponent: React.FC<GroupContentProps> = memo(({
   onDragStart,
   onDragEndCallback,
   currentUserId: _currentUserId,
-  selectedTool,
+  selectedTool: _selectedTool,
   canEdit = true,
   enableGroupCaching = false,
   isLockedByOther = false,
@@ -129,13 +129,6 @@ const GroupContentComponent: React.FC<GroupContentProps> = memo(({
   }, [enableGroupCaching, content.contentIds, content.contentData, content.width, content.height, content.scaleX, content.scaleY, content.rotation, content.id])
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    // Only allow selection with select, pan, or ai tools
-    const allowSelection = selectedTool === 'select' || selectedTool === 'pan' || selectedTool === 'ai' || selectedTool === null
-
-    if (!allowSelection) {
-      return
-    }
-
     // Prevent selection if locked by another user
     if (isLockedByOther) {
       e.cancelBubble = true
@@ -143,11 +136,14 @@ const GroupContentComponent: React.FC<GroupContentProps> = memo(({
       return
     }
 
-    // Prevent event from bubbling to stage for selection
+    // Always allow selection when clicking on existing content
+    // The shape handling hook will handle tool switching as needed
+
+    // Prevent event from bubbling to stage
     e.cancelBubble = true
     e.evt.stopPropagation()
 
-    // Call onSelect to show details in panel
+    // Call onSelect to trigger selection and potential tool switch
     onSelect()
   }
 
@@ -170,6 +166,13 @@ const GroupContentComponent: React.FC<GroupContentProps> = memo(({
       e.target.stopDrag()
       return
     }
+
+    // Set cursor to grabbing while dragging
+    const container = e.target.getStage()?.container()
+    if (container) {
+      container.style.cursor = 'grabbing'
+    }
+
     // Notify parent that dragging has started
     onDragStart()
   }
@@ -193,6 +196,12 @@ const GroupContentComponent: React.FC<GroupContentProps> = memo(({
     const halfHeight = content.height / 2
     const clampedX = clamp(groupX, -CANVAS_HALF + halfWidth, CANVAS_HALF - halfWidth)
     const clampedY = clamp(groupY, -CANVAS_HALF + halfHeight, CANVAS_HALF - halfHeight)
+
+    // Reset cursor after dragging ends
+    const container = e.target.getStage()?.container()
+    if (container) {
+      container.style.cursor = 'grab'
+    }
 
     // Update position in store (React will handle the re-render)
     onDragEnd(clampedX, clampedY)
@@ -353,7 +362,16 @@ const GroupContentComponent: React.FC<GroupContentProps> = memo(({
           try {
             const container = e.target.getStage()?.container()
             if (container) {
-              container.style.cursor = isLockedByOther ? 'not-allowed' : 'pointer'
+              // Show 'grab' cursor when hovering over selected content
+              // Show 'not-allowed' if locked by another user
+              // Otherwise show 'pointer'
+              if (isLockedByOther) {
+                container.style.cursor = 'not-allowed'
+              } else if (isSelected) {
+                container.style.cursor = 'grab'
+              } else {
+                container.style.cursor = 'pointer'
+              }
             }
           } catch {
             // Ignore errors in test environment
@@ -377,14 +395,48 @@ const GroupContentComponent: React.FC<GroupContentProps> = memo(({
           width={content.width}
           height={content.height}
           fill="transparent"
-          stroke={isLockedByOther ? '#FF0000' : (isSelected ? '#007AFF' : 'transparent')}
-          strokeWidth={isLockedByOther ? LOCK_INDICATOR_STROKE_WIDTH : (isSelected ? 2 : 0)}
+          stroke={isSelected ? '#007AFF' : 'transparent'}
+          strokeWidth={isSelected ? 2 : 0}
           listening={true}
         />
 
         {/* Render nested items in order (last item is on top) */}
         {content.contentIds.map(renderNestedItem)}
       </Group>
+
+      {/* Lock indicator - Centered tag with username and lock icon */}
+      {isLockedByOther && _lockInfo?.userName && (
+        <Group
+          x={content.x}
+          y={content.y}
+          offsetX={content.width / 2}
+          offsetY={content.height / 2}
+        >
+          {/* Background rounded rectangle */}
+          <Rect
+            x={content.width / 2 - 60}
+            y={content.height / 2 - 12}
+            width={120}
+            height={24}
+            fill="rgba(255, 68, 68, 0.95)"
+            cornerRadius={12}
+            shadowColor="black"
+            shadowBlur={6}
+            shadowOpacity={0.3}
+            shadowOffsetY={2}
+          />
+          {/* Lock icon and username text */}
+          <KonvaText
+            x={content.width / 2 - 55}
+            y={content.height / 2 - 8}
+            text={`🔒 ${_lockInfo.userName}`}
+            fontSize={13}
+            fill="white"
+            fontStyle="bold"
+            align="center"
+          />
+        </Group>
+      )}
 
       {isSelected && !isLockedByOther && canEdit && (
         <Transformer
